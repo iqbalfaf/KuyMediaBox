@@ -49,7 +49,7 @@ func TestFromRelease(t *testing.T) {
 	if !info.Available || info.Latest != "0.2.0" || !strings.HasSuffix(info.AssetName, "portable.exe") {
 		t.Fatalf("portable: %+v", info)
 	}
-	if info.Notes != "## What's Changed\n* Fitur baru" {
+	if info.Notes != "* Fitur baru" {
 		t.Fatalf("notes %q", info.Notes)
 	}
 	inst := fromRelease(release("v0.2.0"), "0.1.0", ModeInstaller)
@@ -64,6 +64,17 @@ func TestFromRelease(t *testing.T) {
 	pre.Prerelease = true
 	if fromRelease(pre, "0.1.0", ModePortable).Available {
 		t.Fatal("pre-releases must be ignored")
+	}
+}
+
+func TestCleanNotes(t *testing.T) {
+	workflow := "## Yang baru\n- Update otomatis\n- Perbaikan drop\n\n## Unduh\n- file\n\nCek `SHA256SUMS.txt`.\n\n**Full Changelog**: x"
+	if got := cleanNotes(workflow); got != "- Update otomatis\n- Perbaikan drop" {
+		t.Errorf("workflow notes: %q", got)
+	}
+	old := "## Unduh\n- **a.exe** — installer\n\nButuh Windows.\nCek keaslian file dengan `SHA256SUMS.txt`.\n\n**Full Changelog**: https://x/compare/v0.1.0...v0.1.1"
+	if got := cleanNotes(old); got != "**Full Changelog**: https://x/compare/v0.1.0...v0.1.1" {
+		t.Errorf("old release notes: %q", got)
 	}
 }
 

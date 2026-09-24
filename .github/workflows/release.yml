@@ -17,6 +17,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # riwayat & tag dibutuhkan untuk catatan rilis
 
       - uses: actions/setup-go@v7
         with:
@@ -80,18 +82,37 @@ jobs:
           name: KuyMediaBox-windows
           path: dist/*
 
+      - name: Susun catatan rilis
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          TAG="$GITHUB_REF_NAME"
+          PREV=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
+          if [ -n "$PREV" ]; then RANGE="$PREV..$TAG"; else RANGE="$TAG"; fi
+          CHANGES=$(git log "$RANGE" --no-merges --pretty=format:'- %s' | head -50)
+          [ -z "$CHANGES" ] && CHANGES="- Perbaikan dan peningkatan"
+          {
+            echo "## Yang baru"
+            echo "$CHANGES"
+            echo
+            echo "## Unduh"
+            echo "- **KuyMediaBox-$TAG-windows-x64-setup.exe**: installer (shortcut Desktop & Start Menu, bisa di-uninstall)"
+            echo "- **KuyMediaBox-$TAG-windows-x64-portable.exe**: langsung jalan tanpa instal"
+            echo "- **KuyMediaBox-$TAG-windows-x64-portable.zip**: versi portable dalam zip"
+            echo
+            echo "Butuh Windows 10/11 64-bit. Sudah memakai KuyMediaBox? Aplikasi akan menawarkan update ini secara otomatis."
+            echo "Cek keaslian file dengan SHA256SUMS.txt."
+            if [ -n "$PREV" ]; then
+              echo
+              echo "**Perubahan lengkap**: https://github.com/$GITHUB_REPOSITORY/compare/$PREV...$TAG"
+            fi
+          } > release-notes.md
+          cat release-notes.md
+
       - name: Terbitkan GitHub Release
         if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v3
         with:
           name: KuyMediaBox ${{ github.ref_name }}
           files: dist/*
-          generate_release_notes: true
-          body: |
-            ## Unduh
-            - **KuyMediaBox-${{ github.ref_name }}-windows-x64-setup.exe** — installer (shortcut Desktop & Start Menu, bisa di-uninstall)
-            - **KuyMediaBox-${{ github.ref_name }}-windows-x64-portable.exe** — langsung jalan tanpa instal
-            - **…-portable.zip** — versi portable dalam zip
-
-            Butuh Windows 10/11 64-bit. Saat pertama dibuka, buka **Pengaturan › Tools pendukung** lalu klik **Unduh** untuk FFmpeg, yt-dlp, dan spotDL.
-            Cek keaslian file dengan `SHA256SUMS.txt`.
+          body_path: release-notes.md

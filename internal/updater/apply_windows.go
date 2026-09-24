@@ -11,10 +11,9 @@ import (
 	"syscall"
 )
 
-const (
-	createNoWindow  = 0x08000000
-	detachedProcess = 0x00000008
-)
+// createNoWindow hides the helper's console. Do NOT add DETACHED_PROCESS: PowerShell started
+// without a console exits immediately without running the script (verified on Windows 10).
+const createNoWindow = 0x08000000
 
 // psQuote quotes a string for a single-quoted PowerShell literal.
 func psQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
@@ -52,7 +51,7 @@ func Apply(downloaded, mode string) error {
 		return errors.New("mode update tidak dikenal")
 	}
 	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command", script)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow | detachedProcess}
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
 	if err := cmd.Start(); err != nil {
 		if mode == ModePortable { // roll back so the app keeps working
 			_ = os.Rename(exe, downloaded)

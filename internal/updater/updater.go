@@ -118,15 +118,48 @@ func fromRelease(rel ghRelease, current, mode string) Info {
 	return info
 }
 
-// cleanNotes drops the static download instructions the release workflow prepends.
+// cleanNotes keeps only the "what changed" part of a release body: the "## Yang baru"
+// section written by the release workflow (or GitHub's "## What's Changed"), without the
+// static download instructions.
 func cleanNotes(body string) string {
 	body = strings.ReplaceAll(body, "\r\n", "\n")
-	if i := strings.Index(body, "## What's Changed"); i >= 0 {
-		body = body[i:]
-	} else if strings.HasPrefix(strings.TrimSpace(body), "## Unduh") {
-		if i := strings.Index(body, "\n## "); i > 0 && !strings.HasPrefix(body[i+1:], "## Unduh") {
-			body = body[i+1:]
+	section := func(title string) (string, bool) {
+		i := strings.Index(body, title)
+		if i < 0 {
+			return "", false
 		}
+		rest := body[i+len(title):]
+		if j := strings.Index(rest, "\n## "); j >= 0 {
+			rest = rest[:j]
+		}
+		return strings.TrimSpace(rest), true
+	}
+	if s, ok := section("## Yang baru"); ok {
+		body = s
+	} else if s, ok := section("## What's Changed"); ok {
+		body = s
+	} else {
+		// Older releases: drop the "## Unduh" block (up to the SHA256SUMS line).
+		var kept []string
+		skipping := false
+		for _, line := range strings.Split(body, "\n") {
+			if strings.HasPrefix(line, "## Unduh") {
+				skipping = true
+				continue
+			}
+			if skipping {
+				if strings.HasPrefix(line, "## ") {
+					skipping = false
+				} else {
+					if strings.Contains(line, "SHA256SUMS") {
+						skipping = false
+					}
+					continue
+				}
+			}
+			kept = append(kept, line)
+		}
+		body = strings.Join(kept, "\n")
 	}
 	body = strings.TrimSpace(body)
 	if r := []rune(body); len(r) > 4000 {
