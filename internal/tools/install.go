@@ -41,6 +41,11 @@ func latestRelease(ctx context.Context, repo string) (*ghRelease, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		// Without login the API allows 60 requests an hour per IP; the release page redirect
+		// has no such limit and still tells the newest tag.
+		if tag, terr := latestTag(ctx, repo); terr == nil {
+			return &ghRelease{TagName: tag}, nil
+		}
 		return nil, fmt.Errorf(i18n.L("GitHub menjawab %s", "GitHub replied %s"), resp.Status)
 	}
 	var rel ghRelease
@@ -48,6 +53,28 @@ func latestRelease(ctx context.Context, repo string) (*ghRelease, error) {
 		return nil, err
 	}
 	return &rel, nil
+}
+
+var noRedirect = &http.Client{
+	Timeout:       20 * time.Second,
+	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+}
+
+// latestTag reads the newest release tag from the github.com/<repo>/releases/latest redirect.
+func latestTag(ctx context.Context, repo string) (string, error) {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://github.com/"+repo+"/releases/latest", nil)
+	req.Header.Set("User-Agent", userAgent)
+	resp, err := noRedirect.Do(req)
+	if err != nil {
+		return "", err
+	}
+	resp.Body.Close()
+	loc := resp.Header.Get("Location")
+	i := strings.LastIndex(loc, "/tag/")
+	if resp.StatusCode/100 != 3 || i < 0 {
+		return "", fmt.Errorf("no release redirect (%s)", resp.Status)
+	}
+	return loc[i+len("/tag/"):], nil
 }
 
 // gallery-dl publishes its Windows builds on Codeberg (the GitHub repository has no assets).
@@ -172,6 +199,12 @@ func (m *Manager) install(ctx context.Context, id string) error {
 			if strings.HasSuffix(strings.ToLower(a.Name), "win32.exe") {
 				return downloadFile(ctx, a.URL, filepath.Join(dir, "spotdl.exe"), progress)
 			}
+		}
+		if len(rel.Assets) == 0 && rel.TagName != "" {
+			// Only the tag is known (API limit reached): use spotDL's usual file name.
+			v := strings.TrimPrefix(rel.TagName, "v")
+			url := fmt.Sprintf("https://github.com/spotDL/spotify-downloader/releases/download/%s/spotdl-%s-win32.exe", rel.TagName, v)
+			return downloadFile(ctx, url, filepath.Join(dir, "spotdl.exe"), progress)
 		}
 		return errors.New(i18n.L("file spotDL untuk Windows tidak ditemukan di rilis terbaru", "spotDL for Windows not found in the latest release"))
 	case LibreOffice:

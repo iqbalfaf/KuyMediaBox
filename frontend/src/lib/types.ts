@@ -174,8 +174,8 @@ export interface DownloadOptions {
   mode: 'video' | 'audio'
   quality: 'best' | '1080' | '720' | '480'
   container: 'mp4' | 'mkv'
-  audioFormat: 'mp3' | 'm4a' | 'opus' | 'flac'
-  audioQuality: 'auto' | '192' | '320'
+  audioFormat: 'mp3' | 'm4a' | 'opus' | 'flac' | 'wav'
+  audioQuality: 'auto' | '96' | '128' | '160' | '192' | '256' | '320'
   embed: boolean
   skipExisting: boolean
   numbering: boolean

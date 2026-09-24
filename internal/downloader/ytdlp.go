@@ -280,8 +280,8 @@ func (e Env) ytArgs(job ytJob) []string {
 		"-o", job.Template+".%(ext)s",
 	)
 	if o.Mode == "audio" {
-		q := "0"
-		if o.AudioQuality == "192" || o.AudioQuality == "320" {
+		q := "0" // best VBR
+		if o.AudioQuality != "" && o.AudioQuality != "auto" {
 			q = o.AudioQuality + "K"
 		}
 		args = append(args, "-f", "ba/b", "-x", "--audio-format", o.AudioFormat, "--audio-quality", q)
@@ -297,7 +297,11 @@ func (e Env) ytArgs(job ytJob) []string {
 		}
 	}
 	if o.Embed && !job.NoEmbed {
-		args = append(args, "--embed-metadata", "--embed-thumbnail", "--convert-thumbnails", "jpg")
+		args = append(args, "--embed-metadata")
+		// WAV can't hold a cover picture; yt-dlp would fail the download trying.
+		if o.Mode != "audio" || o.AudioFormat != "wav" {
+			args = append(args, "--embed-thumbnail", "--convert-thumbnails", "jpg")
+		}
 	}
 	if job.Archive && e.ArchivePath != "" {
 		args = append(args, "--download-archive", e.ArchivePath)

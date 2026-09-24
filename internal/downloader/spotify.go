@@ -312,7 +312,7 @@ func tagAudio(ctx context.Context, ffmpegPath, in, cover, out string, s spotifyS
 		return queue.Fail(i18n.L("FFmpeg belum terpasang", "FFmpeg is not installed"), "")
 	}
 	args := []string{"-i", in}
-	withCover := cover != "" && format != "opus"
+	withCover := cover != "" && format != "opus" && format != "wav" // WAV has no picture tag
 	if withCover {
 		args = append(args, "-i", cover, "-map", "0:a:0", "-map", "1:v:0", "-c:v", "mjpeg", "-disposition:v:0", "attached_pic")
 	} else {

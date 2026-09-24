@@ -57,8 +57,8 @@ type Options struct {
 	Mode         string `json:"mode"`         // video | audio
 	Quality      string `json:"quality"`      // best | 1080 | 720 | 480
 	Container    string `json:"container"`    // mp4 | mkv
-	AudioFormat  string `json:"audioFormat"`  // mp3 | m4a | opus | flac
-	AudioQuality string `json:"audioQuality"` // auto | 192 | 320 (Spotify)
+	AudioFormat  string `json:"audioFormat"`  // mp3 | m4a | opus | flac | wav
+	AudioQuality string `json:"audioQuality"` // auto (best VBR) or a bitrate in kbps: 96 128 160 192 256 320
 	Embed        bool   `json:"embed"`
 	SkipExisting bool   `json:"skipExisting"`
 	Numbering    bool   `json:"numbering"`   // prefix list position
@@ -82,7 +82,7 @@ func (o *Options) Normalize(source string) {
 		o.Container = "mp4"
 	}
 	switch o.AudioFormat {
-	case "mp3", "m4a", "opus", "flac":
+	case "mp3", "m4a", "opus", "flac", "wav":
 	default:
 		o.AudioFormat = "mp3"
 	}
@@ -93,8 +93,12 @@ func (o *Options) Normalize(source string) {
 		o.ImageFormat = "original"
 	}
 	switch o.AudioQuality {
-	case "auto", "192", "320":
+	case "auto", "96", "128", "160", "192", "256", "320":
 	default:
+		o.AudioQuality = "auto"
+	}
+	// Lossless formats have no bitrate to choose.
+	if o.AudioFormat == "flac" || o.AudioFormat == "wav" {
 		o.AudioQuality = "auto"
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"os"
@@ -65,8 +66,14 @@ type ghRelease struct {
 
 var client = &http.Client{}
 
-// APIBase can be overridden in tests.
-var APIBase = "https://api.github.com"
+// APIBase and WebBase can be overridden in tests.
+var (
+	APIBase = "https://api.github.com"
+	WebBase = "https://github.com"
+)
+
+// noRedirect reads a redirect's Location instead of following it.
+var noRedirect = &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 
 // Check asks GitHub for the latest release and compares it with current.
 func Check(ctx context.Context, current string) (Info, error) {
@@ -84,6 +91,11 @@ func Check(ctx context.Context, current string) (Info, error) {
 		return Info{Current: current}, errors.New(i18n.L("belum ada rilis yang diterbitkan", "no release has been published yet"))
 	}
 	if resp.StatusCode != http.StatusOK {
+		// The API allows only 60 requests an hour per IP without login (shared by everyone
+		// behind the same router). The release pages have no such limit, so fall back to them.
+		if info, err := checkWeb(ctx, current, detectMode()); err == nil {
+			return info, nil
+		}
 		return Info{Current: current}, fmt.Errorf(i18n.L("GitHub menjawab %s, coba lagi nanti", "GitHub replied %s, try again later"), resp.Status)
 	}
 	var rel ghRelease
@@ -118,6 +130,103 @@ func fromRelease(rel ghRelease, current, mode string) Info {
 	}
 	info.Available = !rel.Draft && !rel.Prerelease && info.assetURL != "" && Compare(latest, current) > 0
 	return info
+}
+
+// checkWeb reads the latest release without the API: the tag from the /releases/latest
+// redirect, the notes from the releases feed, and the files from their fixed download URLs.
+func checkWeb(ctx context.Context, current, mode string) (Info, error) {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, WebBase+"/"+Repo+"/releases/latest", nil)
+	req.Header.Set("User-Agent", "KuyMediaBox/"+current)
+	resp, err := noRedirect.Do(req)
+	if err != nil {
+		return Info{}, err
+	}
+	resp.Body.Close()
+	loc := resp.Header.Get("Location")
+	i := strings.LastIndex(loc, "/tag/")
+	if resp.StatusCode/100 != 3 || i < 0 {
+		return Info{}, fmt.Errorf("no release redirect (%s)", resp.Status)
+	}
+	tag := loc[i+len("/tag/"):]
+	rel := ghRelease{TagName: tag, HTMLURL: WebBase + "/" + Repo + "/releases/tag/" + tag}
+	rel.Body, rel.PublishedAt = feedEntry(ctx, tag)
+	dl := WebBase + "/" + Repo + "/releases/download/" + tag + "/"
+	for _, kind := range []string{"portable.exe", "setup.exe"} {
+		name := fmt.Sprintf("KuyMediaBox-%s-windows-x64-%s", tag, kind)
+		if size, ok := remoteSize(ctx, dl+name); ok {
+			rel.Assets = append(rel.Assets, ghAsset{Name: name, URL: dl + name, Size: size})
+		}
+	}
+	rel.Assets = append(rel.Assets, ghAsset{Name: "SHA256SUMS.txt", URL: dl + "SHA256SUMS.txt"})
+	return fromRelease(rel, current, mode), nil
+}
+
+// remoteSize checks that a download exists and returns its size.
+func remoteSize(ctx context.Context, url string) (int64, bool) {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
+	req.Header.Set("User-Agent", "KuyMediaBox")
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, false
+	}
+	resp.Body.Close()
+	return max(resp.ContentLength, 0), resp.StatusCode == http.StatusOK
+}
+
+var (
+	reEntry   = regexp.MustCompile(`(?s)<entry>.*?</entry>`)
+	reContent = regexp.MustCompile(`(?s)<content[^>]*>(.*?)</content>`)
+	reUpdated = regexp.MustCompile(`<updated>([^<]+)</updated>`)
+	reHeading = regexp.MustCompile(`(?is)<h2[^>]*>(.*?)</h2>`)
+	reItem    = regexp.MustCompile(`(?is)<li[^>]*>(.*?)</li>`)
+	reTag     = regexp.MustCompile(`<[^>]+>`)
+)
+
+// feedEntry returns the release notes (as markdown) and date of tag from the Atom feed.
+func feedEntry(ctx context.Context, tag string) (notes, published string) {
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, WebBase+"/"+Repo+"/releases.atom", nil)
+	req.Header.Set("User-Agent", "KuyMediaBox")
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", ""
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return "", ""
+	}
+	for _, e := range reEntry.FindAllString(string(data), -1) {
+		if !strings.Contains(e, "/tag/"+tag+"\"") {
+			continue
+		}
+		if m := reUpdated.FindStringSubmatch(e); m != nil {
+			published = m[1]
+		}
+		m := reContent.FindStringSubmatch(e)
+		if m == nil {
+			return "", published
+		}
+		return feedNotes(html.UnescapeString(m[1])), published
+	}
+	return "", ""
+}
+
+// feedNotes turns the release HTML into markdown sections ("## title" and "- item").
+func feedNotes(h string) string {
+	text := func(s string) string { return strings.TrimSpace(html.UnescapeString(reTag.ReplaceAllString(s, ""))) }
+	var out []string
+	heads := reHeading.FindAllStringSubmatchIndex(h, -1)
+	for k, m := range heads {
+		end := len(h)
+		if k+1 < len(heads) {
+			end = heads[k+1][0]
+		}
+		out = append(out, "## "+text(h[m[2]:m[3]]))
+		for _, li := range reItem.FindAllStringSubmatch(h[m[1]:end], -1) {
+			out = append(out, "- "+text(li[1]))
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 // cleanNotes keeps only the "what changed" part of a release body: the "## Yang baru"

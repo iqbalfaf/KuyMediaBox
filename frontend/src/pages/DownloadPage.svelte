@@ -5,6 +5,7 @@
   import Segmented from '../components/Segmented.svelte'
   import Switch from '../components/Switch.svelte'
   import RunFooter from '../components/RunFooter.svelte'
+  import AudioDownloadOptions from '../components/AudioDownloadOptions.svelte'
   import ToolBanner from '../components/ToolBanner.svelte'
   import Icon from '../components/Icon.svelte'
   import OutputPicker from '../components/OutputPicker.svelte'
@@ -418,15 +419,7 @@
             <Icon name="info" size={16} />
             <span>{L('Spotify selalu diunduh sebagai audio. Lagunya dicocokkan dari YouTube, lalu diberi judul, artis, album & cover dari Spotify.', 'Spotify is always downloaded as audio. Songs are matched on YouTube, then tagged with the title, artist, album & cover from Spotify.')}</span>
           </div>
-          <div class="sec">
-            <span class="label">{L('Format audio', 'Audio format')}</span>
-            <Chips bind:value={opts.audioFormat} columns={3} onchange={optsChanged} options={[{ value: 'mp3', label: 'MP3' }, { value: 'm4a', label: 'M4A' }, { value: 'opus', label: 'OPUS' }]} />
-          </div>
-          <div class="sec">
-            <span class="label">{L('Kualitas', 'Quality')}</span>
-            <Segmented label={L('Kualitas', 'Quality')} bind:value={opts.audioQuality} onchange={optsChanged} options={[{ value: 'auto', label: L('Otomatis', 'Auto') }, { value: '192', label: '192 kbps' }, { value: '320', label: '320 kbps' }]} />
-            <p class="hint">{L('Otomatis mengikuti kualitas sumber — angka lebih tinggi tidak membuat suara lebih bagus.', 'Auto follows the source quality — a higher number does not make it sound better.')}</p>
-          </div>
+          <AudioDownloadOptions {opts} spotify label={L('Format audio', 'Audio format')} onchange={optsChanged} />
           {#if hasList}
             <Switch bind:checked={opts.numbering} onchange={optsChanged} label={L('Nomor urut di nama file', 'Track numbers in file names')} hint={L('Urutan sama seperti di Spotify', 'Same order as on Spotify')} />
           {/if}
@@ -454,16 +447,10 @@
                 <Chips bind:value={opts.container} columns={2} onchange={optsChanged} options={[{ value: 'mp4', label: 'MP4' }, { value: 'mkv', label: 'MKV' }]} />
               </div>
             {:else}
-              <div class="sec">
-                <span class="label">{L('Format audio', 'Audio format')}</span>
-                <Chips bind:value={opts.audioFormat} columns={4} small onchange={optsChanged} options={[{ value: 'mp3', label: 'MP3' }, { value: 'm4a', label: 'M4A' }, { value: 'opus', label: 'OPUS' }, { value: 'flac', label: 'FLAC' }]} />
-              </div>
+              <AudioDownloadOptions {opts} label={L('Format audio', 'Audio format')} onchange={optsChanged} />
             {/if}
           {:else if kinds.audio}
-            <div class="sec">
-              <span class="label">{L('Format musik', 'Sound format')}</span>
-              <Chips bind:value={opts.audioFormat} columns={4} small onchange={optsChanged} options={[{ value: 'mp3', label: 'MP3' }, { value: 'm4a', label: 'M4A' }, { value: 'opus', label: 'OPUS' }, { value: 'flac', label: 'FLAC' }]} />
-            </div>
+            <AudioDownloadOptions {opts} label={L('Format musik', 'Sound format')} onchange={optsChanged} />
           {/if}
 
           {#if !social || kinds.video || kinds.audio}
