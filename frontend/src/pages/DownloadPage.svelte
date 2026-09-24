@@ -11,8 +11,8 @@
   import { api, errText, runtime } from '../lib/api'
   import { hasTool, settings, showDetail, toast } from '../lib/stores/app.svelte'
   import {
-    activeRow, addLinks, analyze, applyRange, applyScope, cancelAll, dl, pendingCount, rememberOpts, removeRow,
-    runningCount, selectable, selectedEntries, setAll, startAll, tabLabel, toQueue, typeLabel, visible,
+    activeRow, addLinks, analyze, applyRange, applyScope, cancelAll, dl, isSocial, kindSummary, pendingCount, rememberOpts, removeRow,
+    runningCount, selectable, selectedEntries, setAll, sourceClass, sourceName, startAll, tabLabel, toQueue, typeLabel, visible,
     type LinkRow,
   } from '../lib/stores/download.svelte'
   import { isActive, tasks } from '../lib/stores/tasks.svelte'
@@ -25,7 +25,21 @@
   const selectableCount = $derived(row ? entries.filter((e) => selectable(e, row)).length : 0)
   const archivedCount = $derived(row && row.opts.skipExisting ? entries.filter((e) => e.archived).length : 0)
   const hasSpotify = $derived(dl.rows.some((r) => r.link.source === 'spotify'))
-  const toolIds = $derived(hasSpotify ? ['ytdlp', 'ffmpeg', 'jsruntime', 'spotdl'] : ['ytdlp', 'ffmpeg', 'jsruntime'])
+  // gallery-dl only matters for TikTok/Facebook photo posts.
+  const needsGallery = $derived(
+    dl.rows.some((r) => (r.link.photo && (r.link.source === 'tiktok' || r.link.source === 'facebook')) || r.error.includes('gallery-dl')),
+  )
+  const toolIds = $derived([
+    'ytdlp', 'ffmpeg', 'jsruntime',
+    ...(hasSpotify ? ['spotdl'] : []),
+    ...(needsGallery ? ['gallerydl'] : []),
+  ])
+  const social = $derived(!!row?.col && isSocial(row.col.source))
+  const kinds = $derived.by(() => {
+    const k = { video: false, audio: false, image: false }
+    for (const e of entries) k[e.kind === 'image' ? 'image' : e.kind === 'audio' ? 'audio' : 'video'] = true
+    return k
+  })
   const pending = $derived(pendingCount())
   const running = $derived(runningCount() > 0)
   const missingTools = $derived(!hasTool('ytdlp') || !hasTool('ffmpeg') || (hasSpotify && !hasTool('spotdl')))
@@ -70,7 +84,16 @@
     const noun = col.source === 'spotify' ? L('lagu', n === 1 ? 'track' : 'tracks') : L('video', n === 1 ? 'video' : 'videos')
     if (col.type === 'video' || col.type === 'track') return typeLabel[col.type]
     if (col.type === 'channel') return `Channel · ${n} ${L('konten', 'items')}`
+    if (col.type === 'post') return n > 1 ? `Post · ${n} item${L('', 's')}` : entryKindLabel(col.entries[0])
+    if (col.type === 'profile') return `${typeLabel.profile} · ${n} video${L('', n === 1 ? '' : 's')}`
     return `${typeLabel[col.type] ?? 'Link'} · ${n} ${noun}`
+  }
+
+  function entryKindLabel(e: Entry | undefined): string {
+    if (!e) return 'Post'
+    if (e.kind === 'image') return L('Foto', 'Photo')
+    if (e.kind === 'audio') return L('Musik', 'Sound')
+    return 'Video'
   }
 
   function shortUrl(u: string) {
@@ -111,7 +134,10 @@
 
   /** Where this link's files land, relative to the Download folder. */
   function destLabel(col: Collection, dir: string): string {
-    const sub = settings.value?.downloadSubfolders && (col.type === 'playlist' || col.type === 'channel' || col.type === 'album')
+    // Mirrors collectionDir in app_download.go.
+    const sub =
+      settings.value?.downloadSubfolders &&
+      (['playlist', 'channel', 'album', 'profile'].includes(col.type) || (col.type === 'post' && col.entries.length > 1))
     if (!sub) return L('Langsung ke folder download', 'Straight into the download folder')
     const name = dir.split(/[\\/]/).pop() ?? ''
     return `${L('Subfolder', 'Subfolder')}: ${name}`
@@ -123,7 +149,7 @@
       if (r.status !== 'ready' || !r.col) continue
       const n = toQueue(r).length
       if (!n) continue
-      const what = r.col.source === 'spotify' ? L(`lagu ${r.col.type === 'album' ? 'album' : 'Spotify'}`, `${r.col.type === 'album' ? 'album' : 'Spotify'} ${n === 1 ? 'track' : 'tracks'}`) : r.col.type === 'channel' ? 'channel' : r.col.type === 'playlist' ? 'playlist' : L('video', n === 1 ? 'video' : 'videos')
+      const what = isSocial(r.col.source) ? `item ${sourceName[r.col.source]}` : r.col.source === 'spotify' ? L(`lagu ${r.col.type === 'album' ? 'album' : 'Spotify'}`, `${r.col.type === 'album' ? 'album' : 'Spotify'} ${n === 1 ? 'track' : 'tracks'}`) : r.col.type === 'channel' ? 'channel' : r.col.type === 'playlist' ? 'playlist' : L('video', n === 1 ? 'video' : 'videos')
       parts.push(`${n} ${what}`)
     }
     return parts.join(' + ')
@@ -146,7 +172,7 @@
   const totalDur = $derived(entries.reduce((s, e) => s + (e.duration || 0), 0))
 </script>
 
-<PageHeader title={L('Download YouTube & Spotify', 'YouTube & Spotify Downloader')} subtitle={L('Video, playlist, channel, lagu, album — tempel link-nya, jenisnya terdeteksi otomatis.', 'Videos, playlists, channels, tracks, albums — paste the link and the type is detected automatically.')} />
+<PageHeader title="Download" subtitle={L('YouTube, TikTok, Instagram, Facebook & Spotify — tempel link-nya, jenisnya terdeteksi otomatis.', 'YouTube, TikTok, Instagram, Facebook & Spotify — paste the link and the type is detected automatically.')} />
 <ToolBanner ids={toolIds} why={L('Dibutuhkan untuk membaca link dan mengunduh. Sekali pasang, dipakai seterusnya.', 'Needed to read links and download. Install once, use forever.')} />
 
 <div class="body">
@@ -155,7 +181,7 @@
       <form class="input-row" onsubmit={(e) => { e.preventDefault(); submit() }}>
         <div class="input-wrap">
           <span class="lic"><Icon name="link" /></span>
-          <input class="url" aria-label={L('Link YouTube atau Spotify', 'YouTube or Spotify link')} placeholder={L('Tempel link video, playlist, channel, lagu, atau album…', 'Paste a video, playlist, channel, track or album link…')} bind:value={dl.input} />
+          <input class="url" aria-label={L('Link yang akan diunduh', 'Link to download')} placeholder={L('Tempel link YouTube, TikTok, Instagram, Facebook, atau Spotify…', 'Paste a YouTube, TikTok, Instagram, Facebook or Spotify link…')} bind:value={dl.input} />
         </div>
         <button type="button" class="btn tall" onclick={paste}><Icon name="clipboard" size={16} />{L('Tempel', 'Paste')}</button>
         <button type="submit" class="btn-accent tall" disabled={!dl.input.trim()}>{L('Periksa link', 'Check link')}</button>
@@ -165,8 +191,8 @@
         <div class="link-list">
           {#each dl.rows as r (r.id)}
             <div class="link-row">
-              <span class="badge {r.link.source === 'spotify' ? 'sp' : 'yt'}">
-                <Icon name={r.link.source === 'spotify' ? 'music' : 'play'} size={10} stroke={3} />{r.link.source === 'spotify' ? 'Spotify' : r.link.source === 'youtube' ? 'YouTube' : 'Web'}
+              <span class="badge {sourceClass[r.link.source] ?? 'yt'}">
+                <Icon name={r.link.source === 'spotify' ? 'music' : r.link.source === 'instagram' ? 'image' : 'play'} size={10} stroke={3} />{sourceName[r.link.source] ?? 'Web'}
               </span>
               <span class="ltype">{countLabel(r)}</span>
               <span class="lurl ellipsis" title={r.link.url}>{shortUrl(r.link.url)}</span>
@@ -194,13 +220,16 @@
           <div class="examples">
             <div><span class="badge yt"><Icon name="play" size={10} stroke={3} />YouTube</span> {L('video · Shorts · playlist · channel (@nama)', 'videos · Shorts · playlists · channels (@name)')}</div>
             <div><span class="badge sp"><Icon name="music" size={10} stroke={3} />Spotify</span> {L('lagu · album · playlist', 'tracks · albums · playlists')}</div>
+            <div><span class="badge tt"><Icon name="play" size={10} stroke={3} />TikTok</span> {L('video · foto slide + musik · profil', 'videos · photo slides + sound · profiles')}</div>
+            <div><span class="badge ig"><Icon name="image" size={10} stroke={3} />Instagram</span> {L('reel · post foto & video · carousel', 'reels · photo & video posts · carousels')}</div>
+            <div><span class="badge fb"><Icon name="play" size={10} stroke={3} />Facebook</span> {L('video · reel · foto', 'videos · reels · photos')}</div>
           </div>
         </div>
       {:else}
         <div class="tabs" role="tablist" aria-label={L('Link yang dibaca', 'Checked links')}>
           {#each dl.rows as r (r.id)}
             <button role="tab" aria-selected={row?.id === r.id} class:on={row?.id === r.id} onclick={() => (dl.active = r.id)}>
-              <span class="dot" class:sp={r.link.source === 'spotify'}></span>{tabText(r)}
+              <span class="dot {sourceClass[r.link.source] ?? 'yt'}"></span>{tabText(r)}
             </button>
           {/each}
         </div>
@@ -220,7 +249,7 @@
               {@const t = tile(col.title)}
               <div class="avatar" style="background: {t.bg}; color: {t.fg}">{initials(col.title)}</div>
             {:else if col.thumbnail}
-              <img class="cover" class:sq={col.source === 'spotify'} src={col.thumbnail} alt="" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = 'hidden')} />
+              <img class="cover" class:sq={col.source === 'spotify' || social} src={col.thumbnail} alt="" referrerpolicy="no-referrer" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = 'hidden')} />
             {:else}
               <div class="cover blank"><Icon name={col.source === 'spotify' ? 'music' : 'play'} /></div>
             {/if}
@@ -229,6 +258,8 @@
               <span class="ch-sub ellipsis">
                 {#if col.type === 'channel'}
                   {L('Channel YouTube', 'YouTube channel')}{col.subtitle ? ` · ${col.subtitle}` : ''} · {col.entries.length} {L('konten', 'items')} ({Object.entries(col.tabCounts ?? {}).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${tabLabel[k] ?? k}`).join(' · ')})
+                {:else if social}
+                  {sourceName[col.source]} {col.type === 'profile' ? typeLabel.profile.toLowerCase() : 'post'}{col.subtitle ? ` · ${col.subtitle}` : ''}{col.type === 'post' ? ` · ${kindSummary(entries)}` : ` · ${entries.length} video${L('', entries.length === 1 ? '' : 's')}`}
                 {:else}
                   {col.source === 'spotify' ? L(`${typeLabel[col.type]} Spotify`, `Spotify ${typeLabel[col.type].toLowerCase()}`) : L(`${typeLabel[col.type]} YouTube`, `YouTube ${typeLabel[col.type].toLowerCase()}`)}{col.subtitle ? ` · ${col.subtitle}` : ''}{entries.length > 1 ? ` · ${entries.length} ${col.source === 'spotify' ? L('lagu', 'tracks') : L('video', 'videos')}` : ''}{totalDur ? ` · ± ${longDuration(totalDur)}` : ''}
                 {/if}
@@ -264,7 +295,7 @@
                 <input type="checkbox" aria-label={L(`Pilih ${e.title}`, `Select ${e.title}`)} checked={!!row.selected[e.id] && can} disabled={!can} onchange={() => toggle(row, e)} />
                 <span class="idx">{String(e.index).padStart(2, '0')}</span>
                 {#if e.thumbnail}
-                  <img class="th" class:sq={col.source === 'spotify'} src={e.thumbnail} alt="" loading="lazy" onerror={(ev) => ((ev.currentTarget as HTMLImageElement).style.visibility = 'hidden')} />
+                  <img class="th" class:sq={col.source === 'spotify' || e.kind === 'image'} src={e.thumbnail} alt="" loading="lazy" referrerpolicy="no-referrer" onerror={(ev) => ((ev.currentTarget as HTMLImageElement).style.visibility = 'hidden')} />
                 {:else}
                   {@const tt = tile(e.title)}
                   <div class="th" class:sq={col.source === 'spotify'} style="background: {tt.bg}"></div>
@@ -277,6 +308,8 @@
                     <span class="esub ellipsis">{e.artist}{e.album ? ` · ${e.album}` : ''}</span>
                   {:else if e.unavailable}
                     <span class="esub">{L('Tidak tersedia (privat/dihapus)', 'Unavailable (private/deleted)')}</span>
+                  {:else if social && col.entries.length > 1}
+                    <span class="esub kind"><Icon name={e.kind === 'image' ? 'image' : e.kind === 'audio' ? 'music' : 'video'} size={12} />{entryKindLabel(e)}</span>
                   {/if}
                 </div>
                 <div class="eright">
@@ -320,7 +353,7 @@
       {@const col = row.col}
       <div class="ph">
         <span class="ph-k">{L('PENGATURAN UNTUK', 'SETTINGS FOR')}</span>
-        <span class="ph-v ellipsis" title={col.title}>{col.type === 'channel' ? `Channel ${col.subtitle || col.title}` : L(`${typeLabel[col.type]} ${col.source === 'spotify' ? 'Spotify' : 'YouTube'}`, `${col.source === 'spotify' ? 'Spotify' : 'YouTube'} ${typeLabel[col.type].toLowerCase()}`)}</span>
+        <span class="ph-v ellipsis" title={col.title}>{social ? `${sourceName[col.source]} · ${col.subtitle || col.title}` : col.type === 'channel' ? `Channel ${col.subtitle || col.title}` : L(`${typeLabel[col.type]} ${col.source === 'spotify' ? 'Spotify' : 'YouTube'}`, `${col.source === 'spotify' ? 'Spotify' : 'YouTube'} ${typeLabel[col.type].toLowerCase()}`)}</span>
       </div>
       <div class="scroll">
         {#if col.source === 'spotify'}
@@ -368,6 +401,15 @@
             </div>
           {/if}
 
+          {#if social && kinds.image}
+            <div class="sec">
+              <span class="label">{L('Format foto', 'Photo format')}</span>
+              <Segmented label={L('Format foto', 'Photo format')} bind:value={row.opts.imageFormat} onchange={() => optsChanged(row)} options={[{ value: 'original', label: L('Asli', 'Original') }, { value: 'jpg', label: 'JPG' }]} />
+              <p class="hint">{row.opts.imageFormat === 'jpg' ? L('WEBP/PNG/HEIC diubah ke JPG agar bisa dibuka di mana saja.', 'WEBP/PNG/HEIC are converted to JPG so they open anywhere.') : L('Foto disimpan apa adanya dari sumbernya.', 'Photos are saved exactly as the source provides them.')}</p>
+            </div>
+          {/if}
+
+          {#if !social || kinds.video}
           <div class="sec">
             <span class="label">{L('Unduh sebagai', 'Download as')}</span>
             <Segmented label={L('Unduh sebagai', 'Download as')} bind:value={row.opts.mode} onchange={() => optsChanged(row)} options={[{ value: 'video', label: 'Video', icon: 'video' }, { value: 'audio', label: 'Audio', icon: 'music' }]} />
@@ -388,8 +430,16 @@
               <Chips bind:value={row.opts.audioFormat} columns={4} small onchange={() => optsChanged(row)} options={[{ value: 'mp3', label: 'MP3' }, { value: 'm4a', label: 'M4A' }, { value: 'opus', label: 'OPUS' }, { value: 'flac', label: 'FLAC' }]} />
             </div>
           {/if}
+          {:else if kinds.audio}
+            <div class="sec">
+              <span class="label">{L('Format musik', 'Sound format')}</span>
+              <Chips bind:value={row.opts.audioFormat} columns={4} small onchange={() => optsChanged(row)} options={[{ value: 'mp3', label: 'MP3' }, { value: 'm4a', label: 'M4A' }, { value: 'opus', label: 'OPUS' }, { value: 'flac', label: 'FLAC' }]} />
+            </div>
+          {/if}
 
+          {#if !social || kinds.video || kinds.audio}
           <Switch bind:checked={row.opts.embed} onchange={() => optsChanged(row)} label={L('Sematkan info & thumbnail', 'Embed info & thumbnail')} hint={L('Judul, channel, dan gambar sampul', 'Title, channel and cover image')} />
+          {/if}
           <Switch bind:checked={row.opts.skipExisting} onchange={() => skipChanged(row)} label={L('Lewati yang sudah ada', 'Skip existing')} hint={L('Unduh ulang hanya ambil yang baru', 'Downloading again only fetches new items')} />
           {#if col.type === 'playlist'}
             <Switch bind:checked={row.opts.numbering} onchange={() => optsChanged(row)} label={L('Nomor urut di nama file', 'Numbers in file names')} hint={L('01 - judul, 02 - judul, …', '01 - title, 02 - title, …')} />
@@ -418,7 +468,7 @@
           <span class="label">{L('Simpan ke', 'Save to')}</span>
           <OutputPicker kind="download" />
           <p class="hint">
-            {settings.value?.downloadSubfolders ?? true ? L('Playlist, channel & album otomatis dibuat subfolder sendiri.', 'Playlists, channels & albums get their own subfolder automatically.') : L('Semua file langsung masuk ke folder ini.', 'All files go straight into this folder.')} {L('Bisa diubah di Pengaturan.', 'You can change this in Settings.')}
+            {settings.value?.downloadSubfolders ?? true ? L('Playlist, channel, album & post berisi banyak item otomatis dibuat subfolder sendiri.', 'Playlists, channels, albums & multi-item posts get their own subfolder automatically.') : L('Semua file langsung masuk ke folder ini.', 'All files go straight into this folder.')} {L('Bisa diubah di Pengaturan.', 'You can change this in Settings.')}
           </p>
         </div>
       </div>
@@ -531,6 +581,18 @@
   .badge.sp {
     background: var(--ok-soft);
     color: var(--ok);
+  }
+  .badge.tt {
+    background: #10302f;
+    color: #6ff2ec;
+  }
+  .badge.ig {
+    background: #3a1a2b;
+    color: #ff8fbf;
+  }
+  .badge.fb {
+    background: #172a40;
+    color: #8ab8ff;
   }
   .ltype {
     width: 150px;
@@ -670,6 +732,15 @@
   }
   .tabs .dot.sp {
     background: var(--ok);
+  }
+  .tabs .dot.tt {
+    background: #3ee8e1;
+  }
+  .tabs .dot.ig {
+    background: #ff5fa2;
+  }
+  .tabs .dot.fb {
+    background: #4d94ff;
   }
   .state {
     flex-grow: 1;
@@ -840,6 +911,11 @@
   .esub {
     font-size: 12px;
     color: var(--text-3);
+  }
+  .esub.kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
   }
   .eright {
     display: flex;

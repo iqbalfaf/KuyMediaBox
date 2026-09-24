@@ -22,6 +22,7 @@ func (a *App) env() downloader.Env {
 		YtDlp:       a.tools.Path(tools.YtDlp),
 		FFmpeg:      a.tools.Path(tools.FFmpeg),
 		SpotDL:      a.tools.Path(tools.SpotDL),
+		GalleryDL:   a.tools.Path(tools.GalleryDL),
 		JSKind:      a.tools.JSRuntimeKind(),
 		JSPath:      a.tools.Path(tools.JSRuntime),
 		ArchivePath: filepath.Join(appdir.DataDir(), "download-archive.txt"),
@@ -48,6 +49,8 @@ func (a *App) AnalyzeLink(raw string) (*downloader.Collection, error) {
 	var col *downloader.Collection
 	var err error
 	switch {
+	case downloader.IsSocial(link.Source):
+		col, err = downloader.AnalyzeSocial(context.Background(), env, link)
 	case link.Type == downloader.TypeUnknown && link.Source == downloader.SourceSpotify:
 		return nil, errors.New(i18n.L("Link Spotify ini belum didukung. Gunakan link lagu, album, atau playlist.", "This Spotify link isn't supported yet. Use a track, album or playlist link."))
 	case link.Type == downloader.TypeUnknown:
@@ -102,6 +105,12 @@ func collectionDir(base string, col *downloader.Collection, subfolders bool) str
 	case downloader.TypePlaylist, downloader.TypeChannel, downloader.TypeAlbum:
 		name := strings.ReplaceAll(naming.SanitizeFileName(col.Title), "%", "")
 		return filepath.Join(base, name)
+	case downloader.TypeProfile:
+		return filepath.Join(base, strings.ReplaceAll(downloader.PostFolderName(col), "%", ""))
+	case downloader.TypePost:
+		if len(col.Entries) > 1 {
+			return filepath.Join(base, strings.ReplaceAll(downloader.PostFolderName(col), "%", ""))
+		}
 	}
 	return base
 }
@@ -116,15 +125,6 @@ func (a *App) StartDownloads(key string, ids []string, o downloader.Options) ([]
 	}
 	o.Normalize(col.Source)
 	env := a.env()
-	if env.YtDlp == "" {
-		return nil, errors.New(i18n.L("yt-dlp belum terpasang. Buka Pengaturan untuk mengunduhnya.", "yt-dlp is not installed. Open Settings to download it."))
-	}
-	if env.FFmpeg == "" {
-		return nil, errors.New(i18n.L("FFmpeg belum terpasang. Buka Pengaturan untuk mengunduhnya.", "FFmpeg is not installed. Open Settings to download it."))
-	}
-	if col.Source == downloader.SourceSpotify && env.SpotDL == "" {
-		return nil, errors.New(i18n.L("spotDL belum terpasang. Buka Pengaturan untuk mengunduhnya.", "spotDL is not installed. Open Settings to download it."))
-	}
 	want := map[string]bool{}
 	for _, id := range ids {
 		want[id] = true
@@ -137,6 +137,23 @@ func (a *App) StartDownloads(key string, ids []string, o downloader.Options) ([]
 	}
 	if len(chosen) == 0 {
 		return nil, errors.New(i18n.L("Belum ada item yang dipilih", "No items selected"))
+	}
+	onlyPictures := true
+	for _, e := range chosen {
+		if e.Kind != downloader.KindImage {
+			onlyPictures = false
+		}
+	}
+	if !onlyPictures {
+		if env.YtDlp == "" {
+			return nil, errors.New(i18n.L("yt-dlp belum terpasang. Buka Pengaturan untuk mengunduhnya.", "yt-dlp is not installed. Open Settings to download it."))
+		}
+		if env.FFmpeg == "" {
+			return nil, errors.New(i18n.L("FFmpeg belum terpasang. Buka Pengaturan untuk mengunduhnya.", "FFmpeg is not installed. Open Settings to download it."))
+		}
+	}
+	if col.Source == downloader.SourceSpotify && env.SpotDL == "" {
+		return nil, errors.New(i18n.L("spotDL belum terpasang. Buka Pengaturan untuk mengunduhnya.", "spotDL is not installed. Open Settings to download it."))
 	}
 
 	dir := collectionDir(a.downloadBase(), col, a.cfg.Get().DownloadSubfolders)
@@ -166,7 +183,14 @@ func (a *App) StartDownloads(key string, ids []string, o downloader.Options) ([]
 			title = e.Artist + " - " + e.Title
 		}
 		var run queue.RunFunc
-		if col.Source == downloader.SourceSpotify {
+		if downloader.IsSocial(col.Source) {
+			name := downloader.SocialFileName(col, e, width)
+			title = name
+			run = func(ctx context.Context, r queue.Reporter) error {
+				_, err := downloader.DownloadSocial(ctx, env, e, dir, name, o, r)
+				return err
+			}
+		} else if col.Source == downloader.SourceSpotify {
 			name := downloader.SpotifyFileName(e, o.Numbering && col.Type != downloader.TypeTrack, width)
 			run = func(ctx context.Context, r queue.Reporter) error {
 				_, err := downloader.DownloadSpotify(ctx, env, e, dir, name, o, matcher, r)

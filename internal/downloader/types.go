@@ -11,11 +11,16 @@ type Entry struct {
 	Date        string  `json:"date"`  // YYYYMMDD when known
 	Index       int     `json:"index"` // 1-based position in the list
 	Thumbnail   string  `json:"thumbnail"`
-	Tab         string  `json:"tab"` // channel only: videos | shorts | streams
+	Tab         string  `json:"tab"`  // channel only: videos | shorts | streams
+	Kind        string  `json:"kind"` // video | audio | image (social posts); empty = video
 	Archived    bool    `json:"archived"`
 	Unavailable bool    `json:"unavailable"`
 
-	song *spotifySong // Spotify metadata used for tagging
+	song       *spotifySong // Spotify metadata used for tagging
+	archiveKey string       // yt-dlp archive line ("<extractor> <id>")
+	item       int          // position inside the post for yt-dlp --playlist-items / gallery-dl --range
+	uploader   string
+	ext        string // picture extension when known
 }
 
 // Collection is what a pasted link contains.
@@ -29,6 +34,10 @@ type Collection struct {
 	Thumbnail string         `json:"thumbnail"`
 	Entries   []Entry        `json:"entries"`
 	TabCounts map[string]int `json:"tabCounts"`
+
+	postID   string // social posts: used in file and folder names
+	uploader string
+	hasSound bool // TikTok photo post with a soundtrack
 }
 
 // Env holds the tool paths a download needs.
@@ -36,6 +45,7 @@ type Env struct {
 	YtDlp       string
 	FFmpeg      string
 	SpotDL      string
+	GalleryDL   string
 	JSKind      string // deno | node
 	JSPath      string
 	ArchivePath string
@@ -51,7 +61,8 @@ type Options struct {
 	AudioQuality string `json:"audioQuality"` // auto | 192 | 320 (Spotify)
 	Embed        bool   `json:"embed"`
 	SkipExisting bool   `json:"skipExisting"`
-	Numbering    bool   `json:"numbering"` // prefix list position
+	Numbering    bool   `json:"numbering"`   // prefix list position
+	ImageFormat  string `json:"imageFormat"` // original | jpg (pictures from social posts)
 }
 
 // Normalize fills defaults.
@@ -77,6 +88,9 @@ func (o *Options) Normalize(source string) {
 	}
 	if source == SourceSpotify && o.AudioFormat == "flac" {
 		o.AudioFormat = "mp3"
+	}
+	if o.ImageFormat != "jpg" {
+		o.ImageFormat = "original"
 	}
 	switch o.AudioQuality {
 	case "auto", "192", "320":

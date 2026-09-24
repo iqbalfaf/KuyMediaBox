@@ -4,7 +4,7 @@
 
 # KuyMediaBox
 
-**Satu aplikasi desktop untuk konversi gambar, video, audio, dan download YouTube & Spotify.**
+**Satu aplikasi desktop untuk konversi gambar, video, audio, dan download dari YouTube, TikTok, Instagram, Facebook & Spotify.**
 Ringan, offline, tanpa iklan, dan tanpa batas ukuran file. Tersedia dalam **Bahasa Indonesia** dan **English**.
 
 [![Release](https://img.shields.io/github/v/release/iqbalfaf/KuyMediaBox?label=download&color=ff7a45)](https://github.com/iqbalfaf/KuyMediaBox/releases/latest)
@@ -44,7 +44,7 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 
 **Kebutuhan sistem:** Windows 10/11 64-bit dengan WebView2 Runtime (sudah bawaan Windows 11 dan Windows 10 yang ter-update; installer akan memasangnya bila belum ada).
 
-> Saat pertama dibuka, buka **Pengaturan › Tools pendukung** lalu klik **Unduh** untuk FFmpeg, yt-dlp, dan spotDL. Cukup sekali. Aplikasinya sendiri berukuran ±20 MB; tools tersebut diunduh terpisah agar selalu versi terbaru.
+> Saat pertama dibuka, buka **Pengaturan › Tools pendukung** lalu klik **Unduh** untuk FFmpeg, yt-dlp, spotDL, dan gallery-dl. Cukup sekali. Aplikasinya sendiri berukuran ±20 MB; tools tersebut diunduh terpisah agar selalu versi terbaru.
 
 ---
 
@@ -87,12 +87,15 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Channel & sample rate** | Ikuti asli / stereo / mono · ikuti asli / 44,1 kHz / 48 kHz |
 | **Info lagu** | Judul, artis, album, dan **cover** tetap terbawa (MP3, M4A, FLAC). Audio 24-bit tetap 24-bit di FLAC/WAV. |
 
-### ⬇ Download YouTube & Spotify
+### ⬇ Download YouTube, TikTok, Instagram, Facebook & Spotify
 
 | | |
 |---|---|
 | **Link YouTube** | Video, Shorts, live, **playlist**, dan **channel** (`@nama`, `/channel/…`, `/c/…`, `/user/…`) |
 | **Link Spotify** | **Lagu, album, dan playlist** |
+| **Link TikTok** | **Video**, **post foto (slide)** beserta musiknya, link pendek `vt.tiktok.com`/`vm.tiktok.com`, dan **profil** (`@nama`) |
+| **Link Instagram** | **Reel**, **post foto**, **post video**, dan **carousel** (banyak foto/video dalam satu post) |
+| **Link Facebook** | **Video**, **reel**, link `fb.watch` / `/share/v/`, dan **foto** |
 | **Situs lain** | Link video lain yang didukung yt-dlp juga bisa dicoba |
 | **Banyak link sekaligus** | Tempel beberapa link (satu per baris), tombol **Tempel**, atau Ctrl+V di halaman Download. Jenis link terdeteksi otomatis. |
 | **Pratinjau isi** | Judul, thumbnail, durasi, dan daftar video/lagu sebelum mengunduh. Setiap link punya tab dan pengaturan sendiri. |
@@ -100,6 +103,7 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Channel** | Pilih jenis konten (**Video / Shorts / Live**) dan cakupan (**Semua / N terbaru / Sejak tanggal**). Nama file diawali tanggal upload. |
 | **YouTube: video** | Kualitas Terbaik / 1080p / 720p / 480p, format MP4 atau MKV |
 | **YouTube: audio** | MP3, M4A, OPUS, FLAC |
+| **TikTok, Instagram & Facebook** | Tiap item diberi label **Video / Foto / Musik**. Video bisa diunduh sebagai video (MP4/MKV) atau audio (MP3/M4A/OPUS/FLAC). **Format foto**: *Asli* atau diubah ke **JPG**. Post berisi banyak item disimpan dalam subfolder sendiri. Hanya konten **publik** (tanpa login). |
 | **Spotify** | Diunduh sebagai audio (MP3/M4A/OPUS). Kualitas Otomatis/192/320 kbps. Lagu dicocokkan dari YouTube, lalu diberi judul, artis, album, nomor track, dan cover dari Spotify. |
 | **Info & thumbnail** | Judul dan gambar sampul disematkan ke file hasil |
 | **Lewati yang sudah ada** | Video yang pernah diunduh ditandai "Sudah ada" dan dilewati, jadi unduh ulang channel/playlist hanya mengambil yang baru |
@@ -122,7 +126,7 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 - **Dua bahasa: Indonesia & English.** Ganti di **Pengaturan › Umum › Bahasa / Language**. Seluruh tampilan, pesan error, dan notifikasi Windows langsung berganti tanpa perlu membuka ulang aplikasi.
 - **Pesan error yang jelas** (sesuai bahasa yang dipilih), plus tombol **Lihat detail** untuk log lengkap (bisa disalin).
 - **Notifikasi Windows** saat antrian selesai (bisa dimatikan).
-- **Tools Manager**: deteksi, unduh, update, atau pilih manual FFmpeg, yt-dlp, JS runtime (memakai Node.js/Deno yang sudah terpasang bila ada), dan spotDL. Update yt-dlp/spotDL dicek otomatis.
+- **Tools Manager**: deteksi, unduh, update, atau pilih manual FFmpeg, yt-dlp, JS runtime (memakai Node.js/Deno yang sudah terpasang bila ada), spotDL, dan gallery-dl. Update yt-dlp/spotDL/gallery-dl dicek otomatis. Unduhan tools yang terputus **dilanjutkan otomatis** dari titik terakhir.
 - **Pengaturan terakhir diingat** per halaman (format, kualitas, resolusi, dll.).
 - **Satu jendela saja**: membuka aplikasi lagi akan memunculkan jendela yang sudah terbuka.
 - **Update otomatis dari GitHub Releases**: saat dibuka, aplikasi mengecek versi terbaru. Kalau ada, muncul dialog berisi catatan rilis dan tombol **Update sekarang**. Aplikasi lalu mengunduh versi baru, memverifikasi checksum SHA-256, memasangnya, dan membuka ulang dirinya sendiri, tanpa perlu download manual.
@@ -133,7 +137,7 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 <table>
 <tr>
 <td><img src="docs/screenshots/video.png" alt="Konversi video" /></td>
-<td><img src="docs/screenshots/download.png" alt="Download YouTube & Spotify" /></td>
+<td><img src="docs/screenshots/download.png" alt="Download YouTube, TikTok, Instagram, Facebook & Spotify" /></td>
 </tr>
 </table>
 
@@ -146,9 +150,10 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 1. Jalankan **KuyMediaBox** (installer atau versi portable).
 2. Buka **Pengaturan** (kiri bawah) › **Tools pendukung**, lalu klik **Unduh** pada tool yang berstatus *Belum ada*:
    - **FFmpeg**: wajib untuk Video, Audio, dan Download
-   - **yt-dlp**: untuk download YouTube & Spotify
+   - **yt-dlp**: untuk download video & audio dari YouTube, TikTok, Instagram, Facebook, dan Spotify
    - **JS runtime**: dipakai yt-dlp untuk YouTube; kalau Node.js sudah terpasang di PC, tidak perlu mengunduh apa pun
    - **spotDL**: khusus Spotify
+   - **gallery-dl**: untuk foto dari post TikTok & Facebook (foto Instagram tidak butuh gallery-dl)
 3. (Opsional) Atur **Folder hasil** untuk tiap menu di halaman yang sama.
 4. (Opsional) Prefer English? Pilih **English** di **Pengaturan › Umum › Bahasa / Language**.
 
@@ -181,17 +186,18 @@ Tidak perlu mengunduh ulang secara manual. Kalau ada versi baru di GitHub Releas
 
 Cek manual kapan saja lewat **Pengaturan › Tentang & update › Cek update**.
 
-### Download YouTube & Spotify
+### Download YouTube, TikTok, Instagram, Facebook & Spotify
 
-1. Buka menu **YouTube & Spotify**.
+1. Buka menu **Download**.
 2. Tempel link (bisa banyak, satu per baris), lalu klik **Periksa link**. Tombol **Tempel** mengambil langsung dari clipboard.
 3. Tiap link muncul sebagai **tab**. Pilih item yang mau diunduh:
    - **Playlist/album**: centang item atau isi **Rentang** (`1-20`)
    - **Channel**: pilih Video/Shorts/Live dan Semua / N terbaru / Sejak tanggal
-4. Di panel kanan pilih **Video** atau **Audio**, kualitas, dan format. Pengaturan ini berlaku per link.
+   - **Post TikTok/Instagram/Facebook**: semua foto, video, dan musik di post tampil sebagai item terpisah
+4. Di panel kanan pilih **Video** atau **Audio**, kualitas, dan format (untuk foto: **Asli** atau **JPG**). Pengaturan ini berlaku per link.
 5. Klik **Unduh semua**. Semua link diproses dalam satu antrian.
 
-> Playlist, channel, dan album otomatis dibuatkan subfolder sesuai namanya (bisa dimatikan di Pengaturan).
+> Playlist, channel, album, dan post berisi banyak item (carousel) otomatis dibuatkan subfolder sesuai namanya (bisa dimatikan di Pengaturan).
 
 ---
 
@@ -304,6 +310,10 @@ Untuk reset total, tutup aplikasi lalu hapus folder `%APPDATA%\KuyMediaBox` dan 
 |---|---|
 | Banner "FFmpeg belum terpasang" | Klik **Unduh sekarang** pada banner, atau buka **Pengaturan › Tools pendukung** |
 | Download YouTube gagal / "minta verifikasi bukan bot" | Update **yt-dlp** di Pengaturan, tunggu beberapa saat, lalu coba lagi |
+| Post Instagram/Facebook "privat, dibatasi, atau butuh login" | Aplikasi hanya mengunduh konten **publik**. Story, profil Instagram, dan post privat butuh login sehingga belum didukung. Kalau post publik tiba-tiba ditolak, tunggu beberapa saat lalu coba lagi. |
+| "Post ini berisi foto. Pasang gallery-dl…" | Klik **Unduh sekarang** pada banner atau **Pengaturan › Tools pendukung › gallery-dl** |
+| TikTok/Instagram/Facebook berhenti bisa dibaca | Situs ini sering berubah; klik **Update** pada yt-dlp dan gallery-dl di Pengaturan |
+| "Link foto sudah kedaluwarsa" | Link gambar dari TikTok/Instagram hanya berlaku beberapa jam. Hapus link, tempel ulang, lalu unduh lagi. |
 | "yt-dlp butuh JS runtime" | Pasang Node.js, atau klik **Unduh** pada JS runtime di Pengaturan |
 | Playlist Spotify tidak terbaca | Playlist buatan Spotify (mis. Discover Weekly) dan playlist private tidak bisa dibaca. Salin lagunya ke playlist publik milik sendiri. |
 | "Video … tidak bisa disalin ke … tanpa encode ulang" | Codec sumber tidak cocok dengan format tujuan; pilih codec lain (misalnya H.264) |
@@ -328,7 +338,7 @@ KuyMediaBox/
 │   ├── ffmpeg/             # ffprobe, runner FFmpeg + progress, daftar encoder
 │   ├── mediaconv/          # argumen FFmpeg untuk video & audio
 │   ├── imageconv/          # konversi gambar pure Go (+ ICO & PDF)
-│   ├── downloader/         # deteksi link, yt-dlp (YouTube), spotDL (Spotify)
+│   ├── downloader/         # deteksi link, yt-dlp (YouTube & sosmed), spotDL (Spotify), gallery-dl (foto)
 │   ├── tools/              # Tools Manager: cari, unduh, update
 │   ├── updater/            # update aplikasi dari GitHub Releases
 │   ├── i18n/               # teks Indonesia/English untuk pesan dari backend
@@ -342,7 +352,7 @@ KuyMediaBox/
 └── .github/workflows/      # release otomatis
 ```
 
-**Teknologi:** Go · Wails v2 · Svelte 5 + TypeScript + Vite · FFmpeg · yt-dlp · spotDL · gen2brain/webp·avif·heic · disintegration/imaging.
+**Teknologi:** Go · Wails v2 · Svelte 5 + TypeScript + Vite · FFmpeg · yt-dlp · spotDL · gallery-dl · gen2brain/webp·avif·heic · disintegration/imaging.
 
 ---
 

@@ -230,7 +230,7 @@ func TestConversions(t *testing.T) {
 
 func env(m *tools.Manager) downloader.Env {
 	return downloader.Env{
-		YtDlp: m.Path(tools.YtDlp), FFmpeg: m.Path(tools.FFmpeg), SpotDL: m.Path(tools.SpotDL),
+		YtDlp: m.Path(tools.YtDlp), FFmpeg: m.Path(tools.FFmpeg), SpotDL: m.Path(tools.SpotDL), GalleryDL: m.Path(tools.GalleryDL),
 		JSKind: m.JSRuntimeKind(), JSPath: m.Path(tools.JSRuntime),
 		ArchivePath: filepath.Join(os.TempDir(), "kmb-it-archive.txt"), TempDir: appdir.TempDir(),
 	}
