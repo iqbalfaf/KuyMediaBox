@@ -1,0 +1,16 @@
+# Dokumen internal (tidak dipublikasikan)
+PRD.md
+
+# Hasil build
+build/bin/
+frontend/dist/
+frontend/package.json.md5
+
+# Dependensi
+frontend/node_modules/
+
+# Lain-lain
+*.log
+*.exe~
+.DS_Store
+Thumbs.db
