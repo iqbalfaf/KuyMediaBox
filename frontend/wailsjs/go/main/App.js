@@ -78,6 +78,38 @@ export function OutputFolder(arg1) {
   return window['go']['main']['App']['OutputFolder'](arg1);
 }
 
+export function PdfCompare(arg1, arg2) {
+  return window['go']['main']['App']['PdfCompare'](arg1, arg2);
+}
+
+export function PdfDoc(arg1, arg2) {
+  return window['go']['main']['App']['PdfDoc'](arg1, arg2);
+}
+
+export function PdfEnvironment() {
+  return window['go']['main']['App']['PdfEnvironment']();
+}
+
+export function PdfFind(arg1, arg2, arg3) {
+  return window['go']['main']['App']['PdfFind'](arg1, arg2, arg3);
+}
+
+export function PdfOcrLanguages() {
+  return window['go']['main']['App']['PdfOcrLanguages']();
+}
+
+export function PdfSaveCapture(arg1) {
+  return window['go']['main']['App']['PdfSaveCapture'](arg1);
+}
+
+export function PdfScan() {
+  return window['go']['main']['App']['PdfScan']();
+}
+
+export function PdfWarmup() {
+  return window['go']['main']['App']['PdfWarmup']();
+}
+
 export function PickDirectory(arg1, arg2) {
   return window['go']['main']['App']['PickDirectory'](arg1, arg2);
 }
@@ -120,6 +152,18 @@ export function StartDownloads(arg1, arg2, arg3) {
 
 export function StartImage(arg1, arg2) {
   return window['go']['main']['App']['StartImage'](arg1, arg2);
+}
+
+export function StartPdf(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartPdf'](arg1, arg2, arg3);
+}
+
+export function StartPdfCombine(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartPdfCombine'](arg1, arg2, arg3);
+}
+
+export function StartPdfEdit(arg1) {
+  return window['go']['main']['App']['StartPdfEdit'](arg1);
 }
 
 export function StartVideo(arg1, arg2) {

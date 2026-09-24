@@ -51,6 +51,7 @@ export function toolAttention(): { missing: number; updates: number } {
   let missing = 0
   let updates = 0
   for (const t of toolState.list) {
+    if (!t.found && t.optional) continue
     if (!t.found) missing++
     else if (t.updateAvailable) updates++
   }

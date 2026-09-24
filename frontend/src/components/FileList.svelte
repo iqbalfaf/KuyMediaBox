@@ -38,7 +38,7 @@
   <div class="toolbar">
     <div class="count">
       <span class="n">{conv.items.length} {noun}</span>
-      <span class="size">{bytes(conv.totalSize)} total</span>
+      {#if conv.totalSize}<span class="size">{bytes(conv.totalSize)} total</span>{/if}
       {#if conv.adding}<span class="loading"><Icon name="loader" size={14} class="spin" /> {L('Membaca file…', 'Reading files…')}</span>{/if}
     </div>
     <button class="btn" onclick={() => conv.pickFiles()} disabled={conv.adding}><Icon name="plus" size={16} />{L('Tambah file', 'Add files')}</button>

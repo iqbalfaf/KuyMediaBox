@@ -34,3 +34,12 @@ func OpenFolder(dir string) error { return exec.Command(opener(), dir).Start() }
 
 // RevealFile opens the file's folder.
 func RevealFile(path string) error { return exec.Command(opener(), filepath.Dir(path)).Start() }
+
+// ComRegistered is always false outside Windows.
+func ComRegistered(string) bool { return false }
+
+// ProcessIDs is not implemented outside Windows.
+func ProcessIDs(string) map[uint32]bool { return map[uint32]bool{} }
+
+// KillNew is a no-op outside Windows.
+func KillNew(string, map[uint32]bool) {}
