@@ -4,6 +4,7 @@ package platform
 
 import (
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -31,23 +32,28 @@ func KillTree(pid int) error {
 	return c.Run()
 }
 
-// OpenFolder shows a folder in Explorer.
-func OpenFolder(dir string) error {
-	c := exec.Command("explorer", dir)
-	HideWindow(c)
-	// explorer.exe returns exit code 1 even on success.
-	_ = c.Run()
+// explorer starts Explorer with a raw command line. It must not get HideWindow: Explorer
+// passes the hidden show state on to the folder window, which then opens invisibly.
+func explorer(cmdLine string) error {
+	c := exec.Command("explorer")
+	c.SysProcAttr = &syscall.SysProcAttr{CmdLine: cmdLine}
+	if err := c.Start(); err != nil {
+		return err
+	}
+	// explorer.exe exits with code 1 even on success; just reap it.
+	go func() { _ = c.Wait() }()
 	return nil
 }
 
-// RevealFile opens Explorer with the file selected.
+// OpenFolder shows a folder in Explorer.
+func OpenFolder(dir string) error {
+	return explorer(`explorer "` + filepath.Clean(dir) + `"`)
+}
+
+// RevealFile opens Explorer with the file (or folder) selected.
 func RevealFile(path string) error {
-	c := exec.Command("explorer")
-	HideWindow(c)
-	// explorer needs the raw "/select,<path>" argument without Go's quoting of the comma part.
-	c.SysProcAttr.CmdLine = `explorer /select,"` + path + `"`
-	_ = c.Run()
-	return nil
+	// Explorer needs the raw "/select,<path>" argument without Go's quoting of the comma part.
+	return explorer(`explorer /select,"` + filepath.Clean(path) + `"`)
 }
 
 // ComRegistered reports whether a COM automation class (e.g. "Word.Application") exists.
