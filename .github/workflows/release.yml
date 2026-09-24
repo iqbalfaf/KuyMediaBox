@@ -58,7 +58,9 @@ jobs:
           Compress-Archive -Path build/bin/KuyMediaBox.exe -DestinationPath "dist/KuyMediaBox-$ver-windows-x64-portable.zip"
           $installer = Get-ChildItem build/bin -Filter '*installer*.exe' | Select-Object -First 1
           if ($installer) { Copy-Item $installer.FullName "dist/KuyMediaBox-$ver-windows-x64-setup.exe" }
-          Get-ChildItem dist | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } | Out-File dist/SHA256SUMS.txt -Encoding utf8
+          # Hitung checksum dulu, baru tulis file (jangan meng-hash SHA256SUMS.txt yang sedang ditulis).
+          $sums = Get-ChildItem dist -File | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" }
+          $sums | Out-File dist/SHA256SUMS.txt -Encoding utf8
           Get-ChildItem dist
 
       - name: Simpan sebagai artifact
