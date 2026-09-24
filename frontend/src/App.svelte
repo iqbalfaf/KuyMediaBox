@@ -3,6 +3,7 @@
   import Sidebar from './components/Sidebar.svelte'
   import Toasts from './components/Toasts.svelte'
   import DetailModal from './components/DetailModal.svelte'
+  import UpdateDialog from './components/UpdateDialog.svelte'
   import ImagePage from './pages/ImagePage.svelte'
   import VideoPage from './pages/VideoPage.svelte'
   import AudioPage from './pages/AudioPage.svelte'
@@ -13,12 +14,14 @@
   import { initTasks } from './lib/stores/tasks.svelte'
   import { audioConv, imageConv, videoConv } from './lib/stores/converter.svelte'
   import { addLinks } from './lib/stores/download.svelte'
+  import { initUpdate } from './lib/stores/update.svelte'
 
   const labels: Record<string, string> = { image: 'Konversi gambar', video: 'Konversi video', audio: 'Konversi audio', download: 'Download' }
 
   onMount(() => {
     initApp()
     initTasks()
+    initUpdate()
 
     runtime.onFileDrop((_x, _y, paths) => {
       switch (nav.page) {
@@ -85,6 +88,7 @@
 
 <Toasts />
 <DetailModal />
+<UpdateDialog />
 
 <style>
   .shell {

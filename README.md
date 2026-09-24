@@ -124,6 +124,10 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 - **Tools Manager**: deteksi, unduh, update, atau pilih manual FFmpeg, yt-dlp, JS runtime (memakai Node.js/Deno yang sudah terpasang bila ada), dan spotDL. Update yt-dlp/spotDL dicek otomatis.
 - **Pengaturan terakhir diingat** per halaman (format, kualitas, resolusi, dll.).
 - **Satu jendela saja**: membuka aplikasi lagi akan memunculkan jendela yang sudah terbuka.
+- **Update otomatis dari GitHub Releases**: saat dibuka, aplikasi mengecek versi terbaru. Kalau ada, muncul dialog berisi catatan rilis dan tombol **Update sekarang**. Aplikasi lalu mengunduh versi baru, memverifikasi checksum SHA-256, memasangnya, dan membuka ulang dirinya sendiri, tanpa perlu download manual.
+  - Versi **portable**: file `.exe` diganti langsung di tempatnya.
+  - Versi **terinstal**: installer baru dijalankan otomatis (Windows akan meminta izin UAC).
+  - Bisa dicek manual di **Pengaturan › Tentang & update** atau dimatikan dengan toggle **Cek update otomatis**.
 
 <table>
 <tr>
@@ -164,6 +168,16 @@ Tips:
 - Ingin video jauh lebih kecil? Pilih **H.265**, kualitas **Hemat**, dan resolusi **720p**.
 - Hanya ingin ganti wadah (misalnya MKV → MP4) tanpa menunggu? Pilih codec **Salin tanpa encode ulang**.
 - Ingin MP3 dari video? Di menu Video pilih **Ambil audio saja**, atau langsung masukkan videonya di menu **Audio**.
+
+### Update aplikasi
+
+Tidak perlu mengunduh ulang secara manual. Kalau ada versi baru di GitHub Releases:
+
+1. Dialog **Versi baru tersedia** muncul otomatis saat aplikasi dibuka (atau klik **Update vX.Y.Z tersedia** di sidebar).
+2. Baca catatan rilis, lalu klik **Update sekarang**.
+3. Tunggu unduhan selesai. Aplikasi tertutup sebentar, lalu terbuka kembali dengan versi baru. Pada versi terinstal, pilih **Yes** jika Windows meminta izin.
+
+Cek manual kapan saja lewat **Pengaturan › Tentang & update › Cek update**.
 
 ### Download YouTube & Spotify
 
@@ -252,16 +266,17 @@ Repo ini sudah memiliki workflow [`.github/workflows/release.yml`](.github/workf
 Cara merilis versi baru:
 
 ```powershell
-# 1. (opsional) naikkan versi di wails.json → "productVersion"
-# 2. commit & push perubahan
+# 1. commit & push perubahan (nomor versi otomatis diambil dari tag)
 git add -A
 git commit -m "Rilis v0.2.0"
 git push
 
-# 3. buat & push tag → release otomatis dibuat
+# 2. buat & push tag → release otomatis dibuat
 git tag v0.2.0
 git push origin v0.2.0
 ```
+
+Nomor versi di dalam aplikasi dan installer mengikuti tag (misalnya `v0.2.0` → versi `0.2.0`). Aplikasi yang sudah terpasang di komputer pengguna akan **menemukan rilis baru ini sendiri** lewat fitur update otomatis. Karena itu, pastikan rilis tidak ditandai *pre-release* dan selalu memuat `SHA256SUMS.txt` (workflow sudah mengurus keduanya).
 
 Setiap push biasa ke branch `main` juga menjalankan build dan test yang sama (tanpa membuat release), jadi error langsung ketahuan. Pantau prosesnya di tab **Actions** repo. Setelah selesai (±5–10 menit), file siap diunduh di **Releases**. Workflow juga bisa dijalankan manual dari tab Actions (**Run workflow**) untuk mengetes build tanpa membuat release; hasilnya tersedia sebagai *artifact*.
 
@@ -313,6 +328,7 @@ KuyMediaBox/
 │   ├── imageconv/          # konversi gambar pure Go (+ ICO & PDF)
 │   ├── downloader/         # deteksi link, yt-dlp (YouTube), spotDL (Spotify)
 │   ├── tools/              # Tools Manager: cari, unduh, update
+│   ├── updater/            # update aplikasi dari GitHub Releases
 │   ├── proc/ platform/     # proses tersembunyi & utilitas Windows
 │   └── integration/        # test nyata dengan tools asli
 ├── frontend/src/

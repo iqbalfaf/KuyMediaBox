@@ -314,12 +314,12 @@ func (e Env) runYtDlp(ctx context.Context, job ytJob, r queue.Reporter, progress
 	}
 	tail := proc.NewTail(60)
 	var (
-		mu          sync.Mutex
-		output      string
-		skipped     string
-		phase       int
-		lastPct     float64
-		phases      = max(1, job.Phases)
+		mu      sync.Mutex
+		output  string
+		skipped string
+		phase   int
+		lastPct float64
+		phases  = max(1, job.Phases)
 	)
 	handle := func(line string) {
 		tail.Add(line)

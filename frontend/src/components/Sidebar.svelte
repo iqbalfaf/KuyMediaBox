@@ -2,6 +2,7 @@
   import Icon from './Icon.svelte'
   import { nav, toolAttention, toolState } from '../lib/stores/app.svelte'
   import { clock, summarize } from '../lib/stores/tasks.svelte'
+  import { upd } from '../lib/stores/update.svelte'
   import type { Kind, Page } from '../lib/types'
 
   const kindName: Record<Kind, string> = { image: 'Gambar', video: 'Video', audio: 'Audio', download: 'Download' }
@@ -35,7 +36,7 @@
     <div class="logo"><Icon name="box" size={20} stroke={2.2} /></div>
     <div class="name">
       <span class="title">KuyMediaBox</span>
-      <span class="ver">v0.1 · MVP</span>
+      <span class="ver">{upd.version ? `v${upd.version}` : ''}</span>
     </div>
   </div>
 
@@ -59,6 +60,11 @@
     <span class="q-sub">{queue ? queue.sub : 'Belum ada tugas'}</span>
   </div>
 
+  {#if upd.info?.available}
+    <button class="tools-link app-upd" onclick={() => (upd.open = true)}>
+      <span class="dot"></span>Update v{upd.info.latest} tersedia
+    </button>
+  {/if}
   {#if toolState.loaded && attention.missing + attention.updates > 0}
     <button class="tools-link" class:bad={attention.missing > 0} onclick={() => (nav.page = 'settings')}>
       <span class="dot"></span>
@@ -210,6 +216,12 @@
     height: 8px;
     border-radius: 50%;
     background: var(--warn-dot);
+  }
+  .tools-link.app-upd {
+    color: var(--accent-text);
+  }
+  .tools-link.app-upd .dot {
+    background: var(--accent);
   }
   .tools-link.bad {
     color: var(--err);

@@ -36,7 +36,7 @@ var ErrSkipped = errors.New("skipped")
 // SkipError carries a human message for a skipped task.
 type SkipError struct{ Reason string }
 
-func (e *SkipError) Error() string { return e.Reason }
+func (e *SkipError) Error() string        { return e.Reason }
 func (e *SkipError) Is(target error) bool { return target == ErrSkipped }
 
 // Skip returns an error that marks the task as skipped with reason.

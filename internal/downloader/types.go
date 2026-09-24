@@ -44,14 +44,14 @@ type Env struct {
 
 // Options are the per-link download settings from the UI.
 type Options struct {
-	Mode        string `json:"mode"`        // video | audio
-	Quality     string `json:"quality"`     // best | 1080 | 720 | 480
-	Container   string `json:"container"`   // mp4 | mkv
-	AudioFormat string `json:"audioFormat"` // mp3 | m4a | opus | flac
+	Mode         string `json:"mode"`         // video | audio
+	Quality      string `json:"quality"`      // best | 1080 | 720 | 480
+	Container    string `json:"container"`    // mp4 | mkv
+	AudioFormat  string `json:"audioFormat"`  // mp3 | m4a | opus | flac
 	AudioQuality string `json:"audioQuality"` // auto | 192 | 320 (Spotify)
-	Embed       bool   `json:"embed"`
-	SkipExisting bool  `json:"skipExisting"`
-	Numbering   bool   `json:"numbering"` // prefix list position
+	Embed        bool   `json:"embed"`
+	SkipExisting bool   `json:"skipExisting"`
+	Numbering    bool   `json:"numbering"` // prefix list position
 }
 
 // Normalize fills defaults.
