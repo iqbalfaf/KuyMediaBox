@@ -1,12 +1,13 @@
 <script lang="ts">
+  import { L } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
   import { nav, toolAttention, toolState } from '../lib/stores/app.svelte'
   import { clock, summarize } from '../lib/stores/tasks.svelte'
   import { upd } from '../lib/stores/update.svelte'
   import type { Kind, Page } from '../lib/types'
 
-  const kindName: Record<Kind, string> = { image: 'Gambar', video: 'Video', audio: 'Audio', download: 'Download' }
-  const unit: Record<Kind, string> = { image: 'file', video: 'file', audio: 'file', download: 'item' }
+  const kindName = $derived<Record<Kind, string>>({ image: L('Gambar', 'Images'), video: 'Video', audio: 'Audio', download: 'Download' })
+  const unit = $derived<Record<Kind, string>>({ image: 'file', video: 'file', audio: 'file', download: 'item' })
 
   const queue = $derived.by(() => {
     void clock.now
@@ -16,22 +17,22 @@
     const main = active[0]
     const total = active.reduce((a, x) => a + x.s.total, 0)
     const progress = active.reduce((a, x) => a + x.s.progress * x.s.total, 0) / Math.max(1, total)
-    let sub = `${kindName[main.k]} · ${main.s.finished + 1 > main.s.total ? main.s.total : main.s.finished + 1} dari ${main.s.total} ${unit[main.k]}`
-    if (active.length > 1) sub += ` · +${active.length - 1} lainnya`
+    let sub = `${kindName[main.k]} · ${main.s.finished + 1 > main.s.total ? main.s.total : main.s.finished + 1} ${L('dari', 'of')} ${main.s.total} ${unit[main.k]}${L('', main.s.total === 1 ? '' : 's')}`
+    if (active.length > 1) sub += ` · +${active.length - 1} ${L('lainnya', 'more')}`
     return { progress, sub }
   })
 
   const attention = $derived(toolAttention())
 
-  const items: { page: Page; label: string; icon: string; group: string }[] = [
-    { page: 'image', label: 'Gambar', icon: 'image', group: 'KONVERSI' },
-    { page: 'video', label: 'Video', icon: 'video', group: 'KONVERSI' },
-    { page: 'audio', label: 'Audio', icon: 'music', group: 'KONVERSI' },
-    { page: 'download', label: 'YouTube & Spotify', icon: 'download', group: 'UNDUH' },
-  ]
+  const items = $derived<{ page: Page; label: string; icon: string; group: string }[]>([
+    { page: 'image', label: L('Gambar', 'Images'), icon: 'image', group: L('KONVERSI', 'CONVERT') },
+    { page: 'video', label: 'Video', icon: 'video', group: L('KONVERSI', 'CONVERT') },
+    { page: 'audio', label: 'Audio', icon: 'music', group: L('KONVERSI', 'CONVERT') },
+    { page: 'download', label: 'YouTube & Spotify', icon: 'download', group: L('UNDUH', 'DOWNLOAD') },
+  ])
 </script>
 
-<nav aria-label="Navigasi utama">
+<nav aria-label={L('Navigasi utama', 'Main navigation')}>
   <div class="brand drag">
     <div class="logo"><Icon name="box" size={20} stroke={2.2} /></div>
     <div class="name">
@@ -53,30 +54,30 @@
 
   <div class="queue">
     <div class="q-head">
-      <span class="q-title">{queue ? 'Antrian berjalan' : 'Antrian kosong'}</span>
+      <span class="q-title">{queue ? L('Antrian berjalan', 'Queue running') : L('Antrian kosong', 'Queue empty')}</span>
       <span class="q-pct">{queue ? `${Math.round(queue.progress * 100)}%` : '—'}</span>
     </div>
     <div class="bar"><div style="width: {queue ? queue.progress * 100 : 0}%"></div></div>
-    <span class="q-sub">{queue ? queue.sub : 'Belum ada tugas'}</span>
+    <span class="q-sub">{queue ? queue.sub : L('Belum ada tugas', 'No tasks yet')}</span>
   </div>
 
   {#if upd.info?.available}
     <button class="tools-link app-upd" onclick={() => (upd.open = true)}>
-      <span class="dot"></span>Update v{upd.info.latest} tersedia
+      <span class="dot"></span>{L(`Update v${upd.info.latest} tersedia`, `Update v${upd.info.latest} available`)}
     </button>
   {/if}
   {#if toolState.loaded && attention.missing + attention.updates > 0}
     <button class="tools-link" class:bad={attention.missing > 0} onclick={() => (nav.page = 'settings')}>
       <span class="dot"></span>
       {#if attention.missing > 0}
-        {attention.missing} tools belum terpasang
+        {attention.missing} {L('tools belum terpasang', attention.missing === 1 ? 'tool missing' : 'tools missing')}
       {:else}
-        {attention.updates} update tools tersedia
+        {attention.updates} {L('update tools tersedia', attention.updates === 1 ? 'tool update available' : 'tool updates available')}
       {/if}
     </button>
   {/if}
   <button class="item" class:active={nav.page === 'settings'} onclick={() => (nav.page = 'settings')}>
-    <span class="ic"><Icon name="sliders" /></span>Pengaturan
+    <span class="ic"><Icon name="sliders" /></span>{L('Pengaturan', 'Settings')}
   </button>
 </nav>
 

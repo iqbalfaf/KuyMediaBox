@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"kuymediabox/internal/i18n"
 	"kuymediabox/internal/proc"
 	"kuymediabox/internal/queue"
 )
@@ -30,7 +31,7 @@ func Run(ctx context.Context, ffmpegPath string, args []string, duration float64
 		return err
 	}
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("ffmpeg tidak bisa dijalankan: %w", err)
+		return fmt.Errorf(i18n.L("ffmpeg tidak bisa dijalankan: %w", "ffmpeg can't be started: %w"), err)
 	}
 
 	tail := proc.NewTail(40)
@@ -96,19 +97,19 @@ func friendly(stderr string, err error) error {
 		strings.Contains(low, "are supported for webm") ||
 		strings.Contains(low, "could not write header") ||
 		strings.Contains(low, "incompatible with output"):
-		msg = "Codec tidak cocok dengan format ini. Pilih encode ulang atau format lain."
+		msg = i18n.L("Codec tidak cocok dengan format ini. Pilih encode ulang atau format lain.", "The codec doesn't fit this format. Choose re-encoding or another format.")
 	case strings.Contains(low, "invalid data found when processing input") || strings.Contains(low, "moov atom not found"):
-		msg = "File rusak atau tidak bisa dibaca"
+		msg = i18n.L("File rusak atau tidak bisa dibaca", "File is damaged or can't be read")
 	case strings.Contains(low, "unknown encoder") || strings.Contains(low, "encoder not found"):
-		msg = "Encoder tidak tersedia di FFmpeg ini"
+		msg = i18n.L("Encoder tidak tersedia di FFmpeg ini", "Encoder not available in this FFmpeg")
 	case strings.Contains(low, "no space left"):
-		msg = "Ruang disk penuh"
+		msg = i18n.L("Ruang disk penuh", "Disk is full")
 	case strings.Contains(low, "permission denied") || strings.Contains(low, "access is denied"):
-		msg = "Tidak punya izin menulis ke folder hasil"
+		msg = i18n.L("Tidak punya izin menulis ke folder hasil", "No permission to write to the output folder")
 	case strings.Contains(low, "does not contain any stream") || strings.Contains(low, "output file does not contain"):
-		msg = "Tidak ada stream yang bisa dikonversi di file ini"
+		msg = i18n.L("Tidak ada stream yang bisa dikonversi di file ini", "No convertible stream in this file")
 	case strings.Contains(low, "matches no streams"):
-		msg = "File ini tidak punya audio/video yang dibutuhkan"
+		msg = i18n.L("File ini tidak punya audio/video yang dibutuhkan", "This file lacks the required audio/video")
 	}
 	if msg == "" {
 		lines := strings.Split(detail, "\n")
@@ -116,7 +117,7 @@ func friendly(stderr string, err error) error {
 		if last == "" || strings.HasPrefix(strings.ToLower(last), "conversion failed") && len(lines) > 1 {
 			last = strings.TrimSpace(reNoise.ReplaceAllString(lines[max(0, len(lines)-2)], ""))
 		}
-		msg = "Konversi gagal: " + last
+		msg = i18n.L("Konversi gagal: ", "Conversion failed: ") + last
 		if len([]rune(msg)) > 140 {
 			msg = string([]rune(msg)[:140]) + "…"
 		}
@@ -149,7 +150,7 @@ func Encoders(ctx context.Context, ffmpegPath string) (map[string]bool, error) {
 		}
 	}
 	if len(set) == 0 {
-		return nil, errors.New("daftar encoder kosong")
+		return nil, errors.New(i18n.L("daftar encoder kosong", "empty encoder list"))
 	}
 	return set, nil
 }

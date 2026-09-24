@@ -1,5 +1,15 @@
-const nf1 = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 1 })
-const nf0 = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 })
+import { L, locale } from './i18n.svelte'
+
+const nfCache = new Map<string, Intl.NumberFormat>()
+function nf(digits: number): Intl.NumberFormat {
+  const key = locale() + digits
+  let f = nfCache.get(key)
+  if (!f) {
+    f = new Intl.NumberFormat(locale(), { maximumFractionDigits: digits })
+    nfCache.set(key, f)
+  }
+  return f
+}
 
 export function bytes(n: number): string {
   if (!n || n < 0) return '0 B'
@@ -9,7 +19,7 @@ export function bytes(n: number): string {
     n /= 1024
     i++
   }
-  return `${i === 0 ? nf0.format(n) : nf1.format(n)} ${units[i]}`
+  return `${i === 0 ? nf(0).format(n) : nf(1).format(n)} ${units[i]}`
 }
 
 export function duration(sec: number): string {
@@ -22,31 +32,35 @@ export function duration(sec: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(r)}` : `${pad(m)}:${pad(r)}`
 }
 
-/** "1 jam 3 menit" style total length. */
+const unit = {
+  sec: () => L('detik', 'sec'),
+  min: () => L('menit', 'min'),
+  hr: () => L('jam', 'hr'),
+}
+
+/** "1 jam 3 menit" / "1 hr 3 min" style total length. */
 export function longDuration(sec: number): string {
   const m = Math.round(sec / 60)
-  if (m < 1) return `${Math.round(sec)} detik`
+  if (m < 1) return `${Math.round(sec)} ${unit.sec()}`
   const h = Math.floor(m / 60)
   const r = m % 60
-  if (h === 0) return `${m} menit`
-  return r ? `${h} jam ${r} menit` : `${h} jam`
+  if (h === 0) return `${m} ${unit.min()}`
+  return r ? `${h} ${unit.hr()} ${r} ${unit.min()}` : `${h} ${unit.hr()}`
 }
 
 export function eta(sec: number): string {
   if (!isFinite(sec) || sec <= 0) return ''
-  if (sec < 60) return `${Math.max(1, Math.round(sec))} detik`
+  if (sec < 60) return `${Math.max(1, Math.round(sec))} ${unit.sec()}`
   const m = Math.round(sec / 60)
-  if (m < 60) return `${m} menit`
-  return `${Math.floor(m / 60)} jam ${m % 60} menit`
+  if (m < 60) return `${m} ${unit.min()}`
+  return `${Math.floor(m / 60)} ${unit.hr()} ${m % 60} ${unit.min()}`
 }
 
-const dateFmt = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
-
-/** YYYYMMDD → "20 Sep 2026" */
+/** YYYYMMDD → "20 Sep 2026" (or "Sep 20, 2026" in English) */
 export function ymd(s: string): string {
   if (!/^\d{8}$/.test(s)) return ''
   const d = new Date(Number(s.slice(0, 4)), Number(s.slice(4, 6)) - 1, Number(s.slice(6, 8)))
-  return dateFmt.format(d)
+  return new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'short', year: 'numeric' }).format(d)
 }
 
 export function pct(p: number): string {
@@ -55,23 +69,24 @@ export function pct(p: number): string {
 
 export const codecLabel: Record<string, string> = {
   h264: 'H.264', hevc: 'H.265', h265: 'H.265', vp9: 'VP9', vp8: 'VP8', av1: 'AV1', mpeg4: 'MPEG-4',
-  mpeg2video: 'MPEG-2', mjpeg: 'MJPEG', prores: 'ProRes', wmv3: 'WMV', gif: 'GIF', copy: 'Tanpa encode ulang',
+  mpeg2video: 'MPEG-2', mjpeg: 'MJPEG', prores: 'ProRes', wmv3: 'WMV', gif: 'GIF',
   aac: 'AAC', mp3: 'MP3', opus: 'Opus', vorbis: 'Vorbis', flac: 'FLAC', alac: 'ALAC', ac3: 'AC-3', eac3: 'E-AC-3',
   pcm_s16le: 'PCM', pcm_s24le: 'PCM', pcm_s32le: 'PCM', pcm_f32le: 'PCM', wmav2: 'WMA', amr_nb: 'AMR',
 }
 
 export function codec(c: string): string {
+  if (c === 'copy') return L('Tanpa encode ulang', 'No re-encode')
   return codecLabel[c] ?? c.toUpperCase()
 }
 
 export function fps(v: number): string {
   if (!v) return ''
-  return `${nf0.format(Math.round(v))} fps`
+  return `${nf(0).format(Math.round(v))} fps`
 }
 
 export function khz(hz: number): string {
   if (!hz) return ''
-  return `${nf1.format(hz / 1000)} kHz`
+  return `${nf(1).format(hz / 1000)} kHz`
 }
 
 /** Stable pastel tile colour from a string. */

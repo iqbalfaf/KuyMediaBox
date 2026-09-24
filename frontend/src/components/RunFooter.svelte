@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { L } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
   import { api } from '../lib/api'
   import { clock, summarize } from '../lib/stores/tasks.svelte'
@@ -37,7 +38,7 @@
     void clock.now
     return summarize(kind)
   })
-  const verb = $derived(kind === 'download' ? 'Mengunduh' : 'Mengonversi')
+  const verb = $derived(kind === 'download' ? L('Mengunduh', 'Downloading') : L('Mengonversi', 'Converting'))
 
   function openOutput() {
     if (lastOutput) api.revealFile(lastOutput)
@@ -47,26 +48,26 @@
 <div class="footer">
   {#if running}
     <div class="line">
-      <span class="t">{verb} {Math.min(sum.total, sum.finished + 1)} dari {sum.total}</span>
-      <span class="eta">{sum.etaSeconds ? `Sisa ± ${eta(sum.etaSeconds)}` : 'Menghitung…'}</span>
+      <span class="t">{verb} {Math.min(sum.total, sum.finished + 1)} {L('dari', 'of')} {sum.total}</span>
+      <span class="eta">{sum.etaSeconds ? `${L('Sisa', 'About')} ± ${eta(sum.etaSeconds)}${L('', ' left')}` : L('Menghitung…', 'Estimating…')}</span>
     </div>
     <div class="bar big"><div style="width: {sum.progress * 100}%"></div></div>
     {#if queueMore > 0}
       <button class="btn-accent more" onclick={onstart} disabled={busy}>
-        <Icon name="plus" size={14} stroke={2.5} />Tambah ke antrian ({queueMore})
+        <Icon name="plus" size={14} stroke={2.5} />{L('Tambah ke antrian', 'Add to queue')} ({queueMore})
       </button>
     {/if}
     <div class="btns">
-      <button class="btn grow" onclick={openOutput} disabled={!lastOutput}>Buka folder hasil</button>
-      <button class="btn danger grow" onclick={oncancel}>Batalkan semua</button>
+      <button class="btn grow" onclick={openOutput} disabled={!lastOutput}>{L('Buka folder hasil', 'Open output folder')}</button>
+      <button class="btn danger grow" onclick={oncancel}>{L('Batalkan semua', 'Cancel all')}</button>
     </div>
   {:else}
     {#if sum.total > 0 && sum.finished === sum.total}
       <div class="summary">
         <span>
-          Terakhir: <b class="ok">{sum.done} berhasil</b>{#if sum.failed}&nbsp;· <b class="err">{sum.failed} gagal</b>{/if}{#if sum.skipped}&nbsp;· {sum.skipped} dilewati{/if}{#if sum.canceled}&nbsp;· {sum.canceled} dibatalkan{/if}
+          {L('Terakhir', 'Last run')}: <b class="ok">{sum.done} {L('berhasil', 'succeeded')}</b>{#if sum.failed}&nbsp;· <b class="err">{sum.failed} {L('gagal', 'failed')}</b>{/if}{#if sum.skipped}&nbsp;· {sum.skipped} {L('dilewati', 'skipped')}{/if}{#if sum.canceled}&nbsp;· {sum.canceled} {L('dibatalkan', 'canceled')}{/if}
         </span>
-        {#if lastOutput}<button class="link" onclick={openOutput}>Buka folder</button>{/if}
+        {#if lastOutput}<button class="link" onclick={openOutput}>{L('Buka folder', 'Open folder')}</button>{/if}
       </div>
     {/if}
     <button class="btn-primary" disabled={disabled || busy} onclick={onstart}>

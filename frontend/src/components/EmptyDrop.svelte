@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { L } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
   import type { Converter } from '../lib/stores/converter.svelte'
 
@@ -19,18 +20,18 @@
   } = $props()
 </script>
 
-<section class="card wrap" aria-label="Tambahkan file">
+<section class="card wrap" aria-label={L('Tambahkan file', 'Add files')}>
   <div class="zone">
     <div class="big-ic">
       {#if conv.adding}<Icon name="loader" size={36} stroke={1.8} class="spin" />{:else}<Icon name="upload" size={36} stroke={1.8} />{/if}
     </div>
     <div class="txt">
-      <h2>{conv.adding ? 'Membaca file…' : title}</h2>
+      <h2>{conv.adding ? L('Membaca file…', 'Reading files…') : title}</h2>
       <p>{subtitle}</p>
     </div>
     <div class="btns">
       <button class="btn-accent big" onclick={() => conv.pickFiles()} disabled={conv.adding}><Icon name="plus" size={16} stroke={2.5} />{pickLabel}</button>
-      <button class="btn big" onclick={() => conv.pickFolder()} disabled={conv.adding}><Icon name="folder" size={16} />Pilih folder</button>
+      <button class="btn big" onclick={() => conv.pickFolder()} disabled={conv.adding}><Icon name="folder" size={16} />{L('Pilih folder', 'Choose folder')}</button>
     </div>
     <div class="fmts">
       {#each formats as f}<span>{f}</span>{/each}

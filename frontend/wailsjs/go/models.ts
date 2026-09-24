@@ -22,6 +22,7 @@ export namespace config {
 	    notify: boolean;
 	    skipDownloaded: boolean;
 	    autoUpdate: boolean;
+	    language: string;
 	    toolPaths: Record<string, string>;
 	
 	    static createFrom(source: any = {}) {
@@ -37,6 +38,7 @@ export namespace config {
 	        this.notify = source["notify"];
 	        this.skipDownloaded = source["skipDownloaded"];
 	        this.autoUpdate = source["autoUpdate"];
+	        this.language = source["language"];
 	        this.toolPaths = source["toolPaths"];
 	    }
 	

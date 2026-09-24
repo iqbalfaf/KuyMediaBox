@@ -35,6 +35,12 @@ type Output struct {
 	Dir  string `json:"dir"` // used when Mode == custom
 }
 
+// UI languages.
+const (
+	LangID = "id"
+	LangEN = "en"
+)
+
 // Settings are the user's global preferences.
 type Settings struct {
 	Outputs            map[string]Output `json:"outputs"`
@@ -44,6 +50,7 @@ type Settings struct {
 	Notify             bool              `json:"notify"`
 	SkipDownloaded     bool              `json:"skipDownloaded"`
 	AutoUpdate         bool              `json:"autoUpdate"`
+	Language           string            `json:"language"` // id | en
 	ToolPaths          map[string]string `json:"toolPaths"`
 }
 
@@ -57,6 +64,7 @@ func Defaults() Settings {
 		Notify:             true,
 		SkipDownloaded:     true,
 		AutoUpdate:         true,
+		Language:           LangID,
 		ToolPaths:          map[string]string{},
 	}
 	for _, k := range OutputKinds {
@@ -103,6 +111,9 @@ func (s *Settings) Normalize() {
 		s.Conflict = d.Conflict
 	}
 	s.Suffix = SanitizeSuffix(s.Suffix)
+	if s.Language != LangEN {
+		s.Language = LangID
+	}
 	if s.ToolPaths == nil {
 		s.ToolPaths = map[string]string{}
 	}
@@ -196,6 +207,9 @@ func parse(data []byte) Settings {
 	}
 	if _, ok := raw["autoUpdate"]; ok {
 		s.AutoUpdate = parsed.AutoUpdate
+	}
+	if _, ok := raw["language"]; ok {
+		s.Language = parsed.Language
 	}
 	if parsed.ToolPaths != nil {
 		s.ToolPaths = parsed.ToolPaths

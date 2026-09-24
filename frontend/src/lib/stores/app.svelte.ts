@@ -1,4 +1,5 @@
 import { api, errText, runtime } from '../api'
+import { setLang } from '../i18n.svelte'
 import type { Capabilities, OutputKind, OutputSpec, Page, Settings, ToolStatus } from '../types'
 
 export const nav = $state<{ page: Page }>({ page: 'image' })
@@ -86,6 +87,7 @@ export async function initApp() {
     const [s, dirs] = await Promise.all([api.getSettings(), api.getDefaultDirs()])
     Object.assign(defaultDirs, dirs)
     settings.value = s
+    setLang(s.language)
   } catch (e) {
     toast(errText(e), 'err')
   }
@@ -100,6 +102,7 @@ export async function saveSettings(patch: Partial<Settings>) {
   if (!settings.value) return
   try {
     settings.value = await api.saveSettings({ ...settings.value, ...patch })
+    setLang(settings.value.language)
   } catch (e) {
     toast(errText(e), 'err')
   }

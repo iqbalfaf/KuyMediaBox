@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { L } from '../lib/i18n.svelte'
   import PageHeader from '../components/PageHeader.svelte'
   import FileList from '../components/FileList.svelte'
   import EmptyDrop from '../components/EmptyDrop.svelte'
@@ -44,7 +45,8 @@
 
   const isCopy = $derived(st.v.format !== 'gif' && st.v.codec === 'copy')
   const isGif = $derived(st.v.format === 'gif')
-  const speed: Record<string, string> = { fast: 'cepat', medium: 'sedang', slow: 'lambat' }
+  const speed = $derived<Record<string, string>>({ fast: L('cepat', 'fast'), medium: L('sedang', 'medium'), slow: L('lambat', 'slow') })
+  const qualityName = $derived<Record<string, string>>({ hemat: L('hemat', 'small'), seimbang: L('seimbang', 'balanced'), tinggi: L('tinggi', 'high') })
 
   function meta(it: FileItem): string {
     const p: string[] = []
@@ -52,24 +54,24 @@
     if (it.videoCodec) p.push(codec(it.videoCodec))
     if (it.fps) p.push(fps(it.fps))
     p.push(bytes(it.size))
-    if (it.height > it.width) p.push('vertikal')
+    if (it.height > it.width) p.push(L('vertikal', 'vertical'))
     return p.join(' · ')
   }
 
   function resultLine(it: FileItem): [string, string] {
     if (st.mode === 'audio') {
       const f = st.a.format.toUpperCase()
-      return [lossyAudio[st.a.format] ? `${f} · ${st.a.bitrate} kbps` : `${f} · lossless`, 'Audio saja']
+      return [lossyAudio[st.a.format] ? `${f} · ${st.a.bitrate} kbps` : `${f} · lossless`, L('Audio saja', 'Audio only')]
     }
     if (isGif) {
       const [w, h] = outputSize(it.width, it.height, st.v)
       return [`GIF · ${w}×${h}`, '12 fps']
     }
-    if (isCopy) return [`${st.v.format.toUpperCase()} · salin`, 'Tanpa encode ulang']
+    if (isCopy) return [`${st.v.format.toUpperCase()} · ${L('salin', 'copy')}`, L('Tanpa encode ulang', 'No re-encode')]
     const [w, h] = outputSize(it.width, it.height, st.v)
     const res = w && h ? `${Math.min(w, h)}p` : ''
-    const q = st.v.manual ? `CRF ${crfFor(st.v)}` : `Kualitas ${st.v.quality}`
-    return [`${st.v.format.toUpperCase()} · ${codec(st.v.codec)}${res ? ` · ${res}` : ''}`, w && h && (w !== it.width || h !== it.height) ? `Menjadi ${w}×${h}` : q]
+    const q = st.v.manual ? `CRF ${crfFor(st.v)}` : `${L('Kualitas', 'Quality')} ${qualityName[st.v.quality] ?? st.v.quality}`
+    return [`${st.v.format.toUpperCase()} · ${codec(st.v.codec)}${res ? ` · ${res}` : ''}`, w && h && (w !== it.width || h !== it.height) ? `${L('Menjadi', 'Becomes')} ${w}×${h}` : q]
   }
 
   const pending = $derived(conv.pending())
@@ -85,28 +87,28 @@
   const totalDuration = $derived(conv.items.reduce((s, it) => s + (it.duration || 0), 0))
 </script>
 
-<PageHeader title="Konversi Video" subtitle="Ubah format, kecilkan ukuran, atau ambil audionya saja." />
-<ToolBanner ids={['ffmpeg']} why="FFmpeg dibutuhkan untuk membaca dan mengonversi video." />
+<PageHeader title={L('Konversi Video', 'Video Converter')} subtitle={L('Ubah format, kecilkan ukuran, atau ambil audionya saja.', 'Change the format, shrink the size, or extract just the audio.')} />
+<ToolBanner ids={['ffmpeg']} why={L('FFmpeg dibutuhkan untuk membaca dan mengonversi video.', 'FFmpeg is needed to read and convert video.')} />
 
 <div class="body">
   {#if conv.items.length === 0}
     <EmptyDrop
       {conv}
-      title="Tarik & lepas video ke sini"
-      subtitle="Bisa banyak file sekaligus, atau satu folder penuh."
-      pickLabel="Pilih video"
+      title={L('Tarik & lepas video ke sini', 'Drag & drop videos here')}
+      subtitle={L('Bisa banyak file sekaligus, atau satu folder penuh.', 'Many files at once, or a whole folder.')}
+      pickLabel={L('Pilih video', 'Choose videos')}
       formats={['MP4', 'MKV', 'MOV', 'AVI', 'WEBM', 'FLV', 'WMV', '3GP', 'TS']}
       steps={[
-        ['Tambahkan video', 'Tarik ke sini atau klik tombol'],
-        ['Pilih format & kualitas', 'Di panel sebelah kanan'],
-        ['Klik Mulai', 'File asli tidak akan diubah'],
+        [L('Tambahkan video', 'Add videos'), L('Tarik ke sini atau klik tombol', 'Drag them here or click the button')],
+        [L('Pilih format & kualitas', 'Pick format & quality'), L('Di panel sebelah kanan', 'In the panel on the right')],
+        [L('Klik Mulai', 'Click Start'), L('File asli tidak akan diubah', 'Your original files stay untouched')],
       ]}
     />
   {:else}
     <FileList
       {conv}
-      noun="video"
-      dropText="Tarik & lepas video di sini"
+      noun={L('video', 'videos')}
+      dropText={L('Tarik & lepas video di sini', 'Drag & drop videos here')}
       formats="MP4 · MKV · MOV · AVI · WEBM · FLV · WMV · 3GP"
       resultWidth={190}
       rowHeight={76}
@@ -136,14 +138,14 @@
     </FileList>
   {/if}
 
-  <aside class="card panel" aria-label="Pengaturan output">
+  <aside class="card panel" aria-label={L('Pengaturan output', 'Output settings')}>
     <div class="scroll">
       <Segmented
-        label="Jenis hasil"
+        label={L('Jenis hasil', 'Output type')}
         bind:value={st.mode}
         options={[
-          { value: 'video', label: 'Jadi video' },
-          { value: 'audio', label: 'Ambil audio saja' },
+          { value: 'video', label: L('Jadi video', 'Video') },
+          { value: 'audio', label: L('Ambil audio saja', 'Audio only') },
         ]}
       />
 
@@ -166,51 +168,51 @@
             <Select
               label="Codec video"
               bind:value={st.v.codec}
-              options={codecs.map((c) => ({ value: c, label: codecOptionLabel[c] + (available(c) ? '' : ' — tidak tersedia'), disabled: !available(c) }))}
+              options={codecs.map((c) => ({ value: c, label: codecOptionLabel(c) + (available(c) ? '' : L(' — tidak tersedia', ' — not available')), disabled: !available(c) }))}
             />
-            {#if isCopy}<p class="hint">Sangat cepat & tanpa turun kualitas, tapi resolusi dan ukuran tetap. Hanya bisa jika codec sumber cocok dengan format tujuan.</p>{/if}
+            {#if isCopy}<p class="hint">{L('Sangat cepat & tanpa turun kualitas, tapi resolusi dan ukuran tetap. Hanya bisa jika codec sumber cocok dengan format tujuan.', 'Very fast with no quality loss, but resolution and size stay the same. Only works when the source codec fits the target format.')}</p>{/if}
           </div>
         {:else}
-          <p class="hint">GIF dibuat 12 fps dengan palet warna optimal. Cocok untuk klip pendek.</p>
+          <p class="hint">{L('GIF dibuat 12 fps dengan palet warna optimal. Cocok untuk klip pendek.', 'GIFs are made at 12 fps with an optimized palette. Best for short clips.')}</p>
         {/if}
 
         {#if !isCopy && !isGif}
           <div class="sec">
-            <span class="label">Kualitas</span>
+            <span class="label">{L('Kualitas', 'Quality')}</span>
             {#if !st.v.manual}
               <Segmented
-                label="Kualitas"
+                label={L('Kualitas', 'Quality')}
                 bind:value={st.v.quality}
                 options={[
-                  { value: 'hemat', label: 'Hemat' },
-                  { value: 'seimbang', label: 'Seimbang' },
-                  { value: 'tinggi', label: 'Tinggi' },
+                  { value: 'hemat', label: L('Hemat', 'Small') },
+                  { value: 'seimbang', label: L('Seimbang', 'Balanced') },
+                  { value: 'tinggi', label: L('Tinggi', 'High') },
                 ]}
               />
             {:else}
               <div class="row-between">
-                <label class="t12" for="crf">CRF (angka kecil = lebih bagus & besar)</label>
+                <label class="t12" for="crf">{L('CRF (angka kecil = lebih bagus & besar)', 'CRF (lower = better & bigger)')}</label>
                 <span class="val">{st.v.crf}</span>
               </div>
               <input id="crf" type="range" min="10" max={maxCrf(st.v.codec)} bind:value={st.v.crf} />
               <Select
-                label="Kecepatan encode"
+                label={L('Kecepatan encode', 'Encoding speed')}
                 bind:value={st.v.preset}
                 options={[
-                  { value: 'fast', label: 'Cepat (file sedikit lebih besar)' },
-                  { value: 'medium', label: 'Sedang (disarankan)' },
-                  { value: 'slow', label: 'Lambat (file lebih kecil)' },
+                  { value: 'fast', label: L('Cepat (file sedikit lebih besar)', 'Fast (slightly bigger file)') },
+                  { value: 'medium', label: L('Sedang (disarankan)', 'Medium (recommended)') },
+                  { value: 'slow', label: L('Lambat (file lebih kecil)', 'Slow (smaller file)') },
                 ]}
               />
             {/if}
             <div class="row-between t12">
-              <span>CRF {crfFor(st.v)} · kecepatan {speed[st.v.preset]}</span>
+              <span>CRF {crfFor(st.v)} · {L('kecepatan', 'speed')} {speed[st.v.preset]}</span>
               <button
                 class="link"
                 onclick={() => {
                   if (!st.v.manual) st.v.crf = crfFor(st.v)
                   st.v.manual = !st.v.manual
-                }}>{st.v.manual ? 'Pakai pilihan mudah' : 'Atur manual'}</button
+                }}>{st.v.manual ? L('Pakai pilihan mudah', 'Use simple choices') : L('Atur manual', 'Set manually')}</button
               >
             </div>
           </div>
@@ -218,31 +220,31 @@
 
         {#if !isCopy}
           <div class="sec">
-            <span class="label">Resolusi</span>
+            <span class="label">{L('Resolusi', 'Resolution')}</span>
             <Chips
               bind:value={st.v.resolution}
               columns={5}
               small
               options={[
-                { value: 'original', label: 'Asli' }, { value: '1080', label: '1080p' }, { value: '720', label: '720p' },
-                { value: '480', label: '480p' }, { value: 'custom', label: 'Lain' },
+                { value: 'original', label: L('Asli', 'Original') }, { value: '1080', label: '1080p' }, { value: '720', label: '720p' },
+                { value: '480', label: '480p' }, { value: 'custom', label: L('Lain', 'Other') },
               ]}
             />
             {#if st.v.resolution === 'custom'}
               <div class="num">
                 <input
                   class="text-input"
-                  aria-label="Sisi pendek dalam piksel"
+                  aria-label={L('Sisi pendek dalam piksel', 'Short side in pixels')}
                   inputmode="numeric"
                   value={st.v.custom || ''}
                   oninput={(e) => {
                     const v = parseInt((e.currentTarget as HTMLInputElement).value.replace(/\D/g, ''), 10)
                     st.v.custom = isNaN(v) ? 0 : Math.min(4320, v)
                   }}
-                /><span>px sisi pendek</span>
+                /><span>{L('px sisi pendek', 'px short side')}</span>
               </div>
             {/if}
-            <p class="hint">Video tidak pernah diperbesar. Video vertikal ikut disesuaikan.</p>
+            <p class="hint">{L('Video tidak pernah diperbesar. Video vertikal ikut disesuaikan.', 'Videos are never upscaled. Vertical videos are handled too.')}</p>
           </div>
         {/if}
       {:else}
@@ -250,7 +252,7 @@
       {/if}
 
       <div class="sec">
-        <span class="label">Simpan ke</span>
+        <span class="label">{L('Simpan ke', 'Save to')}</span>
         <OutputPicker kind="video" />
       </div>
     </div>
@@ -259,10 +261,10 @@
       kind="video"
       running={conv.running}
       busy={conv.starting}
-      startLabel={conv.hasUnprocessed() || pending.length === 0 ? `Mulai konversi${pending.length ? ` (${pending.length})` : ''}` : `Konversi ulang (${pending.length})`}
+      startLabel={conv.hasUnprocessed() || pending.length === 0 ? `${L('Mulai konversi', 'Start converting')}${pending.length ? ` (${pending.length})` : ''}` : `${L('Konversi ulang', 'Convert again')} (${pending.length})`}
       disabled={pending.length === 0 || invalidCustom || noFFmpeg}
-      disabledHint={noFFmpeg ? 'Pasang FFmpeg dulu (lihat banner di atas).' : conv.items.length === 0 ? 'Tambahkan video dulu untuk memulai.' : invalidCustom ? 'Isi resolusi yang valid (minimal 16 px).' : ''}
-      note={conv.items.length && !conv.running && totalDuration ? `Total durasi ${duration(totalDuration)}` : ''}
+      disabledHint={noFFmpeg ? L('Pasang FFmpeg dulu (lihat banner di atas).', 'Install FFmpeg first (see the banner above).') : conv.items.length === 0 ? L('Tambahkan video dulu untuk memulai.', 'Add videos to get started.') : invalidCustom ? L('Isi resolusi yang valid (minimal 16 px).', 'Enter a valid resolution (at least 16 px).') : ''}
+      note={conv.items.length && !conv.running && totalDuration ? `${L('Total durasi', 'Total duration')} ${duration(totalDuration)}` : ''}
       lastOutput={conv.lastOutput()}
       queueMore={conv.running ? conv.fresh().filter((it) => !it.error).length : 0}
       onstart={start}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { L } from '../lib/i18n.svelte'
   import type { Snippet } from 'svelte'
   import Icon from './Icon.svelte'
   import StatusCell from './StatusCell.svelte'
@@ -33,19 +34,19 @@
   const cols = $derived(`minmax(0, 1fr) ${resultWidth}px 128px 64px`)
 </script>
 
-<section class="card list" aria-label="Daftar {noun}">
+<section class="card list" aria-label={L(`Daftar ${noun}`, `${noun} list`)}>
   <div class="toolbar">
     <div class="count">
       <span class="n">{conv.items.length} {noun}</span>
       <span class="size">{bytes(conv.totalSize)} total</span>
-      {#if conv.adding}<span class="loading"><Icon name="loader" size={14} class="spin" /> Membaca file…</span>{/if}
+      {#if conv.adding}<span class="loading"><Icon name="loader" size={14} class="spin" /> {L('Membaca file…', 'Reading files…')}</span>{/if}
     </div>
-    <button class="btn" onclick={() => conv.pickFiles()} disabled={conv.adding}><Icon name="plus" size={16} />Tambah file</button>
-    <button class="btn" onclick={() => conv.pickFolder()} disabled={conv.adding}><Icon name="folder" size={16} />Tambah folder</button>
+    <button class="btn" onclick={() => conv.pickFiles()} disabled={conv.adding}><Icon name="plus" size={16} />{L('Tambah file', 'Add files')}</button>
+    <button class="btn" onclick={() => conv.pickFolder()} disabled={conv.adding}><Icon name="folder" size={16} />{L('Tambah folder', 'Add folder')}</button>
     {#if conv.items.some((it) => conv.state(it) === 'done' || conv.state(it) === 'skipped')}
-      <button class="btn" onclick={() => conv.clearFinished()} title="Hapus yang sudah selesai dari daftar"><Icon name="check" size={16} />Bersihkan selesai</button>
+      <button class="btn" onclick={() => conv.clearFinished()} title={L('Hapus yang sudah selesai dari daftar', 'Remove finished items from the list')}><Icon name="check" size={16} />{L('Bersihkan selesai', 'Clear finished')}</button>
     {/if}
-    <button class="btn icon" aria-label="Kosongkan daftar" title="Kosongkan daftar" onclick={() => conv.clear()}><Icon name="trash" size={16} /></button>
+    <button class="btn icon" aria-label={L('Kosongkan daftar', 'Clear list')} title={L('Kosongkan daftar', 'Clear list')} onclick={() => conv.clear()}><Icon name="trash" size={16} /></button>
   </div>
 
   <div class="drop">
@@ -55,7 +56,7 @@
   </div>
 
   <div class="head" style="grid-template-columns: {cols}">
-    <span>FILE</span><span>HASIL</span><span>STATUS</span><span></span>
+    <span>FILE</span><span>{L('HASIL', 'OUTPUT')}</span><span>STATUS</span><span></span>
   </div>
 
   <div class="rows">
@@ -79,11 +80,11 @@
           {#if it.error}
             <span class="bad">{it.error}</span>
           {:else if st === 'failed' && task}
-            <span class="bad ellipsis" title={task.message}>{task.message || 'Gagal'}</span>
-            <button class="link" onclick={() => showDetail(it.name, task.message, task.detail)}>Lihat detail</button>
+            <span class="bad ellipsis" title={task.message}>{task.message || L('Gagal', 'Failed')}</span>
+            <button class="link" onclick={() => showDetail(it.name, task.message, task.detail)}>{L('Lihat detail', 'View details')}</button>
           {:else if st === 'skipped' && task}
             <span class="r1">{task.message}</span>
-            {#if task.output}<button class="link" onclick={() => api.revealFile(task.output)}>Lihat file</button>{/if}
+            {#if task.output}<button class="link" onclick={() => api.revealFile(task.output)}>{L('Lihat file', 'Show file')}</button>{/if}
           {:else}
             {@render result(it)}
           {/if}
@@ -91,12 +92,12 @@
         <div><StatusCell state={st} {task} /></div>
         <div class="actions">
           {#if st === 'done' && task?.output}
-            <button class="mini" aria-label="Tampilkan file hasil" title="Tampilkan file hasil" onclick={() => api.revealFile(task.output)}><Icon name="folderOpen" size={16} /></button>
+            <button class="mini" aria-label={L('Tampilkan file hasil', 'Show output file')} title={L('Tampilkan file hasil', 'Show output file')} onclick={() => api.revealFile(task.output)}><Icon name="folderOpen" size={16} /></button>
           {/if}
           <button
             class="mini"
-            aria-label={st === 'running' || st === 'queued' ? `Batalkan ${it.name}` : `Hapus ${it.name} dari daftar`}
-            title={st === 'running' || st === 'queued' ? 'Batalkan' : 'Hapus dari daftar'}
+            aria-label={st === 'running' || st === 'queued' ? L(`Batalkan ${it.name}`, `Cancel ${it.name}`) : L(`Hapus ${it.name} dari daftar`, `Remove ${it.name} from the list`)}
+            title={st === 'running' || st === 'queued' ? L('Batalkan', 'Cancel') : L('Hapus dari daftar', 'Remove from list')}
             onclick={() => conv.remove(it)}><Icon name="x" size={16} /></button
           >
         </div>

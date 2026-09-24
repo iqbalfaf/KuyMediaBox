@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { L } from '../lib/i18n.svelte'
   import PageHeader from '../components/PageHeader.svelte'
   import FileList from '../components/FileList.svelte'
   import EmptyDrop from '../components/EmptyDrop.svelte'
@@ -27,7 +28,7 @@
   function meta(it: FileItem): string {
     const p: string[] = []
     if (it.hasVideo) {
-      p.push('Audio dari video')
+      p.push(L('Audio dari video', 'Audio from video'))
       if (it.audioCodec) p.push(codec(it.audioCodec))
     } else {
       p.push(it.ext.toUpperCase())
@@ -36,7 +37,7 @@
     }
     if (it.duration) p.push(duration(it.duration))
     p.push(bytes(it.size))
-    if (it.hasCover) p.push('ada cover')
+    if (it.hasCover) p.push(L('ada cover', 'has cover'))
     return p.join(' · ')
   }
 
@@ -48,28 +49,28 @@
   }
 </script>
 
-<PageHeader title="Konversi Audio" subtitle="Ubah format dan kualitas audio, termasuk audio dari file video." />
-<ToolBanner ids={['ffmpeg']} why="FFmpeg dibutuhkan untuk membaca dan mengonversi audio." />
+<PageHeader title={L('Konversi Audio', 'Audio Converter')} subtitle={L('Ubah format dan kualitas audio, termasuk audio dari file video.', 'Change audio format and quality, including audio from video files.')} />
+<ToolBanner ids={['ffmpeg']} why={L('FFmpeg dibutuhkan untuk membaca dan mengonversi audio.', 'FFmpeg is needed to read and convert audio.')} />
 
 <div class="body">
   {#if conv.items.length === 0}
     <EmptyDrop
       {conv}
-      title="Tarik & lepas audio ke sini"
-      subtitle="File audio atau video — audionya yang diambil."
-      pickLabel="Pilih audio"
+      title={L('Tarik & lepas audio ke sini', 'Drag & drop audio here')}
+      subtitle={L('File audio atau video — audionya yang diambil.', 'Audio or video files — the audio is extracted.')}
+      pickLabel={L('Pilih audio', 'Choose audio')}
       formats={['MP3', 'WAV', 'FLAC', 'M4A', 'OGG', 'OPUS', 'WMA', 'AAC', 'MP4']}
       steps={[
-        ['Tambahkan audio', 'Tarik ke sini atau klik tombol'],
-        ['Pilih format & bitrate', 'Di panel sebelah kanan'],
-        ['Klik Mulai', 'File asli tidak akan diubah'],
+        [L('Tambahkan audio', 'Add audio'), L('Tarik ke sini atau klik tombol', 'Drag it here or click the button')],
+        [L('Pilih format & bitrate', 'Pick format & bitrate'), L('Di panel sebelah kanan', 'In the panel on the right')],
+        [L('Klik Mulai', 'Click Start'), L('File asli tidak akan diubah', 'Your original files stay untouched')],
       ]}
     />
   {:else}
     <FileList
       {conv}
-      noun="file"
-      dropText="Tarik & lepas audio atau video di sini"
+      noun={L('file', 'files')}
+      dropText={L('Tarik & lepas audio atau video di sini', 'Drag & drop audio or video here')}
       formats="MP3 · WAV · FLAC · M4A · OGG · OPUS · WMA"
       resultWidth={150}
       {meta}
@@ -93,7 +94,7 @@
     </FileList>
   {/if}
 
-  <aside class="card panel" aria-label="Pengaturan output">
+  <aside class="card panel" aria-label={L('Pengaturan output', 'Output settings')}>
     <div class="scroll">
       <AudioFormatPanel bind:o={st.a} />
 
@@ -103,7 +104,7 @@
           label="Channel"
           bind:value={st.a.channels}
           options={[
-            { value: 'source', label: 'Ikuti asli' },
+            { value: 'source', label: L('Ikuti asli', 'Keep original') },
             { value: 'stereo', label: 'Stereo' },
             { value: 'mono', label: 'Mono' },
           ]}
@@ -116,18 +117,18 @@
           label="Sample rate"
           bind:value={st.a.sampleRate}
           options={[
-            { value: 'source', label: 'Ikuti file asli' },
+            { value: 'source', label: L('Ikuti file asli', 'Same as source') },
             { value: '44100', label: '44,1 kHz (CD)' },
             { value: '48000', label: '48 kHz (video)' },
           ]}
         />
-        {#if st.a.format === 'opus' && st.a.sampleRate === '44100'}<p class="hint">Opus selalu memakai 48 kHz.</p>{/if}
+        {#if st.a.format === 'opus' && st.a.sampleRate === '44100'}<p class="hint">{L('Opus selalu memakai 48 kHz.', 'Opus always uses 48 kHz.')}</p>{/if}
       </div>
 
-      <Switch bind:checked={st.a.keepMetadata} label="Pertahankan info lagu" hint="Judul, artis, album & cover" />
+      <Switch bind:checked={st.a.keepMetadata} label={L('Pertahankan info lagu', 'Keep song info')} hint={L('Judul, artis, album & cover', 'Title, artist, album & cover')} />
 
       <div class="sec">
-        <span class="label">Simpan ke</span>
+        <span class="label">{L('Simpan ke', 'Save to')}</span>
         <OutputPicker kind="audio" />
       </div>
     </div>
@@ -136,9 +137,9 @@
       kind="audio"
       running={conv.running}
       busy={conv.starting}
-      startLabel={conv.hasUnprocessed() || pending.length === 0 ? `Mulai konversi${pending.length ? ` (${pending.length})` : ''}` : `Konversi ulang (${pending.length})`}
+      startLabel={conv.hasUnprocessed() || pending.length === 0 ? `${L('Mulai konversi', 'Start converting')}${pending.length ? ` (${pending.length})` : ''}` : `${L('Konversi ulang', 'Convert again')} (${pending.length})`}
       disabled={pending.length === 0 || noFFmpeg}
-      disabledHint={noFFmpeg ? 'Pasang FFmpeg dulu (lihat banner di atas).' : conv.items.length === 0 ? 'Tambahkan audio dulu untuk memulai.' : ''}
+      disabledHint={noFFmpeg ? L('Pasang FFmpeg dulu (lihat banner di atas).', 'Install FFmpeg first (see the banner above).') : conv.items.length === 0 ? L('Tambahkan audio dulu untuk memulai.', 'Add audio to get started.') : ''}
       lastOutput={conv.lastOutput()}
       queueMore={conv.running ? conv.fresh().filter((it) => !it.error).length : 0}
       onstart={start}

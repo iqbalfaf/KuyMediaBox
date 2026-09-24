@@ -1,3 +1,4 @@
+import { L } from '../i18n.svelte'
 import { api, errText, runtime } from '../api'
 import type { UpdateInfo } from '../types'
 import { toast } from './app.svelte'
@@ -41,9 +42,9 @@ export async function checkNow() {
     const info = await api.checkUpdate()
     upd.info = info
     if (info.available) upd.open = true
-    else toast(`KuyMediaBox sudah versi terbaru (v${info.current})`, 'ok')
+    else toast(L(`KuyMediaBox sudah versi terbaru (v${info.current})`, `KuyMediaBox is up to date (v${info.current})`), 'ok')
   } catch (e) {
-    toast(`Cek update gagal: ${errText(e)}`, 'err')
+    toast(`${L('Cek update gagal', 'Update check failed')}: ${errText(e)}`, 'err')
   } finally {
     upd.checking = false
   }

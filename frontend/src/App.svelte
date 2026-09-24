@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { L } from './lib/i18n.svelte'
   import { onMount } from 'svelte'
   import Sidebar from './components/Sidebar.svelte'
   import Toasts from './components/Toasts.svelte'
@@ -16,7 +17,19 @@
   import { addLinks } from './lib/stores/download.svelte'
   import { initUpdate } from './lib/stores/update.svelte'
 
-  const labels: Record<string, string> = { image: 'Konversi gambar', video: 'Konversi video', audio: 'Konversi audio', download: 'Download' }
+  function batchTitle(kind: string): string {
+    switch (kind) {
+      case 'image':
+        return L('Konversi gambar selesai', 'Image conversion finished')
+      case 'video':
+        return L('Konversi video selesai', 'Video conversion finished')
+      case 'audio':
+        return L('Konversi audio selesai', 'Audio conversion finished')
+      case 'download':
+        return L('Download selesai', 'Download finished')
+    }
+    return L('Tugas selesai', 'Tasks finished')
+  }
 
   onMount(() => {
     initApp()
@@ -35,19 +48,19 @@
           audioConv.addPaths(paths)
           break
         case 'download':
-          toast('Di halaman Download, tempel link (bukan file). Pindah ke Gambar/Video/Audio untuk konversi file.', 'info')
+          toast(L('Di halaman Download, tempel link (bukan file). Pindah ke Gambar/Video/Audio untuk konversi file.', 'The Download page takes links, not files. Switch to Images/Video/Audio to convert files.'), 'info')
           break
         default:
-          toast('Buka halaman Gambar, Video, atau Audio untuk menambahkan file.', 'info')
+          toast(L('Buka halaman Gambar, Video, atau Audio untuk menambahkan file.', 'Open the Images, Video or Audio page to add files.'), 'info')
       }
     })
 
     runtime.on('batch:done', (b: { kind: string; done: number; failed: number; skipped: number; canceled: number }) => {
       if (b.done + b.failed + b.skipped === 0) return
-      const parts = [`${b.done} berhasil`]
-      if (b.failed) parts.push(`${b.failed} gagal`)
-      if (b.skipped) parts.push(`${b.skipped} dilewati`)
-      toast(`${labels[b.kind] ?? 'Tugas'} selesai: ${parts.join(' · ')}`, b.failed ? 'err' : 'ok')
+      const parts = [`${b.done} ${L('berhasil', 'succeeded')}`]
+      if (b.failed) parts.push(`${b.failed} ${L('gagal', 'failed')}`)
+      if (b.skipped) parts.push(`${b.skipped} ${L('dilewati', 'skipped')}`)
+      toast(`${batchTitle(b.kind)}: ${parts.join(' · ')}`, b.failed ? 'err' : 'ok')
     })
   })
 
@@ -81,7 +94,7 @@
       <SettingsPage />
     {/if}
     <div class="drop-overlay" aria-hidden="true">
-      <div class="drop-box">Lepaskan file untuk menambahkan</div>
+      <div class="drop-box">{L('Lepaskan file untuk menambahkan', 'Drop files to add them')}</div>
     </div>
   </main>
 </div>

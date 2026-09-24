@@ -13,6 +13,7 @@ import (
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"kuymediabox/internal/ffmpeg"
+	"kuymediabox/internal/i18n"
 	"kuymediabox/internal/imageconv"
 	"kuymediabox/internal/mediaconv"
 	"kuymediabox/internal/naming"
@@ -162,7 +163,7 @@ func (a *App) describe(kind, path, ffprobe string) FileItem {
 		if err != nil {
 			// ICO and exotic formats may still convert through the fallback decoders.
 			if it.Ext != "ico" {
-				it.Error = "Format tidak dikenali atau file rusak"
+				it.Error = i18n.L("Format tidak dikenali atau file rusak", "Unknown format or damaged file")
 			}
 			return it
 		}
@@ -170,12 +171,12 @@ func (a *App) describe(kind, path, ffprobe string) FileItem {
 		return it
 	}
 	if ffprobe == "" {
-		it.Error = "FFmpeg belum terpasang"
+		it.Error = i18n.L("FFmpeg belum terpasang", "FFmpeg is not installed")
 		return it
 	}
 	info, err := ffmpeg.Probe(context.Background(), ffprobe, path)
 	if err != nil {
-		it.Error = "File tidak bisa dibaca"
+		it.Error = i18n.L("File tidak bisa dibaca", "File can't be read")
 		return it
 	}
 	it.Width, it.Height, it.Duration = info.Width, info.Height, info.Duration
@@ -184,15 +185,15 @@ func (a *App) describe(kind, path, ffprobe string) FileItem {
 	it.HasVideo, it.HasAudio, it.HasCover = info.HasVideo, info.HasAudio, info.CoverIndex >= 0
 	switch {
 	case kind == queue.KindVideo && !info.HasVideo:
-		it.Error = "Tidak ada video di file ini"
+		it.Error = i18n.L("Tidak ada video di file ini", "This file has no video")
 	case kind == queue.KindAudio && !info.HasAudio:
-		it.Error = "Tidak ada audio di file ini"
+		it.Error = i18n.L("Tidak ada audio di file ini", "This file has no audio")
 	}
 	return it
 }
 
 var dialogFilters = map[string]wruntime.FileFilter{
-	queue.KindImage: {DisplayName: "Gambar", Pattern: "*.jpg;*.jpeg;*.jfif;*.png;*.webp;*.gif;*.bmp;*.tif;*.tiff;*.heic;*.heif;*.avif;*.ico"},
+	queue.KindImage: {DisplayName: "Images", Pattern: "*.jpg;*.jpeg;*.jfif;*.png;*.webp;*.gif;*.bmp;*.tif;*.tiff;*.heic;*.heif;*.avif;*.ico"},
 	queue.KindVideo: {DisplayName: "Video", Pattern: "*.mp4;*.mkv;*.mov;*.avi;*.webm;*.flv;*.wmv;*.3gp;*.ts;*.m4v;*.mpg;*.mpeg;*.mts;*.m2ts;*.ogv;*.vob"},
 	queue.KindAudio: {DisplayName: "Audio & video", Pattern: "*.mp3;*.wav;*.flac;*.aac;*.m4a;*.ogg;*.opus;*.wma;*.aiff;*.aif;*.amr;*.ape;*.wv;*.mka;*.oga;*.mp4;*.mkv;*.mov;*.avi;*.webm;*.flv;*.wmv;*.m4v"},
 }
@@ -201,11 +202,17 @@ var dialogFilters = map[string]wruntime.FileFilter{
 func (a *App) PickFiles(kind string) ([]FileItem, error) {
 	filter, ok := dialogFilters[kind]
 	if !ok {
-		return nil, errors.New("jenis tidak dikenal")
+		return nil, errors.New(i18n.L("jenis tidak dikenal", "unknown kind"))
+	}
+	switch kind {
+	case queue.KindImage:
+		filter.DisplayName = i18n.L("Gambar", "Images")
+	case queue.KindAudio:
+		filter.DisplayName = i18n.L("Audio & video", "Audio & video")
 	}
 	paths, err := wruntime.OpenMultipleFilesDialog(a.ctx, wruntime.OpenDialogOptions{
-		Title:   "Pilih file",
-		Filters: []wruntime.FileFilter{filter, {DisplayName: "Semua file", Pattern: "*.*"}},
+		Title:   i18n.L("Pilih file", "Choose files"),
+		Filters: []wruntime.FileFilter{filter, {DisplayName: i18n.L("Semua file", "All files"), Pattern: "*.*"}},
 	})
 	if err != nil || len(paths) == 0 {
 		return []FileItem{}, err
@@ -215,7 +222,7 @@ func (a *App) PickFiles(kind string) ([]FileItem, error) {
 
 // PickFolder opens a folder dialog and adds every matching file inside it.
 func (a *App) PickFolder(kind string) ([]FileItem, error) {
-	dir, err := wruntime.OpenDirectoryDialog(a.ctx, wruntime.OpenDialogOptions{Title: "Pilih folder"})
+	dir, err := wruntime.OpenDirectoryDialog(a.ctx, wruntime.OpenDialogOptions{Title: i18n.L("Pilih folder", "Choose a folder")})
 	if err != nil || dir == "" {
 		return []FileItem{}, err
 	}
@@ -239,10 +246,10 @@ func (a *App) resolveOutput(kind string) (naming.OutputSpec, error) {
 	out := a.outputSpec(kind)
 	if out.Mode == "custom" {
 		if strings.TrimSpace(out.Dir) == "" {
-			return out, errors.New("Pilih folder hasil terlebih dulu")
+			return out, errors.New(i18n.L("Pilih folder hasil terlebih dulu", "Choose an output folder first"))
 		}
 		if err := os.MkdirAll(out.Dir, 0o755); err != nil {
-			return out, fmt.Errorf("Folder hasil tidak bisa dipakai (%s): %w", out.Dir, err)
+			return out, fmt.Errorf(i18n.L("Folder hasil tidak bisa dipakai (%s): %w", "Output folder can't be used (%s): %w"), out.Dir, err)
 		}
 	}
 	return out, nil
@@ -252,13 +259,13 @@ func (a *App) resolveOutput(kind string) (naming.OutputSpec, error) {
 func (a *App) convertTask(item JobItem, out naming.OutputSpec, ext string, work func(ctx context.Context, tmp string, r queue.Reporter) error) queue.RunFunc {
 	return func(ctx context.Context, r queue.Reporter) error {
 		if _, err := os.Stat(item.Path); err != nil {
-			return queue.Fail("File asli tidak ditemukan (dipindah atau dihapus?)", err.Error())
+			return queue.Fail(i18n.L("File asli tidak ditemukan (dipindah atau dihapus?)", "Source file not found (moved or deleted?)"), err.Error())
 		}
 		s := a.cfg.Get()
 		target, release, err := a.namer.Reserve(item.Path, out, s.Suffix, ext, s.Conflict)
 		if errors.Is(err, naming.ErrExists) {
 			r.SetOutput(target, 0)
-			return queue.Skip("File hasil sudah ada")
+			return queue.Skip(i18n.L("File hasil sudah ada", "Output file already exists"))
 		}
 		if err != nil {
 			return queue.Fail(err.Error(), "")
@@ -273,11 +280,11 @@ func (a *App) convertTask(item JobItem, out naming.OutputSpec, ext string, work 
 			return err
 		}
 		if err := naming.Commit(tmp, target); err != nil {
-			return queue.Fail("Tidak bisa menyimpan file hasil", err.Error())
+			return queue.Fail(i18n.L("Tidak bisa menyimpan file hasil", "Can't save the output file"), err.Error())
 		}
 		st, err := os.Stat(target)
 		if err != nil {
-			return queue.Fail("File hasil hilang setelah disimpan", err.Error())
+			return queue.Fail(i18n.L("File hasil hilang setelah disimpan", "Output file disappeared after saving"), err.Error())
 		}
 		r.SetOutput(target, st.Size())
 		return nil
@@ -296,7 +303,7 @@ func (a *App) StartImage(items []JobItem, o imageconv.Options) ([]JobRef, error)
 	for i, it := range items {
 		it := it
 		specs[i] = queue.Spec{Title: filepath.Base(it.Path), Run: a.convertTask(it, out, o.Format, func(ctx context.Context, tmp string, r queue.Reporter) error {
-			r.Message("Mengonversi…")
+			r.Message(i18n.L("Mengonversi…", "Converting…"))
 			if err := imageconv.Convert(ctx, it.Path, tmp, o, ffmpegPath, r.Progress); err != nil {
 				if ctx.Err() != nil {
 					return ctx.Err()
@@ -324,13 +331,13 @@ func (a *App) StartVideo(items []JobItem, job VideoJob) ([]JobRef, error) {
 	}
 	ff, probe := a.tools.Path(tools.FFmpeg), a.tools.Path(tools.FFprobe)
 	if ff == "" || probe == "" {
-		return nil, errors.New("FFmpeg belum terpasang. Buka Pengaturan untuk mengunduhnya.")
+		return nil, errors.New(i18n.L("FFmpeg belum terpasang. Buka Pengaturan untuk mengunduhnya.", "FFmpeg is not installed. Open Settings to download it."))
 	}
 	job.Video.Normalize()
 	job.Audio.Normalize()
 	enc := a.encoders()
 	if job.Mode != "audio" && job.Video.Codec != "copy" && job.Video.Format != "gif" && mediaconv.PickEncoder(job.Video.Codec, enc) == "" {
-		return nil, fmt.Errorf("Encoder %s tidak tersedia di FFmpeg ini. Pilih codec lain.", strings.ToUpper(job.Video.Codec))
+		return nil, fmt.Errorf(i18n.L("Encoder %s tidak tersedia di FFmpeg ini. Pilih codec lain.", "The %s encoder isn't available in this FFmpeg. Choose another codec."), strings.ToUpper(job.Video.Codec))
 	}
 	kind := queue.KindVideo
 	specs := make([]queue.Spec, len(items))
@@ -343,7 +350,7 @@ func (a *App) StartVideo(items []JobItem, job VideoJob) ([]JobRef, error) {
 		specs[i] = queue.Spec{Title: filepath.Base(it.Path), Run: a.convertTask(it, out, ext, func(ctx context.Context, tmp string, r queue.Reporter) error {
 			info, err := ffmpeg.Probe(ctx, probe, it.Path)
 			if err != nil {
-				return queue.Fail("File tidak bisa dibaca", err.Error())
+				return queue.Fail(i18n.L("File tidak bisa dibaca", "File can't be read"), err.Error())
 			}
 			var args []string
 			if job.Mode == "audio" {
@@ -368,7 +375,7 @@ func (a *App) StartAudio(items []JobItem, o mediaconv.AudioOptions) ([]JobRef, e
 	}
 	ff, probe := a.tools.Path(tools.FFmpeg), a.tools.Path(tools.FFprobe)
 	if ff == "" || probe == "" {
-		return nil, errors.New("FFmpeg belum terpasang. Buka Pengaturan untuk mengunduhnya.")
+		return nil, errors.New(i18n.L("FFmpeg belum terpasang. Buka Pengaturan untuk mengunduhnya.", "FFmpeg is not installed. Open Settings to download it."))
 	}
 	o.Normalize()
 	specs := make([]queue.Spec, len(items))
@@ -377,7 +384,7 @@ func (a *App) StartAudio(items []JobItem, o mediaconv.AudioOptions) ([]JobRef, e
 		specs[i] = queue.Spec{Title: filepath.Base(it.Path), Run: a.convertTask(it, out, o.Format, func(ctx context.Context, tmp string, r queue.Reporter) error {
 			info, err := ffmpeg.Probe(ctx, probe, it.Path)
 			if err != nil {
-				return queue.Fail("File tidak bisa dibaca", err.Error())
+				return queue.Fail(i18n.L("File tidak bisa dibaca", "File can't be read"), err.Error())
 			}
 			args, err := mediaconv.AudioArgs(it.Path, tmp, info, o)
 			if err != nil {
@@ -390,11 +397,11 @@ func (a *App) StartAudio(items []JobItem, o mediaconv.AudioOptions) ([]JobRef, e
 }
 
 func runFFmpeg(ctx context.Context, ff string, args []string, duration float64, r queue.Reporter) error {
-	r.Message("Mengonversi…")
+	r.Message(i18n.L("Mengonversi…", "Converting…"))
 	return ffmpeg.Run(ctx, ff, args, duration, func(p float64, speed string) {
 		r.Progress(p)
 		if speed != "" && speed != "N/A" {
-			r.Message("Mengonversi · " + speed)
+			r.Message(i18n.L("Mengonversi · ", "Converting · ") + speed)
 		}
 	})
 }
