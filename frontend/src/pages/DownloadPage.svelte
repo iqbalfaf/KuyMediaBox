@@ -1,0 +1,1002 @@
+<script lang="ts">
+  import PageHeader from '../components/PageHeader.svelte'
+  import Chips from '../components/Chips.svelte'
+  import Segmented from '../components/Segmented.svelte'
+  import Switch from '../components/Switch.svelte'
+  import RunFooter from '../components/RunFooter.svelte'
+  import ToolBanner from '../components/ToolBanner.svelte'
+  import Icon from '../components/Icon.svelte'
+  import OutputPicker from '../components/OutputPicker.svelte'
+  import { api, errText, runtime } from '../lib/api'
+  import { hasTool, settings, showDetail, toast } from '../lib/stores/app.svelte'
+  import {
+    activeRow, addLinks, analyze, applyRange, applyScope, cancelAll, dl, pendingCount, rememberOpts, removeRow,
+    runningCount, selectable, selectedEntries, setAll, startAll, tabLabel, toQueue, typeLabel, visible,
+    type LinkRow,
+  } from '../lib/stores/download.svelte'
+  import { isActive, tasks } from '../lib/stores/tasks.svelte'
+  import { duration, initials, longDuration, parseRange, pct, tile, ymd } from '../lib/format'
+  import type { Collection, Entry } from '../lib/types'
+
+  const row = $derived(activeRow())
+  const entries = $derived(row ? visible(row) : [])
+  const selCount = $derived(row ? selectedEntries(row).length : 0)
+  const selectableCount = $derived(row ? entries.filter((e) => selectable(e, row)).length : 0)
+  const archivedCount = $derived(row && row.opts.skipExisting ? entries.filter((e) => e.archived).length : 0)
+  const hasSpotify = $derived(dl.rows.some((r) => r.link.source === 'spotify'))
+  const toolIds = $derived(hasSpotify ? ['ytdlp', 'ffmpeg', 'jsruntime', 'spotdl'] : ['ytdlp', 'ffmpeg', 'jsruntime'])
+  const pending = $derived(pendingCount())
+  const running = $derived(runningCount() > 0)
+  const missingTools = $derived(!hasTool('ytdlp') || !hasTool('ffmpeg') || (hasSpotify && !hasTool('spotdl')))
+
+  let dirOf = $state<Record<string, string>>({})
+  $effect(() => {
+    const r = row
+    // Re-resolve when the Download folder setting changes.
+    void settings.value?.outputs?.download?.mode
+    void settings.value?.outputs?.download?.dir
+    void settings.value?.downloadSubfolders
+    if (r?.col) {
+      const key = r.col.key
+      api.collectionDir(key).then((d) => (dirOf[key] = d)).catch(() => {})
+    }
+  })
+
+  async function submit() {
+    const text = dl.input.trim()
+    if (!text) return
+    dl.input = ''
+    await addLinks(text)
+  }
+
+  async function paste() {
+    try {
+      const text = (await runtime.clipboardText()) ?? ''
+      if (!text.trim()) {
+        toast('Clipboard kosong', 'info')
+        return
+      }
+      await addLinks(text)
+    } catch (e) {
+      toast(errText(e), 'err')
+    }
+  }
+
+  function countLabel(r: LinkRow): string {
+    const col = r.col
+    if (!col) return typeLabel[r.link.type] ?? 'Link'
+    const n = col.entries.length
+    const noun = col.source === 'spotify' ? 'lagu' : 'video'
+    if (col.type === 'video' || col.type === 'track') return typeLabel[col.type]
+    if (col.type === 'channel') return `Channel · ${n} konten`
+    return `${typeLabel[col.type] ?? 'Link'} · ${n} ${noun}`
+  }
+
+  function shortUrl(u: string) {
+    return u.replace(/^https?:\/\/(www\.)?/, '')
+  }
+
+  function tabText(r: LinkRow): string {
+    const name = r.col?.title || typeLabel[r.link.type]
+    if (r.status === 'loading') return `${typeLabel[r.link.type] ?? 'Link'} · membaca…`
+    if (r.status === 'error') return `${typeLabel[r.link.type] ?? 'Link'} · gagal`
+    const total = visible(r).length
+    return `${name.length > 22 ? name.slice(0, 21) + '…' : name} · ${selectedEntries(r).length}/${total}`
+  }
+
+  function toggle(r: LinkRow, e: Entry) {
+    if (!selectable(e, r)) return
+    r.selected[e.id] = !r.selected[e.id]
+  }
+
+  function onRange(r: LinkRow) {
+    if (!r.col) return
+    const set = parseRange(r.range, r.col.entries.length)
+    if (!set) {
+      toast('Format rentang tidak valid. Contoh: 1-20 atau 3,5,7-9', 'err')
+      return
+    }
+    applyRange(r, set)
+  }
+
+  function optsChanged(r: LinkRow) {
+    rememberOpts(r)
+  }
+
+  function skipChanged(r: LinkRow) {
+    rememberOpts(r)
+    applyScope(r)
+  }
+
+  /** Where this link's files land, relative to the Download folder. */
+  function destLabel(col: Collection, dir: string): string {
+    const sub = settings.value?.downloadSubfolders && (col.type === 'playlist' || col.type === 'channel' || col.type === 'album')
+    if (!sub) return 'Langsung ke folder download'
+    const name = dir.split(/[\\/]/).pop() ?? ''
+    return `Subfolder: ${name}`
+  }
+
+  const breakdown = $derived.by(() => {
+    const parts: string[] = []
+    for (const r of dl.rows) {
+      if (r.status !== 'ready' || !r.col) continue
+      const n = toQueue(r).length
+      if (!n) continue
+      const what = r.col.source === 'spotify' ? `lagu ${r.col.type === 'album' ? 'album' : 'Spotify'}` : r.col.type === 'channel' ? 'channel' : r.col.type === 'playlist' ? 'playlist' : 'video'
+      parts.push(`${n} ${what}`)
+    }
+    return parts.join(' + ')
+  })
+
+  const lastOutput = $derived.by(() => {
+    let best = ''
+    let at = 0
+    for (const r of dl.rows)
+      for (const tid of Object.values(r.taskOf)) {
+        const t = tasks[tid]
+        if (t?.output && t.finished >= at) {
+          best = t.output
+          at = t.finished
+        }
+      }
+    return best
+  })
+
+  const totalDur = $derived(entries.reduce((s, e) => s + (e.duration || 0), 0))
+</script>
+
+<PageHeader title="Download YouTube & Spotify" subtitle="Video, playlist, channel, lagu, album — tempel link-nya, jenisnya terdeteksi otomatis." />
+<ToolBanner ids={toolIds} why="Dibutuhkan untuk membaca link dan mengunduh. Sekali pasang, dipakai seterusnya." />
+
+<div class="body">
+  <div class="left">
+    <section class="card links" aria-label="Link">
+      <form class="input-row" onsubmit={(e) => { e.preventDefault(); submit() }}>
+        <div class="input-wrap">
+          <span class="lic"><Icon name="link" /></span>
+          <input class="url" aria-label="Link YouTube atau Spotify" placeholder="Tempel link video, playlist, channel, lagu, atau album…" bind:value={dl.input} />
+        </div>
+        <button type="button" class="btn tall" onclick={paste}><Icon name="clipboard" size={16} />Tempel</button>
+        <button type="submit" class="btn-accent tall" disabled={!dl.input.trim()}>Periksa link</button>
+      </form>
+
+      {#if dl.rows.length > 0}
+        <div class="link-list">
+          {#each dl.rows as r (r.id)}
+            <div class="link-row">
+              <span class="badge {r.link.source === 'spotify' ? 'sp' : 'yt'}">
+                <Icon name={r.link.source === 'spotify' ? 'music' : 'play'} size={10} stroke={3} />{r.link.source === 'spotify' ? 'Spotify' : r.link.source === 'youtube' ? 'YouTube' : 'Web'}
+              </span>
+              <span class="ltype">{countLabel(r)}</span>
+              <span class="lurl ellipsis" title={r.link.url}>{shortUrl(r.link.url)}</span>
+              {#if r.status === 'loading'}
+                <span class="lst load"><Icon name="loader" size={12} stroke={3} class="spin" />Membaca…</span>
+              {:else if r.status === 'ready'}
+                <span class="lst ok"><Icon name="check" size={12} stroke={3} />Terbaca</span>
+              {:else}
+                <button class="lst err" title={r.error} onclick={() => showDetail(r.link.url, r.error, '')}>Gagal</button>
+                <button class="mini" aria-label="Coba lagi" title="Coba lagi" onclick={() => analyze(r.id)}><Icon name="refresh" size={14} /></button>
+              {/if}
+              <button class="mini" aria-label="Hapus link" title="Hapus link" onclick={() => removeRow(r.id)}><Icon name="x" size={14} /></button>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </section>
+
+    <section class="card content" aria-label="Isi link">
+      {#if dl.rows.length === 0}
+        <div class="empty">
+          <div class="big-ic"><Icon name="download" size={34} stroke={1.8} /></div>
+          <h2>Tempel link untuk mulai</h2>
+          <p>Bisa beberapa link sekaligus, satu per baris.</p>
+          <div class="examples">
+            <div><span class="badge yt"><Icon name="play" size={10} stroke={3} />YouTube</span> video · Shorts · playlist · channel (@nama)</div>
+            <div><span class="badge sp"><Icon name="music" size={10} stroke={3} />Spotify</span> lagu · album · playlist</div>
+          </div>
+        </div>
+      {:else}
+        <div class="tabs" role="tablist" aria-label="Link yang dibaca">
+          {#each dl.rows as r (r.id)}
+            <button role="tab" aria-selected={row?.id === r.id} class:on={row?.id === r.id} onclick={() => (dl.active = r.id)}>
+              <span class="dot" class:sp={r.link.source === 'spotify'}></span>{tabText(r)}
+            </button>
+          {/each}
+        </div>
+
+        {#if row?.status === 'loading'}
+          <div class="state"><Icon name="loader" size={28} class="spin" /><span>Membaca isi link… {row.link.type === 'channel' ? 'Channel besar bisa butuh beberapa menit.' : ''}</span></div>
+        {:else if row?.status === 'error'}
+          <div class="state err">
+            <Icon name="alert" size={28} />
+            <span>{row.error}</span>
+            <button class="btn" onclick={() => analyze(row.id)}><Icon name="refresh" size={16} />Coba lagi</button>
+          </div>
+        {:else if row?.col}
+          {@const col = row.col}
+          <div class="col-head">
+            {#if col.type === 'channel'}
+              {@const t = tile(col.title)}
+              <div class="avatar" style="background: {t.bg}; color: {t.fg}">{initials(col.title)}</div>
+            {:else if col.thumbnail}
+              <img class="cover" class:sq={col.source === 'spotify'} src={col.thumbnail} alt="" onerror={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = 'hidden')} />
+            {:else}
+              <div class="cover blank"><Icon name={col.source === 'spotify' ? 'music' : 'play'} /></div>
+            {/if}
+            <div class="ch-text">
+              <span class="ch-title ellipsis" title={col.title}>{col.title || 'Tanpa judul'}</span>
+              <span class="ch-sub ellipsis">
+                {#if col.type === 'channel'}
+                  Channel YouTube{col.subtitle ? ` · ${col.subtitle}` : ''} · {col.entries.length} konten ({Object.entries(col.tabCounts ?? {}).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${tabLabel[k] ?? k}`).join(' · ')})
+                {:else}
+                  {col.source === 'spotify' ? `${typeLabel[col.type]} Spotify` : `${typeLabel[col.type]} YouTube`}{col.subtitle ? ` · ${col.subtitle}` : ''}{entries.length > 1 ? ` · ${entries.length} ${col.source === 'spotify' ? 'lagu' : 'video'}` : ''}{totalDur ? ` · ± ${longDuration(totalDur)}` : ''}
+                {/if}
+              </span>
+            </div>
+            {#if col.type === 'playlist' || col.type === 'album'}
+              <form class="range" onsubmit={(e) => { e.preventDefault(); onRange(row) }}>
+                <label for="rentang">Rentang</label>
+                <input id="rentang" class="text-input" bind:value={row.range} onblur={() => onRange(row)} />
+              </form>
+            {/if}
+          </div>
+
+          <div class="selbar">
+            <input
+              id="semua"
+              type="checkbox"
+              checked={selCount > 0 && selCount === selectableCount}
+              indeterminate={selCount > 0 && selCount < selectableCount}
+              onchange={(e) => setAll(row, (e.currentTarget as HTMLInputElement).checked)}
+            />
+            <label for="semua">Pilih semua</label>
+            <span class="selinfo">{selCount} dari {entries.length} dipilih{col.type === 'channel' ? ' · urut dari terbaru' : ''}</span>
+            {#if archivedCount > 0}<span class="arch">{archivedCount} sudah pernah diunduh · dilewati</span>{/if}
+          </div>
+
+          <div class="entries">
+            {#each entries as e (e.id)}
+              {@const tid = row.taskOf[e.id]}
+              {@const t = tid ? tasks[tid] : undefined}
+              {@const can = selectable(e, row)}
+              <div class="entry" class:dim={!can} class:active={t?.status === 'running'}>
+                <input type="checkbox" aria-label="Pilih {e.title}" checked={!!row.selected[e.id] && can} disabled={!can} onchange={() => toggle(row, e)} />
+                <span class="idx">{String(e.index).padStart(2, '0')}</span>
+                {#if e.thumbnail}
+                  <img class="th" class:sq={col.source === 'spotify'} src={e.thumbnail} alt="" loading="lazy" onerror={(ev) => ((ev.currentTarget as HTMLImageElement).style.visibility = 'hidden')} />
+                {:else}
+                  {@const tt = tile(e.title)}
+                  <div class="th" class:sq={col.source === 'spotify'} style="background: {tt.bg}"></div>
+                {/if}
+                <div class="et">
+                  <span class="etitle ellipsis" title={e.title}>{e.title}</span>
+                  {#if t && (t.status === 'running' || t.status === 'queued') && t.message}
+                    <span class="esub ellipsis">{t.message}</span>
+                  {:else if e.artist}
+                    <span class="esub ellipsis">{e.artist}{e.album ? ` · ${e.album}` : ''}</span>
+                  {:else if e.unavailable}
+                    <span class="esub">Tidak tersedia (privat/dihapus)</span>
+                  {/if}
+                </div>
+                <div class="eright">
+                  {#if t}
+                    {#if t.status === 'running'}
+                      <div class="erun">
+                        <span>{t.progress >= 0 ? pct(t.progress) : '…'}</span>
+                        <div class="bar thin" class:indeterminate={t.progress < 0}><div style="width: {Math.max(0, t.progress) * 100}%"></div></div>
+                      </div>
+                    {:else if t.status === 'queued'}
+                      <span class="pill muted">Menunggu</span>
+                    {:else if t.status === 'done'}
+                      <button class="pill ok as-btn" title="Tampilkan file" onclick={() => api.revealFile(t.output)}><Icon name="check" size={12} stroke={3} />Selesai</button>
+                    {:else if t.status === 'failed'}
+                      <button class="pill err as-btn" title={t.message} onclick={() => showDetail(e.title, t.message, t.detail)}>Gagal · detail</button>
+                    {:else if t.status === 'skipped'}
+                      <span class="pill muted" title={t.message}>{t.message || 'Dilewati'}</span>
+                    {:else}
+                      <span class="pill muted">Dibatalkan</span>
+                    {/if}
+                  {:else}
+                    {#if e.date && col.type === 'channel'}<span class="edate">{e.archived && row.opts.skipExisting ? 'Sudah ada' : ymd(e.date)}</span>{:else if e.archived && row.opts.skipExisting}<span class="edate">Sudah ada</span>{/if}
+                    <span class="edur">{duration(e.duration)}</span>
+                  {/if}
+                </div>
+                {#if t && isActive(t)}
+                  <button class="mini" aria-label="Batalkan" title="Batalkan" onclick={() => api.cancelTask(t.id)}><Icon name="x" size={14} /></button>
+                {:else}
+                  <span></span>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        {/if}
+      {/if}
+    </section>
+  </div>
+
+  <aside class="card panel" aria-label="Pengaturan download">
+    {#if row?.col && row.status === 'ready'}
+      {@const col = row.col}
+      <div class="ph">
+        <span class="ph-k">PENGATURAN UNTUK</span>
+        <span class="ph-v ellipsis" title={col.title}>{col.type === 'channel' ? `Channel ${col.subtitle || col.title}` : `${typeLabel[col.type]} ${col.source === 'spotify' ? 'Spotify' : 'YouTube'}`}</span>
+      </div>
+      <div class="scroll">
+        {#if col.source === 'spotify'}
+          <div class="info">
+            <Icon name="info" size={16} />
+            <span>Spotify selalu diunduh sebagai audio. Lagunya dicocokkan dari YouTube, lalu diberi judul, artis, album &amp; cover dari Spotify.</span>
+          </div>
+          <div class="sec">
+            <span class="label">Format audio</span>
+            <Chips bind:value={row.opts.audioFormat} columns={3} onchange={() => optsChanged(row)} options={[{ value: 'mp3', label: 'MP3' }, { value: 'm4a', label: 'M4A' }, { value: 'opus', label: 'OPUS' }]} />
+          </div>
+          <div class="sec">
+            <span class="label">Kualitas</span>
+            <Segmented label="Kualitas" bind:value={row.opts.audioQuality} onchange={() => optsChanged(row)} options={[{ value: 'auto', label: 'Otomatis' }, { value: '192', label: '192 kbps' }, { value: '320', label: '320 kbps' }]} />
+            <p class="hint">Otomatis mengikuti kualitas sumber — angka lebih tinggi tidak membuat suara lebih bagus.</p>
+          </div>
+          {#if col.type !== 'track'}
+            <Switch bind:checked={row.opts.numbering} onchange={() => optsChanged(row)} label="Nomor urut di nama file" hint="Urutan sama seperti di Spotify" />
+          {/if}
+        {:else}
+          {#if col.type === 'channel'}
+            <div class="sec">
+              <span class="label">Jenis konten</span>
+              <div class="multi">
+                {#each ['videos', 'shorts', 'streams'] as k}
+                  {@const n = col.tabCounts?.[k] ?? 0}
+                  <button class="mchip" class:on={row.types[k]} disabled={n === 0} aria-pressed={row.types[k]} onclick={() => { row.types[k] = !row.types[k]; applyScope(row) }}>
+                    {tabLabel[k]}<span>{n}</span>
+                  </button>
+                {/each}
+              </div>
+            </div>
+            <div class="sec">
+              <span class="label">Ambil yang mana</span>
+              <Segmented label="Cakupan" bind:value={row.scope} onchange={() => applyScope(row)} options={[{ value: 'all', label: 'Semua' }, { value: 'latest', label: 'N terbaru' }, { value: 'since', label: 'Sejak tanggal' }]} />
+              {#if row.scope === 'latest'}
+                <div class="inline">
+                  <input class="text-input" aria-label="Jumlah terbaru" inputmode="numeric" value={row.latestN} oninput={(e) => { const v = parseInt((e.currentTarget as HTMLInputElement).value, 10); row.latestN = isNaN(v) ? 1 : Math.max(1, Math.min(5000, v)); applyScope(row) }} />
+                  <span class="t12">terbaru per jenis</span>
+                </div>
+              {:else if row.scope === 'since'}
+                <input class="text-input" type="date" aria-label="Sejak tanggal" bind:value={row.since} onchange={() => applyScope(row)} />
+                <p class="hint">Tanggal dari YouTube bersifat perkiraan.</p>
+              {/if}
+            </div>
+          {/if}
+
+          <div class="sec">
+            <span class="label">Unduh sebagai</span>
+            <Segmented label="Unduh sebagai" bind:value={row.opts.mode} onchange={() => optsChanged(row)} options={[{ value: 'video', label: 'Video', icon: 'video' }, { value: 'audio', label: 'Audio', icon: 'music' }]} />
+          </div>
+
+          {#if row.opts.mode === 'video'}
+            <div class="sec">
+              <span class="label">Kualitas video</span>
+              <Chips bind:value={row.opts.quality} columns={4} small onchange={() => optsChanged(row)} options={[{ value: 'best', label: 'Terbaik' }, { value: '1080', label: '1080p' }, { value: '720', label: '720p' }, { value: '480', label: '480p' }]} />
+            </div>
+            <div class="sec">
+              <span class="label">Format file</span>
+              <Chips bind:value={row.opts.container} columns={2} onchange={() => optsChanged(row)} options={[{ value: 'mp4', label: 'MP4' }, { value: 'mkv', label: 'MKV' }]} />
+            </div>
+          {:else}
+            <div class="sec">
+              <span class="label">Format audio</span>
+              <Chips bind:value={row.opts.audioFormat} columns={4} small onchange={() => optsChanged(row)} options={[{ value: 'mp3', label: 'MP3' }, { value: 'm4a', label: 'M4A' }, { value: 'opus', label: 'OPUS' }, { value: 'flac', label: 'FLAC' }]} />
+            </div>
+          {/if}
+
+          <Switch bind:checked={row.opts.embed} onchange={() => optsChanged(row)} label="Sematkan info & thumbnail" hint="Judul, channel, dan gambar sampul" />
+          <Switch bind:checked={row.opts.skipExisting} onchange={() => skipChanged(row)} label="Lewati yang sudah ada" hint="Unduh ulang hanya ambil yang baru" />
+          {#if col.type === 'playlist'}
+            <Switch bind:checked={row.opts.numbering} onchange={() => optsChanged(row)} label="Nomor urut di nama file" hint="01 - judul, 02 - judul, …" />
+          {/if}
+        {/if}
+
+        <div class="sec">
+          <span class="label">Simpan ke</span>
+          <OutputPicker kind="download" />
+          {#if dirOf[col.key]}
+            <div class="dest">
+              <span class="ellipsis" title={dirOf[col.key]}>{destLabel(col, dirOf[col.key])}</span>
+              <button class="link" onclick={() => api.openFolder(dirOf[col.key])}>Buka folder</button>
+            </div>
+          {/if}
+        </div>
+      </div>
+    {:else}
+      <div class="ph">
+        <span class="ph-k">PENGATURAN</span>
+        <span class="ph-v">Download</span>
+      </div>
+      <div class="scroll">
+        <p class="hint">Tempel link lalu klik <b>Periksa link</b>. Pengaturan kualitas dan format akan muncul di sini untuk setiap link.</p>
+        <div class="sec">
+          <span class="label">Simpan ke</span>
+          <OutputPicker kind="download" />
+          <p class="hint">
+            {settings.value?.downloadSubfolders ?? true ? 'Playlist, channel & album otomatis dibuat subfolder sendiri.' : 'Semua file langsung masuk ke folder ini.'} Bisa diubah di Pengaturan.
+          </p>
+        </div>
+      </div>
+    {/if}
+
+    <RunFooter
+      kind="download"
+      {running}
+      busy={dl.starting}
+      startIcon="download"
+      startLabel={pending > 0 ? `Unduh semua · ${pending} item` : 'Unduh semua'}
+      disabled={pending === 0 || missingTools}
+      disabledHint={missingTools ? 'Pasang tools yang dibutuhkan dulu (lihat banner).' : dl.rows.length === 0 ? '' : 'Pilih minimal satu item.'}
+      note={pending > 0 ? breakdown : ''}
+      {lastOutput}
+      queueMore={running ? pending : 0}
+      onstart={startAll}
+      oncancel={cancelAll}
+    />
+  </aside>
+</div>
+
+<style>
+  .body {
+    flex-grow: 1;
+    min-height: 0;
+    display: flex;
+    gap: 20px;
+    padding: 0 24px 24px 28px;
+  }
+  .left {
+    flex-grow: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .links {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .input-row {
+    display: flex;
+    gap: 8px;
+  }
+  .input-wrap {
+    position: relative;
+    flex-grow: 1;
+  }
+  .lic {
+    position: absolute;
+    left: 14px;
+    top: 13px;
+    color: var(--text-3);
+    display: flex;
+  }
+  .url {
+    width: 100%;
+    height: 44px;
+    padding: 0 12px 0 42px;
+    border-radius: 12px;
+    border: 1px solid var(--border-strong);
+    background: var(--inset);
+    font-size: 14px;
+  }
+  .url:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .tall {
+    height: 44px;
+    border-radius: 12px;
+  }
+  .link-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 184px;
+    overflow-y: auto;
+  }
+  .link-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 40px;
+    padding: 0 4px 0 10px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    flex-shrink: 0;
+  }
+  .badge {
+    width: 82px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 24px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .badge.yt {
+    background: var(--err-soft);
+    color: #ff9c9c;
+  }
+  .badge.sp {
+    background: var(--ok-soft);
+    color: var(--ok);
+  }
+  .ltype {
+    width: 150px;
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .lurl {
+    flex-grow: 1;
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .lst {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .lst.ok {
+    color: var(--ok);
+  }
+  .lst.load {
+    color: var(--accent-text-2);
+  }
+  .lst.err {
+    color: var(--err);
+    border: 0;
+    background: none;
+    padding: 0;
+    text-decoration: underline dotted;
+  }
+  .mini {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-3);
+  }
+  .mini:hover {
+    background: #2a303b;
+    color: var(--text);
+  }
+  .content {
+    flex-grow: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .empty {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px;
+    text-align: center;
+  }
+  .big-ic {
+    width: 72px;
+    height: 72px;
+    border-radius: 22px;
+    background: var(--accent-tint);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 6px;
+  }
+  .empty h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 800;
+  }
+  .empty p {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 14px;
+  }
+  .examples {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-2);
+    align-items: flex-start;
+  }
+  .examples div {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .tabs {
+    display: flex;
+    gap: 2px;
+    padding: 4px 10px 0;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+  .tabs button {
+    height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--text-2);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .tabs button.on {
+    border-bottom-color: var(--accent);
+    color: var(--text);
+    font-weight: 700;
+  }
+  .tabs .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--err);
+  }
+  .tabs .dot.sp {
+    background: var(--ok);
+  }
+  .state {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-2);
+    font-size: 13px;
+    padding: 24px;
+    text-align: center;
+  }
+  .state.err {
+    color: var(--err);
+  }
+  .col-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    flex-shrink: 0;
+  }
+  .avatar {
+    width: 54px;
+    height: 54px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    font-weight: 800;
+  }
+  .cover {
+    width: 96px;
+    height: 54px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    object-fit: cover;
+    background: var(--surface-2);
+  }
+  .cover.sq {
+    width: 54px;
+  }
+  .cover.blank {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-3);
+  }
+  .ch-text {
+    flex-grow: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .ch-title {
+    font-size: 15px;
+    font-weight: 800;
+  }
+  .ch-sub {
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .range {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .range label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-2);
+  }
+  .range input {
+    width: 92px;
+    height: 34px;
+    text-align: center;
+  }
+  .selbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 38px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--surface-3);
+    flex-shrink: 0;
+  }
+  .selbar label {
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .selinfo {
+    flex-grow: 1;
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .arch {
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: 6px;
+    background: var(--ok-soft);
+    color: var(--ok);
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  input[type='checkbox'] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+  }
+  .entries {
+    flex-grow: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .entry {
+    display: grid;
+    grid-template-columns: 18px 26px 56px minmax(0, 1fr) 150px 32px;
+    align-items: center;
+    gap: 12px;
+    min-height: 50px;
+    padding: 4px 8px 4px 16px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .entry.active {
+    background: #1c2029;
+  }
+  .entry.dim .et,
+  .entry.dim .th {
+    opacity: 0.5;
+  }
+  .idx {
+    font-size: 12px;
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .th {
+    width: 56px;
+    height: 32px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: var(--surface-2);
+  }
+  .th.sq {
+    width: 36px;
+    height: 36px;
+  }
+  .et {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .etitle {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .esub {
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .eright {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    min-width: 0;
+  }
+  .edate {
+    font-size: 12px;
+    color: var(--text-3);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .edur {
+    width: 50px;
+    text-align: right;
+    font-size: 12px;
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .erun {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-text-2);
+  }
+  .thin {
+    height: 4px;
+  }
+  .as-btn {
+    border: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pill.muted {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .panel {
+    width: 344px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .ph {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .ph-k {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--text-3);
+  }
+  .ph-v {
+    font-size: 14px;
+    font-weight: 800;
+  }
+  .scroll {
+    flex-grow: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .sec {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .info {
+    display: flex;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--info-soft);
+    color: var(--info-text);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .multi {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .mchip {
+    height: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-4);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .mchip span {
+    font-size: 10px;
+    color: var(--text-3);
+  }
+  .mchip.on {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-weight: 700;
+  }
+  .mchip.on span {
+    color: var(--accent-text-2);
+  }
+  .mchip:disabled {
+    opacity: 0.35;
+  }
+  .inline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .inline input {
+    width: 100px;
+  }
+  .t12 {
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  input[type='date'] {
+    color-scheme: dark;
+  }
+  .dest {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .link {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-text-2);
+  }
+</style>
