@@ -13,7 +13,7 @@
   import type { OutputKind, ToolStatus } from '../lib/types'
   import { checkNow, upd } from '../lib/stores/update.svelte'
 
-  const icons: Record<string, string> = { ffmpeg: 'video', ytdlp: 'download', jsruntime: 'code', spotdl: 'music' }
+  const icons: Record<string, string> = { ffmpeg: 'video', ytdlp: 'download', jsruntime: 'code', spotdl: 'music', gallerydl: 'image', libreoffice: 'fileText' }
   const sourceLabel = $derived<Record<string, string>>({
     downloaded: L('dipasang oleh KuyMediaBox', 'installed by KuyMediaBox'),
     bundled: L('dari folder aplikasi', 'from the app folder'),
@@ -25,6 +25,7 @@
     { kind: 'video', label: 'Video', icon: 'video' },
     { kind: 'audio', label: 'Audio', icon: 'music' },
     { kind: 'download', label: 'Download', icon: 'download' },
+    { kind: 'pdf', label: 'PDF', icon: 'fileText' },
   ])
 
   let checking = $state(false)
@@ -80,12 +81,33 @@
   async function resetAllFolders() {
     if (!settings.value) return
     await saveSettings({
-      outputs: { image: { mode: 'default', dir: '' }, video: { mode: 'default', dir: '' }, audio: { mode: 'default', dir: '' }, download: { mode: 'default', dir: '' } },
+      outputs: { image: { mode: 'default', dir: '' }, video: { mode: 'default', dir: '' }, audio: { mode: 'default', dir: '' }, download: { mode: 'default', dir: '' }, pdf: { mode: 'default', dir: '' } },
     })
     toast(L('Semua folder hasil kembali ke default', 'All output folders reset to default'), 'ok')
   }
 
   const allDefault = $derived(folderRows.every((r) => outputOf(r.kind).mode === 'default'))
+
+  // Open-source projects KuyMediaBox is built on (GitHub owner/repo).
+  const credits = $derived<{ name: string; repo: string; role: string }[]>([
+    { name: 'Wails', repo: 'wailsapp/wails', role: L('Kerangka aplikasi desktop', 'Desktop app framework') },
+    { name: 'Svelte', repo: 'sveltejs/svelte', role: L('Tampilan aplikasi', 'User interface') },
+    { name: 'FFmpeg', repo: 'FFmpeg/FFmpeg', role: L('Konversi video & audio', 'Video & audio conversion') },
+    { name: 'yt-dlp', repo: 'yt-dlp/yt-dlp', role: L('Download video & audio', 'Video & audio downloads') },
+    { name: 'spotDL', repo: 'spotDL/spotify-downloader', role: L('Download Spotify', 'Spotify downloads') },
+    { name: 'gallery-dl', repo: 'mikf/gallery-dl', role: L('Foto dari post sosmed', 'Pictures from social posts') },
+    { name: 'Deno', repo: 'denoland/deno', role: L('JS runtime untuk yt-dlp', 'JS runtime for yt-dlp') },
+    { name: 'pdfcpu', repo: 'pdfcpu/pdfcpu', role: L('Olah & ubah file PDF', 'PDF processing') },
+    { name: 'go-pdfium', repo: 'klippa-app/go-pdfium', role: L('Tampilan & teks PDF (PDFium)', 'PDF rendering & text (PDFium)') },
+    { name: 'wazero', repo: 'tetratelabs/wazero', role: L('Menjalankan PDFium (WebAssembly)', 'Runs PDFium (WebAssembly)') },
+    { name: 'LibreOffice', repo: 'LibreOffice/core', role: L('Konversi dokumen Office (opsional)', 'Office conversion (optional)') },
+    { name: 'imaging', repo: 'disintegration/imaging', role: L('Ubah ukuran gambar', 'Image resizing') },
+    { name: 'webp', repo: 'gen2brain/webp', role: L('Format WEBP', 'WEBP format') },
+    { name: 'avif', repo: 'gen2brain/avif', role: L('Format AVIF', 'AVIF format') },
+    { name: 'heic', repo: 'gen2brain/heic', role: L('Foto HEIC (iPhone)', 'HEIC photos (iPhone)') },
+    { name: 'Gorilla WebSocket', repo: 'gorilla/websocket', role: L('HTML ke PDF lewat browser', 'HTML to PDF through the browser') },
+    { name: 'Fontsource', repo: 'fontsource/fontsource', role: 'Plus Jakarta Sans · JetBrains Mono' },
+  ])
 </script>
 
 <PageHeader title={L('Pengaturan', 'Settings')} subtitle={L('Kelola tools pendukung dan cara file disimpan.', 'Manage helper tools and how files are saved.')} />
@@ -151,13 +173,13 @@
       {/if}
 
       {#each toolState.list as t (t.id)}
-        <div class="tool" class:hl={t.updateAvailable || !t.found}>
+        <div class="tool" class:hl={t.updateAvailable || (!t.found && !t.optional)}>
           <div class="tic"><Icon name={icons[t.id] ?? 'box'} size={20} /></div>
           <div class="tinfo">
             <div class="tname">
               <span>{t.id === 'jsruntime' && t.found ? `JS runtime (${t.runtime === 'deno' ? 'Deno' : 'Node.js'})` : t.name}</span>
               {#if t.found && t.version}<span class="ver">{t.version}</span>{/if}
-              {#if !t.found && !t.busy}<span class="ver bad">{L('Belum ada', 'Missing')}</span>{/if}
+              {#if !t.found && !t.busy}<span class="ver {t.optional ? 'opt' : 'bad'}">{t.optional ? L('Opsional', 'Optional') : L('Belum ada', 'Missing')}</span>{/if}
             </div>
             <span class="tdesc">
               {t.description}
@@ -204,6 +226,7 @@
         <div class="about-t">
           <b>KuyMediaBox</b>
           <span>{L('Versi', 'Version')} {upd.version || '—'}</span>
+          <span>{L('Dibuat oleh', 'Made by')} <button class="author" onclick={() => runtime.openURL('https://github.com/iqbalfaf')}>iqbalfaf</button></span>
         </div>
         {#if upd.info?.available}
           <button class="btn-accent" onclick={() => (upd.open = true)}><Icon name="download" size={14} stroke={2.5} />Update v{upd.info.latest}</button>
@@ -217,6 +240,27 @@
         <Switch checked={settings.value.autoUpdate} onchange={(v) => saveSettings({ autoUpdate: v })} label={L('Cek update otomatis', 'Check for updates automatically')} hint={L('Saat aplikasi dibuka, dari GitHub Releases', 'When the app opens, from GitHub Releases')} />
       {/if}
       <button class="link" onclick={() => runtime.openURL('https://github.com/iqbalfaf/KuyMediaBox/releases')}>{L('Lihat semua rilis di GitHub', 'See all releases on GitHub')}</button>
+    </div>
+  </section>
+
+  <section class="card" aria-label={L('Kredit', 'Credits')}>
+    <div class="head">
+      <div class="ht">
+        <h2>{L('Kredit', 'Credits')}</h2>
+        <p>{L('KuyMediaBox dibangun di atas proyek open-source berikut. Terima kasih!', 'KuyMediaBox is built on these open-source projects. Thank you!')}</p>
+      </div>
+    </div>
+    <div class="credits">
+      <button class="credit own" onclick={() => runtime.openURL('https://github.com/iqbalfaf/KuyMediaBox')}>
+        <span class="cn">KuyMediaBox</span>
+        <span class="cr">iqbalfaf/KuyMediaBox</span>
+      </button>
+      {#each credits as c (c.repo)}
+        <button class="credit" onclick={() => runtime.openURL(`https://github.com/${c.repo}`)} title={`${c.role} — https://github.com/${c.repo}`}>
+          <span class="cn">{c.name}</span>
+          <span class="cr">{c.repo}</span>
+        </button>
+      {/each}
     </div>
   </section>
 
@@ -291,6 +335,54 @@
     color: var(--accent-text-2);
   }
   .link:hover {
+    color: var(--accent-text);
+  }
+  .credits {
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+  }
+  .credit {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 12px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    text-align: left;
+    min-width: 0;
+  }
+  .credit:hover {
+    background: var(--surface-2);
+  }
+  .cn {
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .author {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-text-2);
+  }
+  .author:hover {
+    text-decoration: underline;
+  }
+  .cr {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent-text-2);
+  }
+  .credit.own .cn {
     color: var(--accent-text);
   }
   .about-t {
@@ -471,6 +563,13 @@
     font-family: var(--mono);
     font-size: 11px;
     font-weight: 500;
+  }
+  .ver.opt {
+    font-family: var(--font);
+    font-weight: 700;
+    background: var(--info-soft);
+    border-color: transparent;
+    color: var(--info);
   }
   .ver.bad {
     font-family: var(--font);

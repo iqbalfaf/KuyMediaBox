@@ -190,6 +190,14 @@ func Convert(ctx context.Context, in, out string, o Options, ffmpegPath string, 
 	return nil
 }
 
+// Decode reads any supported image (EXIF orientation applied); ffmpegPath may be empty.
+func Decode(ctx context.Context, path, ffmpegPath string) (image.Image, error) {
+	return decode(ctx, path, true, ffmpegPath)
+}
+
+// Flatten draws img over a solid background so it can be stored without alpha.
+func Flatten(img image.Image, bg color.Color) image.Image { return flatten(img, bg) }
+
 func decode(ctx context.Context, path string, autoRotate bool, ffmpegPath string) (image.Image, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

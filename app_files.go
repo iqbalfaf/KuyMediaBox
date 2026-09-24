@@ -17,6 +17,7 @@ import (
 	"kuymediabox/internal/imageconv"
 	"kuymediabox/internal/mediaconv"
 	"kuymediabox/internal/naming"
+	"kuymediabox/internal/pdf"
 	"kuymediabox/internal/queue"
 	"kuymediabox/internal/tools"
 )
@@ -35,6 +36,14 @@ var audioExts = map[string]bool{
 func acceptExt(kind, ext string) bool {
 	ext = strings.ToLower(ext)
 	switch kind {
+	case kindPDF:
+		return ext == ".pdf"
+	case kindPDFImage:
+		return imageconv.InputExts[ext]
+	case kindWord, kindExcel, kindPPT:
+		return pdf.OfficeExts[ext] == officeFamily[kind]
+	case kindHTML:
+		return ext == ".html" || ext == ".htm" || ext == ".mhtml" || ext == ".svg"
 	case queue.KindImage:
 		return imageconv.InputExts[ext]
 	case queue.KindVideo:
@@ -65,6 +74,9 @@ type FileItem struct {
 	HasVideo      bool    `json:"hasVideo"`
 	HasAudio      bool    `json:"hasAudio"`
 	HasCover      bool    `json:"hasCover"`
+	Pages         int     `json:"pages"`
+	Encrypted     bool    `json:"encrypted"` // PDF uses a password or permissions
+	Locked        bool    `json:"locked"`    // PDF needs a password to open
 	Error         string  `json:"error"`
 }
 
@@ -158,7 +170,20 @@ func (a *App) describe(kind, path, ffprobe string) FileItem {
 	if st, err := os.Stat(path); err == nil {
 		it.Size = st.Size()
 	}
-	if kind == queue.KindImage {
+	switch kind {
+	case kindPDF:
+		info, err := pdf.Inspect(context.Background(), path)
+		if err != nil {
+			it.Error = i18n.L("Bukan PDF yang valid atau file rusak", "Not a valid PDF or damaged file")
+			return it
+		}
+		it.Pages, it.Encrypted, it.Locked = info.Pages, info.Encrypted, info.Locked
+		it.Width, it.Height = int(info.Width), int(info.Height)
+		return it
+	case kindWord, kindExcel, kindPPT, kindHTML:
+		return it
+	}
+	if kind == queue.KindImage || kind == kindPDFImage {
 		size, format, err := imageconv.Config(path)
 		if err != nil {
 			// ICO and exotic formats may still convert through the fallback decoders.
@@ -196,6 +221,12 @@ var dialogFilters = map[string]wruntime.FileFilter{
 	queue.KindImage: {DisplayName: "Images", Pattern: "*.jpg;*.jpeg;*.jfif;*.png;*.webp;*.gif;*.bmp;*.tif;*.tiff;*.heic;*.heif;*.avif;*.ico"},
 	queue.KindVideo: {DisplayName: "Video", Pattern: "*.mp4;*.mkv;*.mov;*.avi;*.webm;*.flv;*.wmv;*.3gp;*.ts;*.m4v;*.mpg;*.mpeg;*.mts;*.m2ts;*.ogv;*.vob"},
 	queue.KindAudio: {DisplayName: "Audio & video", Pattern: "*.mp3;*.wav;*.flac;*.aac;*.m4a;*.ogg;*.opus;*.wma;*.aiff;*.aif;*.amr;*.ape;*.wv;*.mka;*.oga;*.mp4;*.mkv;*.mov;*.avi;*.webm;*.flv;*.wmv;*.m4v"},
+	kindPDF:         {DisplayName: "PDF", Pattern: "*.pdf"},
+	kindPDFImage:    {DisplayName: "Images", Pattern: "*.jpg;*.jpeg;*.jfif;*.png;*.webp;*.gif;*.bmp;*.tif;*.tiff;*.heic;*.heif;*.avif"},
+	kindWord:        {DisplayName: "Word", Pattern: "*.doc;*.docx;*.docm;*.dot;*.dotx;*.odt;*.rtf;*.wpd"},
+	kindExcel:       {DisplayName: "Excel", Pattern: "*.xls;*.xlsx;*.xlsm;*.xlsb;*.ods;*.csv"},
+	kindPPT:         {DisplayName: "PowerPoint", Pattern: "*.ppt;*.pptx;*.pptm;*.pps;*.ppsx;*.odp"},
+	kindHTML:        {DisplayName: "HTML", Pattern: "*.html;*.htm;*.mhtml;*.svg"},
 }
 
 // PickFiles opens a multi-file dialog for a converter page.
@@ -205,7 +236,7 @@ func (a *App) PickFiles(kind string) ([]FileItem, error) {
 		return nil, errors.New(i18n.L("jenis tidak dikenal", "unknown kind"))
 	}
 	switch kind {
-	case queue.KindImage:
+	case queue.KindImage, kindPDFImage:
 		filter.DisplayName = i18n.L("Gambar", "Images")
 	case queue.KindAudio:
 		filter.DisplayName = i18n.L("Audio & video", "Audio & video")

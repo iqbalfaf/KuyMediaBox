@@ -4,7 +4,7 @@
 
 # KuyMediaBox
 
-**Satu aplikasi desktop untuk konversi gambar, video, audio, dan download dari YouTube, TikTok, Instagram, Facebook & Spotify.**
+**Satu aplikasi desktop untuk konversi gambar, video, audio, 29 alat PDF, dan download dari YouTube, TikTok, Instagram, Facebook & Spotify.**
 Ringan, offline, tanpa iklan, dan tanpa batas ukuran file. Tersedia dalam **Bahasa Indonesia** dan **English**.
 
 [![Release](https://img.shields.io/github/v/release/iqbalfaf/KuyMediaBox?label=download&color=ff7a45)](https://github.com/iqbalfaf/KuyMediaBox/releases/latest)
@@ -28,6 +28,7 @@ Ringan, offline, tanpa iklan, dan tanpa batas ukuran file. Tersedia dalam **Baha
 - [Lokasi data & file](#-lokasi-data--file)
 - [Troubleshooting](#-troubleshooting)
 - [Struktur project](#-struktur-project)
+- [Kredit](#-kredit)
 
 ---
 
@@ -44,7 +45,7 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 
 **Kebutuhan sistem:** Windows 10/11 64-bit dengan WebView2 Runtime (sudah bawaan Windows 11 dan Windows 10 yang ter-update; installer akan memasangnya bila belum ada).
 
-> Saat pertama dibuka, buka **Pengaturan › Tools pendukung** lalu klik **Unduh** untuk FFmpeg, yt-dlp, spotDL, dan gallery-dl. Cukup sekali. Aplikasinya sendiri berukuran ±20 MB; tools tersebut diunduh terpisah agar selalu versi terbaru.
+> Saat pertama dibuka, buka **Pengaturan › Tools pendukung** lalu klik **Unduh** untuk FFmpeg, yt-dlp, spotDL, dan gallery-dl. Cukup sekali. Aplikasinya sendiri berukuran ±35 MB (sudah termasuk mesin PDF); tools tersebut diunduh terpisah agar selalu versi terbaru.
 
 ---
 
@@ -112,6 +113,34 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Nomor urut** | `01 - judul`, `02 - judul`, … sesuai urutan playlist/album |
 | **Progress** | Persen, kecepatan, dan sisa waktu per item; bisa dibatalkan per item atau semua |
 
+### 📄 Alat PDF (29 alat, semuanya offline)
+
+Semua file PDF diproses **di komputer Anda**, tidak ada yang diunggah ke internet. Buka **Alat PDF** di sidebar, lalu pilih alatnya (bisa dicari).
+
+| Kategori | Alat |
+|---|---|
+| **Atur halaman** | **Gabungkan PDF** (urutan bisa digeser) · **Pisahkan PDF** (per rentang, tiap N halaman, atau per halaman — klik gunting di antara halaman) · **Hapus halaman** · **Ekstrak halaman** (satu file atau per halaman) · **Susun halaman** (geser, putar, gandakan, hapus, sisipkan halaman kosong, gabung halaman dari beberapa PDF) · **Scan ke PDF** (scanner via dialog Windows atau kamera) |
+| **Optimasi** | **Kompres PDF** (Ekstrem / Disarankan / Ringan, opsional hitam-putih) · **Perbaiki PDF** (bangun ulang struktur, selamatkan halaman dari file rusak) · **OCR PDF** (teks hasil scan jadi bisa dicari & disalin, memakai OCR bawaan Windows) |
+| **Ubah ke PDF** | **Gambar ke PDF** (JPG, PNG, HEIC, WEBP, … dengan ukuran kertas A4/F4/Letter/…, arah, margin) · **Word, PowerPoint, Excel ke PDF** (lewat Microsoft Office bila terpasang, atau LibreOffice) · **HTML ke PDF** (alamat web atau file HTML, lebar layar HP/tablet/laptop/desktop, bisa satu halaman panjang) |
+| **Ubah dari PDF** | **PDF ke gambar** (JPG/PNG 72–300 DPI, atau ambil gambar asli di dalam PDF) · **PDF ke Word** (Microsoft Word bila ada; tanpa Word teks & paragraf tetap diambil) · **PDF ke PowerPoint** (satu halaman = satu slide) · **PDF ke Excel** (tabel disusun ke baris & kolom) · **PDF ke PDF/A** (PDF/A-2b untuk arsip) |
+| **Edit & tandai** | **Putar PDF** · **Nomor halaman** (6 posisi, format "Halaman 1 dari N", mulai dari nomor tertentu, lewati sampul, mode buku) · **Watermark** teks atau logo (transparansi, kemiringan, 9 posisi atau berulang, di atas/di bawah isi) · **Edit PDF** (teks, kotak, lingkaran, garis, coretan bebas, gambar, tutup putih; bisa digeser, diubah ukuran, urungkan) · **Potong PDF** (pilih area atau margin mm) |
+| **Keamanan** | **Kunci PDF** (AES-256, izin cetak/salin/ubah) · **Buka kunci PDF** · **Tanda tangan PDF** (gambar dengan mouse/pena, ketik nama dengan huruf tulisan tangan, atau unggah gambar; plus tanggal) · **Sensor PDF** (tarik kotak atau cari teks, mis. nomor rekening; teks di bawahnya benar-benar dihapus dari file) · **Bandingkan PDF** (dua versi berdampingan, kata yang dihapus merah dan yang ditambah hijau) |
+
+- PDF yang dikunci password bisa dipakai di semua alat: password ditanyakan saat mulai dan **tidak disimpan**.
+- Hasil tersimpan di `Documents › KuyMediaBox` (bisa diubah ke folder dinamis atau folder pilihan). Nama file diberi akhiran sesuai alatnya, mis. `laporan_kecil.pdf`, `laporan_ttd.pdf`, `laporan_disensor.pdf`.
+- Konversi Word/Excel/PowerPoint memakai **Microsoft Office** yang sudah terpasang. Tanpa Office, unduh **LibreOffice** (opsional, ±375 MB) di **Pengaturan › Tools pendukung**.
+
+<table>
+<tr>
+<td><img src="docs/screenshots/pdf-alat.png" alt="Daftar Alat PDF" /></td>
+<td><img src="docs/screenshots/pdf-susun.png" alt="Susun halaman PDF" /></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/pdf-tanda-tangan.png" alt="Tanda tangan PDF" /></td>
+<td><img src="docs/screenshots/pdf-bandingkan.png" alt="Bandingkan dua PDF" /></td>
+</tr>
+</table>
+
 ### ⚙ Fitur umum
 
 - **Drag & drop** file atau folder ke jendela. Folder dipindai beserta subfoldernya, dan hanya file yang cocok yang diambil.
@@ -119,8 +148,8 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 - **Antrian global** di sidebar: kerja tetap jalan saat pindah halaman. File baru bisa **ditambahkan ke antrian** saat proses berjalan.
 - **Batalkan** satu file atau semua; file setengah jadi otomatis dihapus.
 - **File asli tidak pernah ditimpa.** Hasil ditulis ke file sementara dulu, baru disimpan setelah selesai.
-- **Folder hasil per menu** (Gambar, Video, Audio, Download):
-  - **Folder default**: `Pictures`, `Videos`, `Music`, `Downloads` › `KuyMediaBox` (ikut OneDrive bila foldernya dipindah)
+- **Folder hasil per menu** (Gambar, Video, Audio, Download, PDF):
+  - **Folder default**: `Pictures`, `Videos`, `Music`, `Downloads`, `Documents` › `KuyMediaBox` (ikut OneDrive bila foldernya dipindah)
   - **Dinamis**: subfolder `converted` di samping file asli, atau folder yang sama dengan file asli
   - **Folder pilihan** sendiri
   - Bisa diubah dari tombol **Simpan ke** di tiap halaman maupun di **Pengaturan**, dan keduanya selalu sinkron
@@ -128,7 +157,7 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 - **Dua bahasa: Indonesia & English.** Ganti di **Pengaturan › Umum › Bahasa / Language**. Seluruh tampilan, pesan error, dan notifikasi Windows langsung berganti tanpa perlu membuka ulang aplikasi.
 - **Pesan error yang jelas** (sesuai bahasa yang dipilih), plus tombol **Lihat detail** untuk log lengkap (bisa disalin).
 - **Notifikasi Windows** saat antrian selesai (bisa dimatikan).
-- **Tools Manager**: deteksi, unduh, update, atau pilih manual FFmpeg, yt-dlp, JS runtime (memakai Node.js/Deno yang sudah terpasang bila ada), spotDL, dan gallery-dl. Update yt-dlp/spotDL/gallery-dl dicek otomatis. Unduhan tools yang terputus **dilanjutkan otomatis** dari titik terakhir.
+- **Tools Manager**: deteksi, unduh, update, atau pilih manual FFmpeg, yt-dlp, JS runtime (memakai Node.js/Deno yang sudah terpasang bila ada), spotDL, gallery-dl, dan LibreOffice (opsional). Update yt-dlp/spotDL/gallery-dl/LibreOffice dicek otomatis. Unduhan tools yang terputus **dilanjutkan otomatis** dari titik terakhir.
 - **Pengaturan terakhir diingat** per halaman (format, kualitas, resolusi, dll.).
 - **Satu jendela saja**: membuka aplikasi lagi akan memunculkan jendela yang sudah terbuka.
 - **Update otomatis dari GitHub Releases**: saat dibuka, aplikasi mengecek versi terbaru. Kalau ada, muncul dialog berisi catatan rilis dan tombol **Update sekarang**. Aplikasi lalu mengunduh versi baru, memverifikasi checksum SHA-256, memasangnya, dan membuka ulang dirinya sendiri, tanpa perlu download manual.
@@ -159,7 +188,7 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 3. (Opsional) Atur **Folder hasil** untuk tiap menu di halaman yang sama.
 4. (Opsional) Prefer English? Pilih **English** di **Pengaturan › Umum › Bahasa / Language**.
 
-> Halaman Gambar sudah bisa dipakai tanpa tools tambahan.
+> Halaman Gambar dan hampir semua Alat PDF sudah bisa dipakai tanpa tools tambahan.
 
 ![Tampilan awal](docs/screenshots/gambar-kosong.png)
 
@@ -177,6 +206,20 @@ Tips:
 - Ingin video jauh lebih kecil? Pilih **H.265**, kualitas **Hemat**, dan resolusi **720p**.
 - Hanya ingin ganti wadah (misalnya MKV → MP4) tanpa menunggu? Pilih codec **Salin tanpa encode ulang**.
 - Ingin MP3 dari video? Di menu Video pilih **Ambil audio saja**, atau langsung masukkan videonya di menu **Audio**.
+
+### Alat PDF
+
+1. Buka **Alat PDF** di sidebar, lalu pilih alatnya (ketik di kotak cari, mis. *kompres*, *gabung*, *word*).
+2. Tambahkan file dengan **tarik & lepas** atau tombol **Pilih file**:
+   - **Alat per file** (Kompres, OCR, Kunci, Watermark, PDF ke Word, …): bisa banyak file sekaligus, prosesnya seperti menu konversi lain.
+   - **Gabungkan / Gambar ke PDF / Scan**: geser kartu untuk mengatur urutan.
+   - **Pisahkan / Hapus / Ekstrak / Susun halaman**: klik halaman pada gambar kecilnya, atau ketik rentang seperti `1-3, 7`.
+   - **Edit / Tanda tangan / Sensor / Potong**: pilih alat di toolbar lalu klik atau tarik di halaman. `Delete` menghapus objek, `Ctrl+Z` mengurungkan.
+   - **Bandingkan**: pilih versi lama (kiri) dan versi baru (kanan); klik perubahan di daftar untuk melompat ke tempatnya.
+3. Atur pilihan di panel kanan, lalu klik tombol di bawah (mis. **Kompres**, **Tanda tangani**). File asli tidak diubah.
+4. PDF yang dikunci password akan ditanyakan passwordnya saat mulai.
+
+![Kompres PDF](docs/screenshots/pdf-kompres.png)
 
 ### Update aplikasi
 
@@ -301,7 +344,9 @@ Setiap push biasa ke branch `main` juga menjalankan build dan test yang sama (ta
 | Tools (FFmpeg, yt-dlp, spotDL, Deno) | `%LOCALAPPDATA%\KuyMediaBox\bin\` |
 | Catatan video yang sudah diunduh | `%LOCALAPPDATA%\KuyMediaBox\download-archive.txt` |
 | File sementara | `%LOCALAPPDATA%\KuyMediaBox\tmp\` (dibersihkan otomatis) |
-| Hasil (default) | `Pictures`, `Videos`, `Music`, `Downloads` › `KuyMediaBox` |
+| Hasil (default) | `Pictures`, `Videos`, `Music`, `Downloads`, `Documents` › `KuyMediaBox` |
+| LibreOffice (opsional) | `%LOCALAPPDATA%\KuyMediaBox\bin\libreoffice\` |
+| Cache mesin PDF | `%LOCALAPPDATA%\KuyMediaBox\cache\` |
 
 Untuk reset total, tutup aplikasi lalu hapus folder `%APPDATA%\KuyMediaBox` dan `%LOCALAPPDATA%\KuyMediaBox`.
 
@@ -321,6 +366,9 @@ Untuk reset total, tutup aplikasi lalu hapus folder `%APPDATA%\KuyMediaBox` dan 
 | Playlist Spotify tidak terbaca | Playlist buatan Spotify (mis. Discover Weekly) dan playlist private tidak bisa dibaca. Salin lagunya ke playlist publik milik sendiri. |
 | "Video … tidak bisa disalin ke … tanpa encode ulang" | Codec sumber tidak cocok dengan format tujuan; pilih codec lain (misalnya H.264) |
 | Windows SmartScreen memperingatkan | Pilih **More info › Run anyway** (aplikasi belum ditandatangani sertifikat digital) |
+| "Butuh Microsoft Office atau LibreOffice" | Konversi Word/Excel/PowerPoint butuh salah satunya. Unduh LibreOffice di **Pengaturan › Tools pendukung**. |
+| OCR: "bahasa OCR belum terpasang" | Tambahkan bahasa di **Pengaturan Windows › Waktu & Bahasa › Bahasa**, lalu pilih bahasa itu di alat OCR. Teks huruf Latin terbaca dengan bahasa apa pun. |
+| PDF ke Word/Excel kosong | PDF hasil scan belum punya teks; jalankan **OCR PDF** dulu. |
 | Detail error | Klik **Lihat detail** pada baris yang gagal, lalu **Salin detail** |
 
 ---
@@ -333,6 +381,7 @@ KuyMediaBox/
 ├── app.go                  # binding: pengaturan, folder hasil, tools, antrian
 ├── app_files.go            # binding: tambah file & mulai konversi
 ├── app_download.go         # binding: baca link & mulai download
+├── app_pdf.go              # binding: alat PDF
 ├── internal/
 │   ├── appdir/             # folder aplikasi & folder default (Known Folder Windows)
 │   ├── config/             # settings.json
@@ -341,6 +390,7 @@ KuyMediaBox/
 │   ├── ffmpeg/             # ffprobe, runner FFmpeg + progress, daftar encoder
 │   ├── mediaconv/          # argumen FFmpeg untuk video & audio
 │   ├── imageconv/          # konversi gambar pure Go (+ ICO & PDF)
+│   ├── pdf/                # alat PDF: PDFium (WebAssembly) + pdfcpu, OCR Windows, Office, Edge/Chrome headless
 │   ├── downloader/         # deteksi link, yt-dlp (YouTube & sosmed), spotDL (Spotify), gallery-dl (foto)
 │   ├── tools/              # Tools Manager: cari, unduh, update
 │   ├── updater/            # update aplikasi dari GitHub Releases
@@ -348,14 +398,38 @@ KuyMediaBox/
 │   ├── proc/ platform/     # proses tersembunyi & utilitas Windows
 │   └── integration/        # test nyata dengan tools asli
 ├── frontend/src/
-│   ├── pages/              # Gambar, Video, Audio, Download, Pengaturan
+│   ├── pages/              # Gambar, Video, Audio, Alat PDF (pages/pdf/), Download, Pengaturan
 │   ├── components/         # Sidebar, FileList, OutputPicker, RunFooter, …
 │   └── lib/                # API, store, format, i18n (L('id', 'en'))
 ├── build/                  # ikon & konfigurasi build Windows
 └── .github/workflows/      # release otomatis
 ```
 
-**Teknologi:** Go · Wails v2 · Svelte 5 + TypeScript + Vite · FFmpeg · yt-dlp · spotDL · gallery-dl · gen2brain/webp·avif·heic · disintegration/imaging.
+**Teknologi:** Go · Wails v2 · Svelte 5 + TypeScript + Vite · FFmpeg · yt-dlp · spotDL · gallery-dl · PDFium (go-pdfium, WebAssembly) · pdfcpu · gen2brain/webp·avif·heic · disintegration/imaging.
+
+## 🙏 Kredit
+
+Dibuat oleh **[iqbalfaf](https://github.com/iqbalfaf)**. KuyMediaBox dibangun di atas proyek open-source berikut (daftar yang sama ada di **Pengaturan › Kredit**):
+
+| Proyek | Repo GitHub | Dipakai untuk |
+|---|---|---|
+| Wails | [wailsapp/wails](https://github.com/wailsapp/wails) | Kerangka aplikasi desktop |
+| Svelte | [sveltejs/svelte](https://github.com/sveltejs/svelte) | Tampilan aplikasi |
+| FFmpeg | [FFmpeg/FFmpeg](https://github.com/FFmpeg/FFmpeg) | Konversi video & audio |
+| yt-dlp | [yt-dlp/yt-dlp](https://github.com/yt-dlp/yt-dlp) | Download video & audio |
+| spotDL | [spotDL/spotify-downloader](https://github.com/spotDL/spotify-downloader) | Download Spotify |
+| gallery-dl | [mikf/gallery-dl](https://github.com/mikf/gallery-dl) | Foto dari post sosmed |
+| Deno | [denoland/deno](https://github.com/denoland/deno) | JS runtime untuk yt-dlp |
+| pdfcpu | [pdfcpu/pdfcpu](https://github.com/pdfcpu/pdfcpu) | Olah & ubah file PDF |
+| go-pdfium | [klippa-app/go-pdfium](https://github.com/klippa-app/go-pdfium) | Tampilan & teks PDF (PDFium) |
+| wazero | [tetratelabs/wazero](https://github.com/tetratelabs/wazero) | Menjalankan PDFium (WebAssembly) |
+| LibreOffice | [LibreOffice/core](https://github.com/LibreOffice/core) | Konversi dokumen Office (opsional) |
+| imaging | [disintegration/imaging](https://github.com/disintegration/imaging) | Ubah ukuran gambar |
+| webp · avif · heic | [gen2brain/webp](https://github.com/gen2brain/webp) · [gen2brain/avif](https://github.com/gen2brain/avif) · [gen2brain/heic](https://github.com/gen2brain/heic) | Format WEBP, AVIF & HEIC |
+| Gorilla WebSocket | [gorilla/websocket](https://github.com/gorilla/websocket) | HTML ke PDF lewat browser |
+| Fontsource | [fontsource/fontsource](https://github.com/fontsource/fontsource) | Font Plus Jakarta Sans & JetBrains Mono |
+
+![Pengaturan dan kredit](docs/screenshots/pengaturan-kredit.png)
 
 ---
 

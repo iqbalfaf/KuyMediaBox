@@ -5,7 +5,7 @@ import type { Kind, TaskInfo } from '../types'
 export const tasks = $state<Record<string, TaskInfo>>({})
 
 /** The task ids of the current (or last) run per kind, used for aggregate progress. */
-export const batches = $state<Record<string, string[]>>({ image: [], video: [], audio: [], download: [] })
+export const batches = $state<Record<string, string[]>>({ image: [], video: [], audio: [], download: [], pdf: [] })
 
 export function isActive(t: TaskInfo | undefined): boolean {
   return !!t && (t.status === 'queued' || t.status === 'running')

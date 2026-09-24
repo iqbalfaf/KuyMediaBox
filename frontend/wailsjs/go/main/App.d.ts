@@ -6,6 +6,7 @@ import {updater} from '../models';
 import {config} from '../models';
 import {tools} from '../models';
 import {queue} from '../models';
+import {pdf} from '../models';
 import {mediaconv} from '../models';
 import {imageconv} from '../models';
 
@@ -47,6 +48,22 @@ export function OpenFolder(arg1:string):Promise<void>;
 
 export function OutputFolder(arg1:string):Promise<string>;
 
+export function PdfCompare(arg1:string,arg2:string):Promise<pdf.CompareResult>;
+
+export function PdfDoc(arg1:string,arg2:string):Promise<pdf.DocInfo>;
+
+export function PdfEnvironment():Promise<main.PdfEnv>;
+
+export function PdfFind(arg1:string,arg2:string,arg3:boolean):Promise<Array<pdf.Rect>>;
+
+export function PdfOcrLanguages():Promise<Array<pdf.OCRLanguage>>;
+
+export function PdfSaveCapture(arg1:string):Promise<main.FileItem>;
+
+export function PdfScan():Promise<main.FileItem>;
+
+export function PdfWarmup():Promise<void>;
+
 export function PickDirectory(arg1:string,arg2:string):Promise<string>;
 
 export function PickFiles(arg1:string):Promise<Array<main.FileItem>>;
@@ -68,5 +85,11 @@ export function StartAudio(arg1:Array<main.JobItem>,arg2:mediaconv.AudioOptions)
 export function StartDownloads(arg1:string,arg2:Array<string>,arg3:downloader.Options):Promise<Array<main.JobRef>>;
 
 export function StartImage(arg1:Array<main.JobItem>,arg2:imageconv.Options):Promise<Array<main.JobRef>>;
+
+export function StartPdf(arg1:string,arg2:Array<main.PdfJob>,arg3:main.PdfOptions):Promise<Array<main.JobRef>>;
+
+export function StartPdfCombine(arg1:string,arg2:Array<main.PdfJob>,arg3:main.PdfOptions):Promise<main.JobRef>;
+
+export function StartPdfEdit(arg1:main.PdfEditRequest):Promise<main.JobRef>;
 
 export function StartVideo(arg1:Array<main.JobItem>,arg2:main.VideoJob):Promise<Array<main.JobRef>>;

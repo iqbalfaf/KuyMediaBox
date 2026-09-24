@@ -1,5 +1,5 @@
-export type Kind = 'image' | 'video' | 'audio' | 'download'
-export type Page = 'image' | 'video' | 'audio' | 'download' | 'settings'
+export type Kind = 'image' | 'video' | 'audio' | 'download' | 'pdf'
+export type Page = 'image' | 'video' | 'audio' | 'download' | 'pdf' | 'settings'
 
 export type TaskStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled' | 'skipped'
 
@@ -37,13 +37,16 @@ export interface FileItem {
   hasVideo: boolean
   hasAudio: boolean
   hasCover: boolean
+  pages: number
+  encrypted: boolean
+  locked: boolean
   error: string
 }
 
 export type Lang = "id" | "en"
 
 export type OutputMode = 'default' | 'subfolder' | 'same' | 'custom'
-export type OutputKind = 'image' | 'video' | 'audio' | 'download'
+export type OutputKind = 'image' | 'video' | 'audio' | 'download' | 'pdf'
 
 export interface OutputSpec {
   mode: OutputMode
@@ -120,6 +123,7 @@ export interface ToolStatus {
   progress: number
   error: string
   required: string
+  optional: boolean
 }
 
 export interface Capabilities {
@@ -181,4 +185,119 @@ export interface DownloadOptions {
 export interface JobRef {
   itemId: string
   taskId: string
+}
+
+// ---- PDF tools ------------------------------------------------------------------------------
+
+export interface PageSize {
+  w: number
+  h: number
+}
+
+export interface DocInfo {
+  path: string
+  name: string
+  pages: PageSize[]
+  encrypted: boolean
+}
+
+export interface PdfRect {
+  page: number
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface PdfChange {
+  kind: 'added' | 'removed'
+  text: string
+  page: number
+  boxes: PdfRect[]
+}
+
+export interface CompareResult {
+  pagesA: number
+  pagesB: number
+  changes: PdfChange[]
+  added: number
+  removed: number
+  same: boolean
+}
+
+export interface OcrLanguage {
+  tag: string
+  name: string
+}
+
+export interface PdfEnv {
+  office: { word: boolean; excel: boolean; powerpoint: boolean; libreoffice: string }
+  browser: string
+}
+
+export interface PdfJob {
+  id: string
+  path: string
+  password: string
+}
+
+export interface PdfOptions {
+  compress: { level: 'extreme' | 'recommended' | 'low'; gray: boolean }
+  rotate: number
+  protect: { password: string; ownerPassword: string; allowPrint: boolean; allowCopy: boolean; allowEdit: boolean; aes128: boolean }
+  watermark: {
+    type: 'text' | 'image'
+    text: string
+    size: number
+    bold: boolean
+    color: string
+    image: string
+    scale: number
+    opacity: number
+    angle: number
+    position: string
+    pages: string
+    under: boolean
+  }
+  numbers: { position: string; margin: number; start: number; pages: string; format: string; size: number; color: string; bold: boolean; mirror: boolean }
+  export: { mode: 'pages' | 'extract'; format: 'jpg' | 'png'; dpi: number; quality: number; pages: string }
+  ocr: { lang: string; pages: string; skipText: boolean }
+  crop: { mode: 'margins' | 'box'; top: number; right: number; bottom: number; left: number; box: PdfRect; pages: string }
+  split: { mode: 'ranges' | 'every' | 'all'; ranges: string; every: number }
+  pages: string
+  separate: boolean
+  html: { pageSize: string; orientation: string; margin: string; width: number; onePage: boolean; background: boolean }
+  images: { pageSize: string; orientation: string; margin: string; quality: number; combine: boolean }
+}
+
+/** One page of an organised document. src -1 = blank page. */
+export interface PageRef {
+  src: number
+  page: number
+  rotate: number
+  w: number
+  h: number
+}
+
+/** An object drawn on a page (points, display space, origin top-left). */
+export interface EditItem {
+  kind: 'text' | 'rect' | 'ellipse' | 'line' | 'ink' | 'image'
+  page: number
+  x: number
+  y: number
+  w: number
+  h: number
+  x2: number
+  y2: number
+  points: [number, number][]
+  text: string
+  size: number
+  bold: boolean
+  align: string
+  color: string
+  fill: string
+  stroke: number
+  opacity: number
+  angle: number
+  imageUrl: string
 }

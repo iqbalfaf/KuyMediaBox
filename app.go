@@ -95,6 +95,8 @@ func kindTitle(kind string) string {
 		return i18n.L("Konversi video selesai", "Video conversion finished")
 	case queue.KindAudio:
 		return i18n.L("Konversi audio selesai", "Audio conversion finished")
+	case queue.KindPDF:
+		return i18n.L("Alat PDF selesai", "PDF tools finished")
 	}
 	return i18n.L("Download selesai", "Download finished")
 }

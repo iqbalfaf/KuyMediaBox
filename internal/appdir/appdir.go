@@ -49,10 +49,10 @@ func ExeDir() string {
 }
 
 // fallbackFolder is the usual folder name under the user profile, per module.
-var fallbackFolder = map[string]string{"image": "Pictures", "video": "Videos", "audio": "Music", "download": "Downloads"}
+var fallbackFolder = map[string]string{"image": "Pictures", "video": "Videos", "audio": "Music", "download": "Downloads", "pdf": "Documents"}
 
 // DefaultOutputDir is the default result folder of a module:
-// Pictures\KuyMediaBox, Videos\KuyMediaBox, Music\KuyMediaBox or Downloads\KuyMediaBox.
+// Pictures\KuyMediaBox, Videos\KuyMediaBox, Music\KuyMediaBox, Downloads\KuyMediaBox or Documents\KuyMediaBox.
 func DefaultOutputDir(kind string) string {
 	base := knownFolder(kind)
 	if base == "" {

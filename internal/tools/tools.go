@@ -20,12 +20,13 @@ import (
 
 // Tool IDs.
 const (
-	FFmpeg    = "ffmpeg"
-	FFprobe   = "ffprobe"
-	YtDlp     = "ytdlp"
-	JSRuntime = "jsruntime"
-	SpotDL    = "spotdl"
-	GalleryDL = "gallerydl"
+	FFmpeg      = "ffmpeg"
+	FFprobe     = "ffprobe"
+	YtDlp       = "ytdlp"
+	JSRuntime   = "jsruntime"
+	SpotDL      = "spotdl"
+	GalleryDL   = "gallerydl"
+	LibreOffice = "libreoffice"
 )
 
 // Status is shown on the Settings page.
@@ -44,6 +45,7 @@ type Status struct {
 	Progress        float64 `json:"progress"`
 	Error           string  `json:"error"`
 	Required        string  `json:"required"` // what needs it, for the UI
+	Optional        bool    `json:"optional"` // nice to have; missing is not a warning
 }
 
 type meta struct {
@@ -54,15 +56,19 @@ type meta struct {
 }
 
 var metas = map[string]meta{
-	FFmpeg:    {"FFmpeg", [2]string{"Mesin konversi video, audio & gambar", "Video, audio & image conversion engine"}, [2]string{"Video, Audio, Download", "Video, Audio, Download"}, []string{"ffmpeg.exe"}},
-	YtDlp:     {"yt-dlp", [2]string{"Download video & audio dari YouTube, TikTok, Instagram & Facebook", "Downloads video & audio from YouTube, TikTok, Instagram & Facebook"}, [2]string{"semua Download", "all downloads"}, []string{"yt-dlp.exe"}},
-	JSRuntime: {"JS runtime", [2]string{"Dibutuhkan yt-dlp untuk YouTube", "Needed by yt-dlp for YouTube"}, [2]string{"Download YouTube", "YouTube downloads"}, []string{"deno.exe", "node.exe"}},
-	SpotDL:    {"spotDL", [2]string{"Membaca playlist, album & lagu Spotify", "Reads Spotify playlists, albums & tracks"}, [2]string{"Download Spotify", "Spotify downloads"}, []string{"spotdl.exe"}},
-	GalleryDL: {"gallery-dl", [2]string{"Membaca foto dari post TikTok & Facebook", "Reads pictures from TikTok & Facebook posts"}, [2]string{"foto TikTok & Facebook", "TikTok & Facebook pictures"}, []string{"gallery-dl.exe"}},
+	FFmpeg:      {"FFmpeg", [2]string{"Mesin konversi video, audio & gambar", "Video, audio & image conversion engine"}, [2]string{"Video, Audio, Download", "Video, Audio, Download"}, []string{"ffmpeg.exe"}},
+	YtDlp:       {"yt-dlp", [2]string{"Download video & audio dari YouTube, TikTok, Instagram & Facebook", "Downloads video & audio from YouTube, TikTok, Instagram & Facebook"}, [2]string{"semua Download", "all downloads"}, []string{"yt-dlp.exe"}},
+	JSRuntime:   {"JS runtime", [2]string{"Dibutuhkan yt-dlp untuk YouTube", "Needed by yt-dlp for YouTube"}, [2]string{"Download YouTube", "YouTube downloads"}, []string{"deno.exe", "node.exe"}},
+	SpotDL:      {"spotDL", [2]string{"Membaca playlist, album & lagu Spotify", "Reads Spotify playlists, albums & tracks"}, [2]string{"Download Spotify", "Spotify downloads"}, []string{"spotdl.exe"}},
+	GalleryDL:   {"gallery-dl", [2]string{"Membaca foto dari post TikTok & Facebook", "Reads pictures from TikTok & Facebook posts"}, [2]string{"foto TikTok & Facebook", "TikTok & Facebook pictures"}, []string{"gallery-dl.exe"}},
+	LibreOffice: {"LibreOffice", [2]string{"Opsional: konversi Word, Excel & PowerPoint ↔ PDF bila Microsoft Office tidak terpasang (±375 MB)", "Optional: Word, Excel & PowerPoint ↔ PDF when Microsoft Office isn't installed (±375 MB)"}, [2]string{"konversi dokumen Office di menu PDF", "Office document conversion in the PDF tools"}, []string{"soffice.com"}},
 }
 
 // Order is the display order.
-var Order = []string{FFmpeg, YtDlp, JSRuntime, SpotDL, GalleryDL}
+var Order = []string{FFmpeg, YtDlp, JSRuntime, SpotDL, GalleryDL, LibreOffice}
+
+// optional tools are not reported as missing.
+var optional = map[string]bool{LibreOffice: true}
 
 // Manager keeps the current status of every tool.
 type Manager struct {
@@ -94,6 +100,7 @@ func (m *Manager) List() []Status {
 		// Resolved on every call so a language switch shows up without a restart.
 		st.Description = i18n.L(md.desc[0], md.desc[1])
 		st.Required = i18n.L(md.required[0], md.required[1])
+		st.Optional = optional[id]
 		out = append(out, st)
 	}
 	return out
@@ -143,6 +150,23 @@ func candidateDirs() []struct{ dir, source string } {
 	}
 }
 
+// libreDir is where the app extracts its own LibreOffice.
+func libreDir() string { return filepath.Join(appdir.ToolsDir(), "libreoffice") }
+
+func libreCandidates() []struct{ path, source string } {
+	var out []struct{ path, source string }
+	add := func(p, source string) { out = append(out, struct{ path, source string }{p, source}) }
+	own := libreDir()
+	add(filepath.Join(own, "program", "soffice.com"), "downloaded")
+	add(filepath.Join(own, "LibreOffice", "program", "soffice.com"), "downloaded")
+	for _, env := range []string{"ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"} {
+		if base := os.Getenv(env); base != "" {
+			add(filepath.Join(base, "LibreOffice", "program", "soffice.com"), "system")
+		}
+	}
+	return out
+}
+
 func fileExists(p string) bool {
 	st, err := os.Stat(p)
 	return err == nil && !st.IsDir()
@@ -152,6 +176,14 @@ func fileExists(p string) bool {
 func (m *Manager) locate(id string) (path, source string) {
 	if custom := m.cfg.Get().ToolPaths[id]; custom != "" && fileExists(custom) {
 		return custom, "custom"
+	}
+	if id == LibreOffice {
+		// Our own extracted copy first, then a normal installation.
+		for _, p := range libreCandidates() {
+			if fileExists(p.path) {
+				return p.path, p.source
+			}
+		}
 	}
 	for _, exe := range metas[id].exes {
 		for _, c := range candidateDirs() {
@@ -261,6 +293,16 @@ func readVersion(ctx context.Context, id, path string) (string, error) {
 			return "", err
 		}
 		return reVersion.FindString(firstLine(out)), nil
+	case LibreOffice:
+		// "LibreOffice 26.8.0.2 <hash>"
+		out, err := proc.Output(ctx, path, "--version")
+		if err != nil {
+			return "", err
+		}
+		if v := reVersion.FindString(out); v != "" {
+			return v, nil
+		}
+		return firstLine(out), nil
 	case SpotDL, GalleryDL:
 		out, err := proc.Output(ctx, path, "--version")
 		if err != nil {

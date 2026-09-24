@@ -3,10 +3,13 @@
   import Icon from './Icon.svelte'
   import { runtime } from '../lib/api'
 
-  let { title, subtitle }: { title: string; subtitle: string } = $props()
+  let { title, subtitle, back, backLabel = '' }: { title: string; subtitle: string; back?: () => void; backLabel?: string } = $props()
 </script>
 
 <header class="drag">
+  {#if back}
+    <button class="back no-drag" onclick={back} aria-label={backLabel || L('Kembali', 'Back')} title={backLabel || L('Kembali', 'Back')}><Icon name="arrowLeft" size={18} /></button>
+  {/if}
   <div class="text">
     <h1>{title}</h1>
     <p>{subtitle}</p>
@@ -25,9 +28,27 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
     padding: 0 12px 0 28px;
   }
+  .back {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-2);
+  }
+  .back:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
   .text {
+    flex-grow: 1;
     display: flex;
     flex-direction: column;
     gap: 4px;

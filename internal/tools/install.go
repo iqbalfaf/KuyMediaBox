@@ -94,6 +94,13 @@ func (m *Manager) CheckUpdates(ctx context.Context) {
 			s.UpdateAvailable = s.Found && newer(latest, s.Version)
 		})
 	}
+	// LibreOffice: only a copy we extracted ourselves is offered for updating.
+	if latest, err := latestLibreOffice(ctx); err == nil {
+		m.update(LibreOffice, func(s *Status) {
+			s.Latest = latest
+			s.UpdateAvailable = s.Found && s.Source == "downloaded" && newer(latest, s.Version)
+		})
+	}
 }
 
 // Install downloads (or re-downloads, for updates) a tool into the app tools folder.
@@ -167,6 +174,8 @@ func (m *Manager) install(ctx context.Context, id string) error {
 			}
 		}
 		return errors.New(i18n.L("file spotDL untuk Windows tidak ditemukan di rilis terbaru", "spotDL for Windows not found in the latest release"))
+	case LibreOffice:
+		return installLibreOffice(ctx, progress)
 	case GalleryDL:
 		rel, err := latestCodeberg(ctx, galleryDLReleases)
 		if err != nil {

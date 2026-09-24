@@ -17,10 +17,13 @@
     note = '',
     lastOutput = '',
     queueMore = 0,
+    summary = true,
     onstart,
     oncancel,
   }: {
     queueMore?: number
+    /** Show the result of the last run (off when it would describe another tool). */
+    summary?: boolean
     kind: Kind
     running: boolean
     startLabel: string
@@ -62,7 +65,7 @@
       <button class="btn danger grow" onclick={oncancel}>{L('Batalkan semua', 'Cancel all')}</button>
     </div>
   {:else}
-    {#if sum.total > 0 && sum.finished === sum.total}
+    {#if summary && sum.total > 0 && sum.finished === sum.total}
       <div class="summary">
         <span>
           {L('Terakhir', 'Last run')}: <b class="ok">{sum.done} {L('berhasil', 'succeeded')}</b>{#if sum.failed}&nbsp;· <b class="err">{sum.failed} {L('gagal', 'failed')}</b>{/if}{#if sum.skipped}&nbsp;· {sum.skipped} {L('dilewati', 'skipped')}{/if}{#if sum.canceled}&nbsp;· {sum.canceled} {L('dibatalkan', 'canceled')}{/if}

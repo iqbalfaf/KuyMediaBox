@@ -10,6 +10,10 @@
   import AudioPage from './pages/AudioPage.svelte'
   import DownloadPage from './pages/DownloadPage.svelte'
   import SettingsPage from './pages/SettingsPage.svelte'
+  import PdfPage from './pages/PdfPage.svelte'
+  import PasswordDialog from './components/PasswordDialog.svelte'
+  import { convFor, pdfDrop, pdfNav } from './lib/stores/pdf.svelte'
+  import { toolById } from './lib/pdfTools'
   import { runtime } from './lib/api'
   import { initApp, nav, toast } from './lib/stores/app.svelte'
   import { initTasks } from './lib/stores/tasks.svelte'
@@ -27,6 +31,8 @@
         return L('Konversi audio selesai', 'Audio conversion finished')
       case 'download':
         return L('Download selesai', 'Download finished')
+      case 'pdf':
+        return L('Alat PDF selesai', 'PDF tools finished')
     }
     return L('Tugas selesai', 'Tasks finished')
   }
@@ -47,11 +53,22 @@
         case 'audio':
           audioConv.addPaths(paths)
           break
+        case 'pdf':
+          if (pdfDrop.fn) pdfDrop.fn(paths)
+          else if (!pdfNav.tool) {
+            // On the overview a drop of PDFs opens the most likely tool: merge for several, compress for one.
+            const pdfs = paths.filter((p) => p.toLowerCase().endsWith('.pdf'))
+            if (pdfs.length) {
+              pdfNav.tool = pdfs.length > 1 ? 'merge' : 'compress'
+              convFor(pdfNav.tool).addPaths(pdfs)
+            } else toast(L('Pilih alat PDF dulu, lalu tarik file ke sana.', 'Pick a PDF tool first, then drop the files on it.'), 'info')
+          } else if (toolById(pdfNav.tool)) convFor(pdfNav.tool).addPaths(paths)
+          break
         case 'download':
           toast(L('Di halaman Download, tempel link (bukan file). Pindah ke Gambar/Video/Audio untuk konversi file.', 'The Download page takes links, not files. Switch to Images/Video/Audio to convert files.'), 'info')
           break
         default:
-          toast(L('Buka halaman Gambar, Video, atau Audio untuk menambahkan file.', 'Open the Images, Video or Audio page to add files.'), 'info')
+          toast(L('Buka halaman Gambar, Video, Audio, atau PDF untuk menambahkan file.', 'Open the Images, Video, Audio or PDF page to add files.'), 'info')
       }
     })
 
@@ -90,6 +107,8 @@
       <AudioPage />
     {:else if nav.page === 'download'}
       <DownloadPage />
+    {:else if nav.page === 'pdf'}
+      <PdfPage />
     {:else}
       <SettingsPage />
     {/if}
@@ -102,6 +121,7 @@
 <Toasts />
 <DetailModal />
 <UpdateDialog />
+<PasswordDialog />
 
 <style>
   .shell {

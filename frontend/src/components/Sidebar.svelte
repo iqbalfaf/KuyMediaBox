@@ -7,12 +7,12 @@
   import { upd } from '../lib/stores/update.svelte'
   import type { Kind, Page } from '../lib/types'
 
-  const kindName = $derived<Record<Kind, string>>({ image: L('Gambar', 'Images'), video: 'Video', audio: 'Audio', download: 'Download' })
-  const unit = $derived<Record<Kind, string>>({ image: 'file', video: 'file', audio: 'file', download: 'item' })
+  const kindName = $derived<Record<Kind, string>>({ image: L('Gambar', 'Images'), video: 'Video', audio: 'Audio', download: 'Download', pdf: 'PDF' })
+  const unit = $derived<Record<Kind, string>>({ image: 'file', video: 'file', audio: 'file', download: 'item', pdf: 'file' })
 
   const queue = $derived.by(() => {
     void clock.now
-    const kinds: Kind[] = ['download', 'video', 'audio', 'image']
+    const kinds: Kind[] = ['download', 'video', 'audio', 'image', 'pdf']
     const active = kinds.map((k) => ({ k, s: summarize(k) })).filter((x) => x.s.active > 0)
     if (active.length === 0) return null
     const main = active[0]
@@ -29,6 +29,7 @@
     { page: 'image', label: L('Gambar', 'Images'), icon: 'image', group: L('KONVERSI', 'CONVERT') },
     { page: 'video', label: 'Video', icon: 'video', group: L('KONVERSI', 'CONVERT') },
     { page: 'audio', label: 'Audio', icon: 'music', group: L('KONVERSI', 'CONVERT') },
+    { page: 'pdf', label: L('Alat PDF', 'PDF Tools'), icon: 'fileText', group: L('DOKUMEN', 'DOCUMENTS') },
     { page: 'download', label: 'Download', icon: 'download', group: 'ONLINE' },
   ])
 </script>
