@@ -18,6 +18,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"kuymediabox/internal/i18n"
 )
 
 // Repo is the GitHub repository that publishes releases.
@@ -75,18 +77,18 @@ func Check(ctx context.Context, current string) (Info, error) {
 	req.Header.Set("User-Agent", "KuyMediaBox/"+current)
 	resp, err := client.Do(req)
 	if err != nil {
-		return Info{Current: current}, errors.New("tidak bisa menghubungi GitHub, periksa koneksi internet")
+		return Info{Current: current}, errors.New(i18n.L("tidak bisa menghubungi GitHub, periksa koneksi internet", "can't reach GitHub, check your internet connection"))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		return Info{Current: current}, errors.New("belum ada rilis yang diterbitkan")
+		return Info{Current: current}, errors.New(i18n.L("belum ada rilis yang diterbitkan", "no release has been published yet"))
 	}
 	if resp.StatusCode != http.StatusOK {
-		return Info{Current: current}, fmt.Errorf("GitHub menjawab %s, coba lagi nanti", resp.Status)
+		return Info{Current: current}, fmt.Errorf(i18n.L("GitHub menjawab %s, coba lagi nanti", "GitHub replied %s, try again later"), resp.Status)
 	}
 	var rel ghRelease
 	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-		return Info{Current: current}, fmt.Errorf("data rilis tidak valid: %w", err)
+		return Info{Current: current}, fmt.Errorf(i18n.L("data rilis tidak valid: %w", "invalid release data: %w"), err)
 	}
 	return fromRelease(rel, current, detectMode()), nil
 }
@@ -223,7 +225,7 @@ func detectMode() string {
 // Download fetches the release asset for info.Mode into dir and verifies its SHA-256.
 func Download(ctx context.Context, info Info, dir string, progress func(float64)) (string, error) {
 	if info.assetURL == "" {
-		return "", errors.New("file update untuk Windows tidak ditemukan di rilis ini")
+		return "", errors.New(i18n.L("file update untuk Windows tidak ditemukan di rilis ini", "no Windows update file in this release"))
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
@@ -243,7 +245,7 @@ func Download(ctx context.Context, info Info, dir string, progress func(float64)
 		return "", err
 	}
 	if !strings.EqualFold(got, want) {
-		return "", errors.New("file update rusak (checksum tidak cocok), coba lagi")
+		return "", errors.New(i18n.L("file update rusak (checksum tidak cocok), coba lagi", "update file is damaged (checksum mismatch), try again"))
 	}
 	os.Remove(dest)
 	if err := os.Rename(tmp, dest); err != nil {
@@ -254,7 +256,7 @@ func Download(ctx context.Context, info Info, dir string, progress func(float64)
 
 func expectedHash(ctx context.Context, info Info) (string, error) {
 	if info.sumsURL == "" {
-		return "", errors.New("rilis tidak menyertakan SHA256SUMS.txt, update dibatalkan demi keamanan")
+		return "", errors.New(i18n.L("rilis tidak menyertakan SHA256SUMS.txt, update dibatalkan demi keamanan", "the release has no SHA256SUMS.txt, update canceled for safety"))
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -262,11 +264,11 @@ func expectedHash(ctx context.Context, info Info) (string, error) {
 	req.Header.Set("User-Agent", "KuyMediaBox")
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("gagal mengambil checksum: %w", err)
+		return "", fmt.Errorf(i18n.L("gagal mengambil checksum: %w", "couldn't fetch the checksum: %w"), err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("gagal mengambil checksum (%s)", resp.Status)
+		return "", fmt.Errorf(i18n.L("gagal mengambil checksum (%s)", "couldn't fetch the checksum (%s)"), resp.Status)
 	}
 	return parseSums(resp.Body, info.AssetName)
 }
@@ -280,7 +282,7 @@ func parseSums(r io.Reader, name string) (string, error) {
 			return strings.ToLower(f[0]), nil
 		}
 	}
-	return "", fmt.Errorf("checksum untuk %s tidak ditemukan", name)
+	return "", fmt.Errorf(i18n.L("checksum untuk %s tidak ditemukan", "checksum for %s not found"), name)
 }
 
 func fileHash(path string) (string, error) {
@@ -307,11 +309,11 @@ func fetch(ctx context.Context, url, dest string, progress func(float64)) error 
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		return fmt.Errorf("gagal mengunduh update, periksa koneksi internet: %w", err)
+		return fmt.Errorf(i18n.L("gagal mengunduh update, periksa koneksi internet: %w", "update download failed, check your internet connection: %w"), err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("gagal mengunduh update (%s)", resp.Status)
+		return fmt.Errorf(i18n.L("gagal mengunduh update (%s)", "update download failed (%s)"), resp.Status)
 	}
 	f, err := os.Create(dest)
 	if err != nil {
@@ -342,12 +344,12 @@ func fetch(ctx context.Context, url, dest string, progress func(float64)) error 
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			return fmt.Errorf("unduhan terputus: %w", rerr)
+			return fmt.Errorf(i18n.L("unduhan terputus: %w", "download interrupted: %w"), rerr)
 		}
 	}
 	if total > 0 && done != total {
 		f.Close()
-		return errors.New("unduhan update tidak lengkap")
+		return errors.New(i18n.L("unduhan update tidak lengkap", "incomplete update download"))
 	}
 	if progress != nil {
 		progress(1)

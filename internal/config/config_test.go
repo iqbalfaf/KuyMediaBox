@@ -26,7 +26,7 @@ func TestNormalize(t *testing.T) {
 		"audio":    {Mode: "rubbish"},                    // unknown → default
 		"download": {Mode: OutputSame},                   // downloads cannot be "same"
 		"other":    {Mode: OutputCustom, Dir: `C:\temp`}, // unknown kind dropped
-	}, Conflict: "?", Suffix: `a/b:c`}
+	}, Conflict: "?", Suffix: `a/b:c`, Language: "fr"}
 	s.Normalize()
 	if s.Outputs["image"].Mode != OutputDefault || s.Outputs["video"].Mode != OutputSubfolder || s.Outputs["video"].Dir != "" ||
 		s.Outputs["audio"].Mode != OutputDefault || s.Outputs["download"].Mode != OutputDefault {
@@ -34,6 +34,9 @@ func TestNormalize(t *testing.T) {
 	}
 	if _, ok := s.Outputs["other"]; ok {
 		t.Fatal("unknown kind kept")
+	}
+	if s.Language != LangID {
+		t.Fatalf("language %q, want id", s.Language)
 	}
 	if s.Conflict != ConflictRename || s.Suffix != "abc" {
 		t.Fatalf("conflict %q suffix %q", s.Conflict, s.Suffix)
@@ -46,18 +49,19 @@ func TestSaveLoadRoundTripAndPartialFile(t *testing.T) {
 	s := st.Get()
 	s.Outputs["video"] = Output{Mode: OutputCustom, Dir: `D:\Hasil Video`}
 	s.Notify = false
+	s.Language = LangEN
 	if _, err := st.Set(s); err != nil {
 		t.Fatal(err)
 	}
 	got := LoadFrom(p).Get()
-	if got.Outputs["video"].Dir != `D:\Hasil Video` || got.Notify || got.Outputs["image"].Mode != OutputDefault {
+	if got.Outputs["video"].Dir != `D:\Hasil Video` || got.Notify || got.Language != LangEN || got.Outputs["image"].Mode != OutputDefault {
 		t.Fatalf("round trip %+v", got)
 	}
 
 	// A file from an older version: missing keys keep their defaults, legacy download folder migrates.
 	os.WriteFile(p, []byte(`{"suffix":"_x","downloadDir":"E:\\Unduhan"}`), 0o644)
 	old := LoadFrom(p).Get()
-	if old.Suffix != "_x" || !old.Notify || !old.SkipDownloaded || !old.DownloadSubfolders {
+	if old.Suffix != "_x" || !old.Notify || !old.SkipDownloaded || !old.DownloadSubfolders || old.Language != LangID {
 		t.Fatalf("partial file lost defaults: %+v", old)
 	}
 	if o := old.Outputs["download"]; o.Mode != OutputCustom || o.Dir != `E:\Unduhan` {

@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from './Icon.svelte'
+  import { L, locale } from '../lib/i18n.svelte'
   import { runtime } from '../lib/api'
   import { bytes } from '../lib/format'
   import { installNow, upd } from '../lib/stores/update.svelte'
@@ -14,7 +15,7 @@
 
   const busyTasks = $derived(Object.values(tasks).filter((t) => isActive(t)).length)
   const date = $derived(
-    upd.info?.publishedAt ? new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(upd.info.publishedAt)) : '',
+    upd.info?.publishedAt ? new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(upd.info.publishedAt)) : '',
   )
 
   function close() {
@@ -28,39 +29,39 @@
       <div class="head">
         <div class="ic"><Icon name="download" size={22} /></div>
         <div class="t">
-          <b>Versi baru tersedia: v{upd.info.latest}</b>
-          <span>Versi Anda sekarang v{upd.info.current}{date ? ` · dirilis ${date}` : ''}</span>
+          <b>{L('Versi baru tersedia', 'New version available')}: v{upd.info.latest}</b>
+          <span>{L('Versi Anda sekarang', 'You have')} v{upd.info.current}{date ? ` · ${L('dirilis', 'released')} ${date}` : ''}</span>
         </div>
-        {#if !upd.installing}<button class="btn icon" aria-label="Tutup" onclick={close}><Icon name="x" size={16} /></button>{/if}
+        {#if !upd.installing}<button class="btn icon" aria-label={L('Tutup', 'Close')} onclick={close}><Icon name="x" size={16} /></button>{/if}
       </div>
 
       <div class="notes">
-        <span class="label">Yang baru</span>
-        <pre>{upd.info.notes || 'Perbaikan dan peningkatan.'}</pre>
-        {#if upd.info.url}<button class="link" onclick={() => runtime.openURL(upd.info!.url)}>Lihat di GitHub</button>{/if}
+        <span class="label">{L('Yang baru', "What's new")}</span>
+        <pre>{upd.info.notes || L('Perbaikan dan peningkatan.', 'Fixes and improvements.')}</pre>
+        {#if upd.info.url}<button class="link" onclick={() => runtime.openURL(upd.info!.url)}>{L('Lihat di GitHub', 'View on GitHub')}</button>{/if}
       </div>
 
       {#if upd.installing}
         <div class="prog">
           <div class="line">
-            <span>{upd.stage === 'install' ? 'Memasang & memulai ulang…' : `Mengunduh ${bytes(upd.info.assetSize)}…`}</span>
+            <span>{upd.stage === 'install' ? L('Memasang & memulai ulang…', 'Installing & restarting…') : `${L('Mengunduh', 'Downloading')} ${bytes(upd.info.assetSize)}…`}</span>
             <span>{Math.round(upd.progress * 100)}%</span>
           </div>
           <div class="bar big" class:indeterminate={upd.stage === 'install'}><div style="width: {upd.progress * 100}%"></div></div>
-          {#if upd.stage === 'install' && upd.info.mode === 'installer'}<p class="hint">Jika Windows meminta izin (UAC), pilih <b>Yes</b>.</p>{/if}
+          {#if upd.stage === 'install' && upd.info.mode === 'installer'}<p class="hint">{L('Jika Windows meminta izin (UAC), pilih', 'If Windows asks for permission (UAC), choose')} <b>Yes</b>.</p>{/if}
         </div>
       {:else}
         {#if upd.error}<p class="err"><Icon name="alert" size={14} /> {upd.error}</p>{/if}
-        {#if busyTasks > 0}<p class="warn">Ada {busyTasks} tugas yang sedang berjalan. Tugas itu akan dibatalkan saat update.</p>{/if}
+        {#if busyTasks > 0}<p class="warn">{L(`Ada ${busyTasks} tugas yang sedang berjalan. Tugas itu akan dibatalkan saat update.`, `${busyTasks} task${busyTasks === 1 ? ' is' : 's are'} still running and will be canceled by the update.`)}</p>{/if}
         <p class="hint">
           {upd.info.mode === 'installer'
-            ? 'Installer versi baru akan dijalankan otomatis, lalu aplikasi dibuka kembali.'
-            : 'File aplikasi akan diganti otomatis, lalu aplikasi dibuka kembali.'}
-          File diperiksa dengan checksum SHA-256 sebelum dipasang.
+            ? L('Installer versi baru akan dijalankan otomatis, lalu aplikasi dibuka kembali.', 'The new installer runs automatically, then the app reopens.')
+            : L('File aplikasi akan diganti otomatis, lalu aplikasi dibuka kembali.', 'The app file is replaced automatically, then the app reopens.')}
+          {L('File diperiksa dengan checksum SHA-256 sebelum dipasang.', 'The file is verified with a SHA-256 checksum before installing.')}
         </p>
         <div class="foot">
-          <button class="btn" onclick={close}>Nanti saja</button>
-          <button class="btn-accent" onclick={installNow}><Icon name="download" size={14} stroke={2.5} />Update sekarang</button>
+          <button class="btn" onclick={close}>{L('Nanti saja', 'Later')}</button>
+          <button class="btn-accent" onclick={installNow}><Icon name="download" size={14} stroke={2.5} />{L('Update sekarang', 'Update now')}</button>
         </div>
       {/if}
     </div>

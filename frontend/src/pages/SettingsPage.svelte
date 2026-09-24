@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { L } from '../lib/i18n.svelte'
   import PageHeader from '../components/PageHeader.svelte'
   import Segmented from '../components/Segmented.svelte'
   import Switch from '../components/Switch.svelte'
@@ -12,18 +13,18 @@
   import { checkNow, upd } from '../lib/stores/update.svelte'
 
   const icons: Record<string, string> = { ffmpeg: 'video', ytdlp: 'download', jsruntime: 'code', spotdl: 'music' }
-  const sourceLabel: Record<string, string> = {
-    downloaded: 'dipasang oleh KuyMediaBox',
-    bundled: 'dari folder aplikasi',
-    system: 'ditemukan di sistem (PATH)',
-    custom: 'lokasi pilihan Anda',
-  }
-  const folderRows: { kind: OutputKind; label: string; icon: string }[] = [
-    { kind: 'image', label: 'Gambar', icon: 'image' },
+  const sourceLabel = $derived<Record<string, string>>({
+    downloaded: L('dipasang oleh KuyMediaBox', 'installed by KuyMediaBox'),
+    bundled: L('dari folder aplikasi', 'from the app folder'),
+    system: L('ditemukan di sistem (PATH)', 'found on the system (PATH)'),
+    custom: L('lokasi pilihan Anda', 'your chosen location'),
+  })
+  const folderRows = $derived<{ kind: OutputKind; label: string; icon: string }[]>([
+    { kind: 'image', label: L('Gambar', 'Images'), icon: 'image' },
     { kind: 'video', label: 'Video', icon: 'video' },
     { kind: 'audio', label: 'Audio', icon: 'music' },
     { kind: 'download', label: 'Download', icon: 'download' },
-  ]
+  ])
 
   let checking = $state(false)
   let suffix = $state(settings.value?.suffix ?? '_converted')
@@ -36,7 +37,7 @@
     checking = true
     try {
       toolState.list = await api.recheckTools()
-      toast('Tools diperiksa ulang', 'ok')
+      toast(L('Tools diperiksa ulang', 'Tools rechecked'), 'ok')
     } catch (e) {
       toast(errText(e), 'err')
     } finally {
@@ -47,7 +48,7 @@
   async function install(t: ToolStatus) {
     try {
       await api.installTool(t.id)
-      toast(`${t.name} ${t.updateAvailable ? 'berhasil di-update' : 'berhasil dipasang'}`, 'ok')
+      toast(`${t.name} ${t.updateAvailable ? L('berhasil di-update', 'updated') : L('berhasil dipasang', 'installed')}`, 'ok')
     } catch (e) {
       toast(`${t.name}: ${errText(e)}`, 'err')
     }
@@ -73,30 +74,30 @@
     if (settings.value && suffix !== settings.value.suffix) saveSettings({ suffix })
   }
 
-  const example = $derived(`foto.jpg → foto${settings.value?.suffix ?? ''}.jpg`)
+  const example = $derived(L(`foto.jpg → foto${settings.value?.suffix ?? ''}.jpg`, `photo.jpg → photo${settings.value?.suffix ?? ''}.jpg`))
 
   async function resetAllFolders() {
     if (!settings.value) return
     await saveSettings({
       outputs: { image: { mode: 'default', dir: '' }, video: { mode: 'default', dir: '' }, audio: { mode: 'default', dir: '' }, download: { mode: 'default', dir: '' } },
     })
-    toast('Semua folder hasil kembali ke default', 'ok')
+    toast(L('Semua folder hasil kembali ke default', 'All output folders reset to default'), 'ok')
   }
 
   const allDefault = $derived(folderRows.every((r) => outputOf(r.kind).mode === 'default'))
 </script>
 
-<PageHeader title="Pengaturan" subtitle="Kelola tools pendukung dan cara file disimpan." />
+<PageHeader title={L('Pengaturan', 'Settings')} subtitle={L('Kelola tools pendukung dan cara file disimpan.', 'Manage helper tools and how files are saved.')} />
 
 <div class="body">
   <div class="col-main">
-    <section class="card" aria-label="Folder hasil">
+    <section class="card" aria-label={L('Folder hasil', 'Output folders')}>
       <div class="head">
         <div class="ht">
-          <h2>Folder hasil</h2>
-          <p>Tempat file hasil disimpan untuk setiap menu. Tombol <b>Simpan ke</b> di tiap halaman ikut berubah.</p>
+          <h2>{L('Folder hasil', 'Output folders')}</h2>
+          <p>{L('Tempat file hasil disimpan untuk setiap menu. Tombol', 'Where each module saves its results. The')} <b>{L('Simpan ke', 'Save to')}</b> {L('di tiap halaman ikut berubah.', 'button on each page follows this.')}</p>
         </div>
-        <button class="btn" onclick={resetAllFolders} disabled={allDefault}><Icon name="refresh" size={16} />Semua ke default</button>
+        <button class="btn" onclick={resetAllFolders} disabled={allDefault}><Icon name="refresh" size={16} />{L('Semua ke default', 'Reset all')}</button>
       </div>
 
       {#each folderRows as r (r.kind)}
@@ -106,14 +107,14 @@
           <div class="fic"><Icon name={r.icon} size={20} /></div>
           <div class="finfo">
             <span class="fname">{r.label}</span>
-            <span class="fdef ellipsis" title={defaultDirs[r.kind] ?? ''}>Default: {shortPath(defaultDirs[r.kind] ?? '')}</span>
+            <span class="fdef ellipsis" title={defaultDirs[r.kind] ?? ''}>{L('Default', 'Default')}: {shortPath(defaultDirs[r.kind] ?? '')}</span>
           </div>
           <OutputPicker kind={r.kind} placement="down" />
           <div class="factions">
-            <button class="mini" title={folder ? `Buka ${folder}` : 'Mode dinamis: folder ikut lokasi file asli'} aria-label="Buka folder {r.label}" disabled={!folder} onclick={() => api.openFolder(folder)}>
+            <button class="mini" title={folder ? `${L('Buka', 'Open')} ${folder}` : L('Mode dinamis: folder ikut lokasi file asli', 'Dynamic mode: the folder follows each source file')} aria-label={L(`Buka folder ${r.label}`, `Open ${r.label} folder`)} disabled={!folder} onclick={() => api.openFolder(folder)}>
               <Icon name="folderOpen" size={16} />
             </button>
-            <button class="mini" title="Kembalikan ke folder default" aria-label="Reset folder {r.label}" disabled={o.mode === 'default'} onclick={() => setOutput(r.kind, { mode: 'default', dir: '' })}>
+            <button class="mini" title={L('Kembalikan ke folder default', 'Back to the default folder')} aria-label={L(`Reset folder ${r.label}`, `Reset ${r.label} folder`)} disabled={o.mode === 'default'} onclick={() => setOutput(r.kind, { mode: 'default', dir: '' })}>
               <Icon name="refresh" size={16} />
             </button>
           </div>
@@ -125,27 +126,27 @@
           <Switch
             checked={settings.value.downloadSubfolders}
             onchange={(v) => saveSettings({ downloadSubfolders: v })}
-            label="Subfolder otomatis untuk playlist, channel & album"
-            hint="Contoh: Downloads › KuyMediaBox › Nama Playlist"
+            label={L('Subfolder otomatis untuk playlist, channel & album', 'Automatic subfolders for playlists, channels & albums')}
+            hint={L('Contoh: Downloads › KuyMediaBox › Nama Playlist', 'Example: Downloads › KuyMediaBox › Playlist Name')}
           />
           <p class="hint">
-            <b>Dinamis</b> = hasil disimpan di samping file asli, jadi lokasinya ikut file sumber. <b>Folder default</b> & <b>folder pilihan</b> = semua hasil terkumpul di satu tempat.
+            <b>{L('Dinamis', 'Dynamic')}</b> = {L('hasil disimpan di samping file asli, jadi lokasinya ikut file sumber.', 'results are saved next to the source file, so the location follows it.')} <b>{L('Folder default', 'Default folder')}</b> & <b>{L('folder pilihan', 'chosen folder')}</b> = {L('semua hasil terkumpul di satu tempat.', 'all results are collected in one place.')}
           </p>
         </div>
       {/if}
     </section>
 
-    <section class="card" aria-label="Tools pendukung">
+    <section class="card" aria-label={L('Tools pendukung', 'Helper tools')}>
       <div class="head">
         <div class="ht">
-          <h2>Tools pendukung</h2>
-          <p>Dicek otomatis setiap aplikasi dibuka. Yang belum ada bisa diunduh di sini.</p>
+          <h2>{L('Tools pendukung', 'Helper tools')}</h2>
+          <p>{L('Dicek otomatis setiap aplikasi dibuka. Yang belum ada bisa diunduh di sini.', 'Checked automatically every time the app opens. Missing ones can be downloaded here.')}</p>
         </div>
-        <button class="btn" onclick={recheck} disabled={checking}><Icon name="refresh" size={16} class={checking ? 'spin' : ''} />Periksa ulang</button>
+        <button class="btn" onclick={recheck} disabled={checking}><Icon name="refresh" size={16} class={checking ? 'spin' : ''} />{L('Periksa ulang', 'Recheck')}</button>
       </div>
 
       {#if !toolState.loaded && toolState.list.every((t) => !t.found && !t.error)}
-        <div class="checking"><Icon name="loader" size={16} class="spin" /> Memeriksa tools…</div>
+        <div class="checking"><Icon name="loader" size={16} class="spin" /> {L('Memeriksa tools…', 'Checking tools…')}</div>
       {/if}
 
       {#each toolState.list as t (t.id)}
@@ -155,22 +156,22 @@
             <div class="tname">
               <span>{t.id === 'jsruntime' && t.found ? `JS runtime (${t.runtime === 'deno' ? 'Deno' : 'Node.js'})` : t.name}</span>
               {#if t.found && t.version}<span class="ver">{t.version}</span>{/if}
-              {#if !t.found && !t.busy}<span class="ver bad">Belum ada</span>{/if}
+              {#if !t.found && !t.busy}<span class="ver bad">{L('Belum ada', 'Missing')}</span>{/if}
             </div>
             <span class="tdesc">
               {t.description}
               {#if t.found}
                 · {sourceLabel[t.source] ?? ''}
               {:else}
-                · dibutuhkan untuk {t.required}
+                · {L('dibutuhkan untuk', 'needed for')} {t.required}
               {/if}
-              {#if t.id === 'jsruntime' && t.found && t.runtime === 'node'}— Deno tidak perlu diunduh{/if}
+              {#if t.id === 'jsruntime' && t.found && t.runtime === 'node'}{L('— Deno tidak perlu diunduh', '— no need to download Deno')}{/if}
             </span>
-            {#if t.updateAvailable && !t.busy}<span class="upd">Versi {t.latest} tersedia</span>{/if}
+            {#if t.updateAvailable && !t.busy}<span class="upd">{L(`Versi ${t.latest} tersedia`, `Version ${t.latest} available`)}</span>{/if}
             {#if t.error && !t.busy}<span class="terr">{t.error}</span>{/if}
             <span class="tlinks">
               {#if t.found}<span class="path ellipsis" title={t.path}>{t.path}</span>{/if}
-              <button class="tl" onclick={() => pickPath(t)}>Pilih file…</button>
+              <button class="tl" onclick={() => pickPath(t)}>{L('Pilih file…', 'Choose file…')}</button>
               {#if t.source === 'custom'}<button class="tl" onclick={() => resetPath(t)}>Reset</button>{/if}
             </span>
           </div>
@@ -181,11 +182,11 @@
                 <span>{Math.round(t.progress * 100)}%</span>
               </div>
             {:else if !t.found}
-              <button class="btn" onclick={() => install(t)}><Icon name="download" size={14} stroke={2.5} />Unduh</button>
+              <button class="btn" onclick={() => install(t)}><Icon name="download" size={14} stroke={2.5} />{L('Unduh', 'Download')}</button>
             {:else if t.updateAvailable}
               <button class="btn-accent" onclick={() => install(t)}><Icon name="refresh" size={14} stroke={2.5} />Update</button>
             {:else}
-              <span class="pill ok"><Icon name="check" size={12} stroke={3} />Siap</span>
+              <span class="pill ok"><Icon name="check" size={12} stroke={3} />{L('Siap', 'Ready')}</span>
             {/if}
           </div>
         </div>
@@ -194,55 +195,67 @@
   </div>
 
   <div class="col-side">
-  <section class="card" aria-label="Tentang dan update">
-    <div class="head"><h2>Tentang & update</h2></div>
+  <section class="card" aria-label={L('Tentang dan update', 'About and updates')}>
+    <div class="head"><h2>{L('Tentang & update', 'About & updates')}</h2></div>
     <div class="gbody">
       <div class="about">
         <div class="logo"><Icon name="box" size={22} stroke={2.2} /></div>
         <div class="about-t">
           <b>KuyMediaBox</b>
-          <span>Versi {upd.version || '—'}</span>
+          <span>{L('Versi', 'Version')} {upd.version || '—'}</span>
         </div>
         {#if upd.info?.available}
           <button class="btn-accent" onclick={() => (upd.open = true)}><Icon name="download" size={14} stroke={2.5} />Update v{upd.info.latest}</button>
         {:else}
           <button class="btn" onclick={checkNow} disabled={upd.checking}>
-            <Icon name={upd.checking ? 'loader' : 'refresh'} size={16} class={upd.checking ? 'spin' : ''} />{upd.checking ? 'Mengecek…' : 'Cek update'}
+            <Icon name={upd.checking ? 'loader' : 'refresh'} size={16} class={upd.checking ? 'spin' : ''} />{upd.checking ? L('Mengecek…', 'Checking…') : L('Cek update', 'Check updates')}
           </button>
         {/if}
       </div>
       {#if settings.value}
-        <Switch checked={settings.value.autoUpdate} onchange={(v) => saveSettings({ autoUpdate: v })} label="Cek update otomatis" hint="Saat aplikasi dibuka, dari GitHub Releases" />
+        <Switch checked={settings.value.autoUpdate} onchange={(v) => saveSettings({ autoUpdate: v })} label={L('Cek update otomatis', 'Check for updates automatically')} hint={L('Saat aplikasi dibuka, dari GitHub Releases', 'When the app opens, from GitHub Releases')} />
       {/if}
-      <button class="link" onclick={() => runtime.openURL('https://github.com/iqbalfaf/KuyMediaBox/releases')}>Lihat semua rilis di GitHub</button>
+      <button class="link" onclick={() => runtime.openURL('https://github.com/iqbalfaf/KuyMediaBox/releases')}>{L('Lihat semua rilis di GitHub', 'See all releases on GitHub')}</button>
     </div>
   </section>
 
-  <section class="card general" aria-label="Pengaturan umum">
-    <div class="head"><h2>Umum</h2></div>
+  <section class="card general" aria-label={L('Pengaturan umum', 'General settings')}>
+    <div class="head"><h2>{L('Umum', 'General')}</h2></div>
     {#if settings.value}
       <div class="gbody">
         <div class="sec">
-          <label class="label" for="akhiran">Tambahan di nama file</label>
-          <input id="akhiran" class="text-input" bind:value={suffix} onblur={saveSuffix} onkeydown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()} placeholder="(kosong)" maxlength="40" />
-          <span class="hint">Contoh: {example}</span>
+          <span class="label">Bahasa / Language</span>
+          <Segmented
+            label="Bahasa / Language"
+            value={settings.value.language}
+            onchange={(v) => saveSettings({ language: v })}
+            options={[
+              { value: 'id', label: 'Indonesia' },
+              { value: 'en', label: 'English' },
+            ]}
+          />
         </div>
         <div class="sec">
-          <span class="label">Jika nama file sudah ada</span>
+          <label class="label" for="akhiran">{L('Tambahan di nama file', 'File name suffix')}</label>
+          <input id="akhiran" class="text-input" bind:value={suffix} onblur={saveSuffix} onkeydown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()} placeholder={L('(kosong)', '(empty)')} maxlength="40" />
+          <span class="hint">{L('Contoh', 'Example')}: {example}</span>
+        </div>
+        <div class="sec">
+          <span class="label">{L('Jika nama file sudah ada', 'If the file name exists')}</span>
           <Segmented
-            label="Jika nama file sudah ada"
+            label={L('Jika nama file sudah ada', 'If the file name exists')}
             value={settings.value.conflict}
             onchange={(v) => saveSettings({ conflict: v })}
             options={[
-              { value: 'rename', label: 'Nama baru' },
-              { value: 'skip', label: 'Lewati' },
-              { value: 'overwrite', label: 'Timpa' },
+              { value: 'rename', label: L('Nama baru', 'New name') },
+              { value: 'skip', label: L('Lewati', 'Skip') },
+              { value: 'overwrite', label: L('Timpa', 'Overwrite') },
             ]}
           />
-          <p class="hint">File asli tidak pernah ditimpa, apa pun pilihannya.</p>
+          <p class="hint">{L('File asli tidak pernah ditimpa, apa pun pilihannya.', 'The original file is never overwritten, whatever you pick.')}</p>
         </div>
-        <Switch checked={settings.value.notify} onchange={(v) => saveSettings({ notify: v })} label="Notifikasi saat selesai" hint="Muncul di pojok kanan bawah Windows" />
-        <Switch checked={settings.value.skipDownloaded} onchange={(v) => saveSettings({ skipDownloaded: v })} label="Lewati video yang pernah diunduh" hint="Bawaan untuk link baru di halaman Download" />
+        <Switch checked={settings.value.notify} onchange={(v) => saveSettings({ notify: v })} label={L('Notifikasi saat selesai', 'Notify when finished')} hint={L('Muncul di pojok kanan bawah Windows', 'Shows in the bottom-right corner of Windows')} />
+        <Switch checked={settings.value.skipDownloaded} onchange={(v) => saveSettings({ skipDownloaded: v })} label={L('Lewati video yang pernah diunduh', 'Skip videos downloaded before')} hint={L('Bawaan untuk link baru di halaman Download', 'Default for new links on the Download page')} />
       </div>
     {/if}
   </section>
@@ -273,8 +286,26 @@
     align-items: center;
     justify-content: center;
   }
+  .about .btn,
+  .about .btn-accent {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .link {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent-text-2);
+  }
+  .link:hover {
+    color: var(--accent-text);
+  }
   .about-t {
     flex-grow: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 2px;

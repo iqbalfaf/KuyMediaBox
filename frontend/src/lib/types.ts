@@ -39,6 +39,8 @@ export interface FileItem {
   error: string
 }
 
+export type Lang = "id" | "en"
+
 export type OutputMode = 'default' | 'subfolder' | 'same' | 'custom'
 export type OutputKind = 'image' | 'video' | 'audio' | 'download'
 
@@ -86,6 +88,7 @@ export interface Settings {
   notify: boolean
   skipDownloaded: boolean
   autoUpdate: boolean
+  language: Lang
   toolPaths: Record<string, string>
 }
 

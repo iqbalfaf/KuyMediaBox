@@ -1,3 +1,4 @@
+import { L } from '../i18n.svelte'
 import { api, errText } from '../api'
 import type { FileItem, JobRef, Kind, TaskInfo } from '../types'
 import { toast } from './app.svelte'
@@ -70,10 +71,10 @@ export class Converter {
     const fresh = list.filter((it) => !known.has(it.path.toLowerCase()))
     this.items.push(...fresh)
     const skipped = list.length - fresh.length
-    if (list.length === 0) toast('Tidak ada file yang cocok untuk halaman ini', 'info')
-    else if (skipped > 0 && fresh.length === 0) toast('File sudah ada di daftar', 'info')
+    if (list.length === 0) toast(L('Tidak ada file yang cocok untuk halaman ini', 'No files suitable for this page'), 'info')
+    else if (skipped > 0 && fresh.length === 0) toast(L('File sudah ada di daftar', 'Files are already in the list'), 'info')
     const bad = fresh.filter((it) => it.error).length
-    if (bad > 0) toast(`${bad} file tidak bisa dibaca dan ditandai merah`, 'err')
+    if (bad > 0) toast(L(`${bad} file tidak bisa dibaca dan ditandai merah`, `${bad} file${bad === 1 ? '' : 's'} couldn't be read and ${bad === 1 ? 'is' : 'are'} marked red`), 'err')
   }
 
   async addPaths(paths: string[]) {
@@ -127,7 +128,7 @@ export class Converter {
 
   clear() {
     if (this.running) {
-      toast('Tunggu konversi selesai atau batalkan dulu', 'info')
+      toast(L('Tunggu konversi selesai atau batalkan dulu', 'Wait for the conversion to finish or cancel it first'), 'info')
       return
     }
     this.items = []

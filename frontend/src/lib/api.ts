@@ -1,4 +1,5 @@
 // Thin typed wrapper around the generated Wails bindings.
+import { L } from './i18n.svelte'
 import * as App from '../../wailsjs/go/main/App'
 import * as RT from '../../wailsjs/runtime/runtime'
 import type {
@@ -65,6 +66,6 @@ export function errText(e: unknown): string {
   try {
     return JSON.stringify(e)
   } catch {
-    return 'Terjadi kesalahan'
+    return L('Terjadi kesalahan', 'Something went wrong')
   }
 }

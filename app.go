@@ -16,6 +16,7 @@ import (
 	"kuymediabox/internal/config"
 	"kuymediabox/internal/downloader"
 	"kuymediabox/internal/ffmpeg"
+	"kuymediabox/internal/i18n"
 	"kuymediabox/internal/naming"
 	"kuymediabox/internal/platform"
 	"kuymediabox/internal/queue"
@@ -45,6 +46,7 @@ type App struct {
 // NewApp creates the application state.
 func NewApp() *App {
 	a := &App{cfg: config.Load(), namer: naming.NewNamer(), collections: map[string]*downloader.Collection{}}
+	i18n.Set(a.cfg.Get().Language)
 	a.tools = tools.New(a.cfg, func(list []tools.Status) { a.emit("tools:changed", list) })
 	a.queue = queue.New(func(info queue.Info) { a.emit("task:update", info) }, a.onBatchDone)
 	return a
@@ -84,11 +86,17 @@ func cleanTemp() {
 	}
 }
 
-var kindLabels = map[string]string{
-	queue.KindImage:    "Konversi gambar",
-	queue.KindVideo:    "Konversi video",
-	queue.KindAudio:    "Konversi audio",
-	queue.KindDownload: "Download",
+// kindTitle is the notification title for a finished batch.
+func kindTitle(kind string) string {
+	switch kind {
+	case queue.KindImage:
+		return i18n.L("Konversi gambar selesai", "Image conversion finished")
+	case queue.KindVideo:
+		return i18n.L("Konversi video selesai", "Video conversion finished")
+	case queue.KindAudio:
+		return i18n.L("Konversi audio selesai", "Audio conversion finished")
+	}
+	return i18n.L("Download selesai", "Download finished")
 }
 
 func (a *App) onBatchDone(kind string, done, failed, skipped, canceled int) {
@@ -98,17 +106,17 @@ func (a *App) onBatchDone(kind string, done, failed, skipped, canceled int) {
 	}
 	var parts []string
 	if done > 0 {
-		parts = append(parts, fmt.Sprintf("%d berhasil", done))
+		parts = append(parts, fmt.Sprintf(i18n.L("%d berhasil", "%d succeeded"), done))
 	}
 	if failed > 0 {
-		parts = append(parts, fmt.Sprintf("%d gagal", failed))
+		parts = append(parts, fmt.Sprintf(i18n.L("%d gagal", "%d failed"), failed))
 	}
 	if skipped > 0 {
-		parts = append(parts, fmt.Sprintf("%d dilewati", skipped))
+		parts = append(parts, fmt.Sprintf(i18n.L("%d dilewati", "%d skipped"), skipped))
 	}
 	_ = wruntime.SendNotification(a.ctx, wruntime.NotificationOptions{
 		ID:    fmt.Sprintf("kmb-%d", time.Now().UnixNano()),
-		Title: kindLabels[kind] + " selesai",
+		Title: kindTitle(kind),
 		Body:  strings.Join(parts, " · "),
 	})
 }
@@ -122,7 +130,14 @@ func (a *App) GetSettings() config.Settings { return a.cfg.Get() }
 func (a *App) SaveSettings(s config.Settings) (config.Settings, error) {
 	cur := a.cfg.Get()
 	s.ToolPaths = cur.ToolPaths // tool paths are managed separately
-	return a.cfg.Set(s)
+	saved, err := a.cfg.Set(s)
+	if err == nil {
+		i18n.Set(saved.Language)
+		if saved.Language != cur.Language {
+			a.emit("tools:changed", a.tools.List()) // descriptions are translated
+		}
+	}
+	return saved, err
 }
 
 // GetDefaultDirs returns the default result folder of every module.
@@ -217,8 +232,8 @@ func (a *App) InstallTool(id string) error {
 // PickToolPath lets the user point to an existing executable.
 func (a *App) PickToolPath(id string) error {
 	p, err := wruntime.OpenFileDialog(a.ctx, wruntime.OpenDialogOptions{
-		Title:   "Pilih file program",
-		Filters: []wruntime.FileFilter{{DisplayName: "Program (*.exe)", Pattern: "*.exe"}},
+		Title:   i18n.L("Pilih file program", "Choose the program file"),
+		Filters: []wruntime.FileFilter{{DisplayName: i18n.L("Program (*.exe)", "Programs (*.exe)"), Pattern: "*.exe"}},
 	})
 	if err != nil || p == "" {
 		return err

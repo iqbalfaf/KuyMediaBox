@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"strings"
 	"syscall"
+
+	"kuymediabox/internal/i18n"
 )
 
 // createNoWindow hides the helper's console. Do NOT add DETACHED_PROCESS: PowerShell started
@@ -34,11 +36,11 @@ func Apply(downloaded, mode string) error {
 		old := exe + ".old"
 		_ = os.Remove(old)
 		if err := os.Rename(exe, old); err != nil {
-			return fmt.Errorf("tidak bisa mengganti file aplikasi: %w", err)
+			return fmt.Errorf(i18n.L("tidak bisa mengganti file aplikasi: %w", "can't replace the app file: %w"), err)
 		}
 		if err := os.Rename(downloaded, exe); err != nil {
 			_ = os.Rename(old, exe) // put the original back
-			return fmt.Errorf("tidak bisa memasang versi baru: %w", err)
+			return fmt.Errorf(i18n.L("tidak bisa memasang versi baru: %w", "can't install the new version: %w"), err)
 		}
 		script = fmt.Sprintf("Wait-Process -Id %d -Timeout 60 -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500; Start-Process -FilePath %s",
 			pid, psQuote(exe))
@@ -48,7 +50,7 @@ func Apply(downloaded, mode string) error {
 			"Start-Sleep -Milliseconds 500; Start-Process -FilePath %s; Remove-Item -LiteralPath %s -ErrorAction SilentlyContinue",
 			pid, psQuote(downloaded), psQuote(exe), psQuote(downloaded))
 	default:
-		return errors.New("mode update tidak dikenal")
+		return errors.New(i18n.L("mode update tidak dikenal", "unknown update mode"))
 	}
 	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command", script)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
@@ -57,7 +59,7 @@ func Apply(downloaded, mode string) error {
 			_ = os.Rename(exe, downloaded)
 			_ = os.Rename(exe+".old", exe)
 		}
-		return fmt.Errorf("tidak bisa menjalankan pemasang update: %w", err)
+		return fmt.Errorf(i18n.L("tidak bisa menjalankan pemasang update: %w", "can't start the update installer: %w"), err)
 	}
 	return cmd.Process.Release()
 }

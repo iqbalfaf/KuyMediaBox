@@ -11,12 +11,13 @@ import (
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"kuymediabox/internal/appdir"
+	"kuymediabox/internal/i18n"
 	"kuymediabox/internal/queue"
 	"kuymediabox/internal/updater"
 )
 
 // Version is the app version. Release builds set it with -ldflags "-X main.Version=x.y.z".
-var Version = "0.1.1"
+var Version = "0.1.3"
 
 type updateState struct {
 	mu         sync.Mutex
@@ -59,7 +60,7 @@ func (a *App) InstallUpdate() error {
 	a.upd.mu.Lock()
 	if a.upd.installing {
 		a.upd.mu.Unlock()
-		return errors.New("update sedang berjalan")
+		return errors.New(i18n.L("update sedang berjalan", "an update is already running"))
 	}
 	a.upd.installing = true
 	a.upd.mu.Unlock()
@@ -74,7 +75,7 @@ func (a *App) InstallUpdate() error {
 		return err
 	}
 	if !info.Available {
-		return errors.New("aplikasi sudah versi terbaru")
+		return errors.New(i18n.L("aplikasi sudah versi terbaru", "the app is already up to date"))
 	}
 
 	// Not under TempDir: that folder is wiped on shutdown, before the installer runs.

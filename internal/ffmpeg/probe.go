@@ -4,12 +4,14 @@ package ffmpeg
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 	"time"
 
+	"kuymediabox/internal/i18n"
 	"kuymediabox/internal/proc"
 )
 
@@ -68,7 +70,7 @@ func Probe(ctx context.Context, ffprobe, path string) (Info, error) {
 	defer cancel()
 	out, err := proc.Output(ctx, ffprobe, "-v", "error", "-print_format", "json", "-show_format", "-show_streams", "--", path)
 	if err != nil {
-		return Info{CoverIndex: -1}, fmt.Errorf("file tidak bisa dibaca: %w", err)
+		return Info{CoverIndex: -1}, fmt.Errorf(i18n.L("file tidak bisa dibaca: %w", "file can't be read: %w"), err)
 	}
 	return parseProbe([]byte(out))
 }
@@ -77,7 +79,7 @@ func parseProbe(data []byte) (Info, error) {
 	var p probeOut
 	info := Info{CoverIndex: -1}
 	if err := json.Unmarshal(data, &p); err != nil {
-		return info, fmt.Errorf("output ffprobe tidak valid: %w", err)
+		return info, fmt.Errorf(i18n.L("output ffprobe tidak valid: %w", "invalid ffprobe output: %w"), err)
 	}
 	info.Format = p.Format.FormatName
 	info.Duration = parseFloat(p.Format.Duration)
@@ -132,7 +134,7 @@ func parseProbe(data []byte) (Info, error) {
 		}
 	}
 	if !info.HasVideo && !info.HasAudio {
-		return info, fmt.Errorf("tidak ada video atau audio di file ini")
+		return info, errors.New(i18n.L("tidak ada video atau audio di file ini", "this file has no video or audio"))
 	}
 	return info, nil
 }

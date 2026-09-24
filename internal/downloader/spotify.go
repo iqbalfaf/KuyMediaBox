@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"kuymediabox/internal/ffmpeg"
+	"kuymediabox/internal/i18n"
 	"kuymediabox/internal/naming"
 	"kuymediabox/internal/proc"
 	"kuymediabox/internal/queue"
@@ -52,7 +53,7 @@ func (s spotifySong) artistLine() string {
 
 func (e Env) spotdlSave(ctx context.Context, urls []string, preload bool) ([]spotifySong, error) {
 	if e.SpotDL == "" {
-		return nil, errors.New("spotDL belum terpasang. Buka Pengaturan untuk mengunduhnya.")
+		return nil, errors.New(i18n.L("spotDL belum terpasang. Buka Pengaturan untuk mengunduhnya.", "spotDL is not installed. Open Settings to download it."))
 	}
 	f, err := os.CreateTemp(e.TempDir, "list-*.spotdl")
 	if err != nil {
@@ -86,7 +87,7 @@ func (e Env) spotdlSave(ctx context.Context, urls []string, preload bool) ([]spo
 	}
 	var songs []spotifySong
 	if err := json.Unmarshal(data, &songs); err != nil {
-		return nil, fmt.Errorf("daftar lagu Spotify tidak bisa dibaca: %w", err)
+		return nil, fmt.Errorf(i18n.L("daftar lagu Spotify tidak bisa dibaca: %w", "Spotify song list can't be read: %w"), err)
 	}
 	return songs, nil
 }
@@ -96,21 +97,21 @@ func friendlySpotifyError(detail string) error {
 	msg := ""
 	switch {
 	case strings.Contains(low, "rate") && strings.Contains(low, "limit"), strings.Contains(low, "429"):
-		msg = "Spotify sedang membatasi permintaan. Coba lagi beberapa menit lagi."
+		msg = i18n.L("Spotify sedang membatasi permintaan. Coba lagi beberapa menit lagi.", "Spotify is rate-limiting requests. Try again in a few minutes.")
 	case strings.Contains(low, "404") || strings.Contains(low, "not found") || strings.Contains(low, "non existing id"):
-		msg = "Playlist/album tidak ditemukan. Playlist buatan Spotify atau private tidak bisa dibaca."
+		msg = i18n.L("Playlist/album tidak ditemukan. Playlist buatan Spotify atau private tidak bisa dibaca.", "Playlist/album not found. Spotify-made or private playlists can't be read.")
 	case strings.Contains(low, "connection") || strings.Contains(low, "timed out") || strings.Contains(low, "getaddrinfo"):
-		msg = "Koneksi bermasalah. Periksa internet lalu coba lagi."
+		msg = i18n.L("Koneksi bermasalah. Periksa internet lalu coba lagi.", "Connection problem. Check your internet and try again.")
 	}
 	if msg == "" {
 		last := proc.LastLines(detail, 1)
 		if last == "" {
-			last = "tidak ada lagu yang terbaca"
+			last = i18n.L("tidak ada lagu yang terbaca", "no songs could be read")
 		}
 		if len([]rune(last)) > 140 {
 			last = string([]rune(last)[:140]) + "…"
 		}
-		msg = "Gagal membaca Spotify: " + last
+		msg = i18n.L("Gagal membaca Spotify: ", "Couldn't read Spotify: ") + last
 	}
 	return queue.Fail(msg, detail)
 }
@@ -124,7 +125,7 @@ func AnalyzeSpotify(ctx context.Context, env Env, link Link) (*Collection, error
 		return nil, err
 	}
 	if len(songs) == 0 {
-		return nil, errors.New("tidak ada lagu di link ini (playlist kosong, private, atau buatan Spotify)")
+		return nil, errors.New(i18n.L("tidak ada lagu di link ini (playlist kosong, private, atau buatan Spotify)", "no songs in this link (empty, private or Spotify-made playlist)"))
 	}
 	col := &Collection{Source: SourceSpotify, Type: link.Type, URL: link.URL, TabCounts: map[string]int{}}
 	switch link.Type {
@@ -219,19 +220,19 @@ func (m *Matcher) Resolve(ctx context.Context, spotifyURL string) (string, error
 // DownloadSpotify downloads one Spotify entry: match on YouTube, fetch audio, tag it.
 func DownloadSpotify(ctx context.Context, env Env, entry Entry, dir, fileName string, o Options, matcher *Matcher, r queue.Reporter) (string, error) {
 	if entry.song == nil {
-		return "", queue.Fail("Data lagu tidak lengkap, periksa link lagi", "")
+		return "", queue.Fail(i18n.L("Data lagu tidak lengkap, periksa link lagi", "Song data incomplete, check the link again"), "")
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", queue.Fail("Tidak bisa membuat folder tujuan", err.Error())
+		return "", queue.Fail(i18n.L("Tidak bisa membuat folder tujuan", "Can't create the destination folder"), err.Error())
 	}
 	final := filepath.Join(dir, fileName+"."+o.AudioFormat)
 	if _, err := os.Stat(final); err == nil {
 		r.SetOutput(final, 0)
-		return final, queue.Skip("File sudah ada")
+		return final, queue.Skip(i18n.L("File sudah ada", "File already exists"))
 	}
 
 	r.Progress(-1)
-	r.Message("Mencocokkan lagu di YouTube…")
+	r.Message(i18n.L("Mencocokkan lagu di YouTube…", "Matching the song on YouTube…"))
 	src, err := matcher.Resolve(ctx, entry.song.URL)
 	if ctx.Err() != nil {
 		return "", ctx.Err()
@@ -254,12 +255,12 @@ func DownloadSpotify(ctx context.Context, env Env, entry Entry, dir, fileName st
 	if err != nil {
 		var ue *queue.UserError
 		if errors.As(err, &ue) && strings.Contains(src, "ytsearch1:") {
-			ue.Message = "Lagu tidak ditemukan di YouTube"
+			ue.Message = i18n.L("Lagu tidak ditemukan di YouTube", "Song not found on YouTube")
 		}
 		return "", err
 	}
 
-	r.Message("Menyematkan judul, artis & cover…")
+	r.Message(i18n.L("Menyematkan judul, artis & cover…", "Embedding title, artist & cover…"))
 	cover := ""
 	if entry.song.CoverURL != "" {
 		if p, cerr := fetchCover(ctx, entry.song.CoverURL, work); cerr == nil {
@@ -271,7 +272,7 @@ func DownloadSpotify(ctx context.Context, env Env, entry Entry, dir, fileName st
 		return "", err
 	}
 	if err := naming.Commit(tmpOut, final); err != nil {
-		return "", queue.Fail("Tidak bisa menyimpan file", err.Error())
+		return "", queue.Fail(i18n.L("Tidak bisa menyimpan file", "Can't save the file"), err.Error())
 	}
 	if st, err := os.Stat(final); err == nil {
 		r.SetOutput(final, st.Size())
@@ -308,7 +309,7 @@ func fetchCover(ctx context.Context, url, dir string) (string, error) {
 
 func tagAudio(ctx context.Context, ffmpegPath, in, cover, out string, s spotifySong, format string) error {
 	if ffmpegPath == "" {
-		return queue.Fail("FFmpeg belum terpasang", "")
+		return queue.Fail(i18n.L("FFmpeg belum terpasang", "FFmpeg is not installed"), "")
 	}
 	args := []string{"-i", in}
 	withCover := cover != "" && format != "opus"

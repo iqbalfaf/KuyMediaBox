@@ -1,3 +1,4 @@
+import { L } from '../i18n.svelte'
 import { api, errText } from '../api'
 import type { Collection, DownloadOptions, Entry, Link } from '../types'
 import { settings, toast } from './app.svelte'
@@ -54,10 +55,10 @@ export function rememberOpts(row: LinkRow) {
 }
 
 export const typeLabel: Record<string, string> = {
-  video: 'Video', playlist: 'Playlist', channel: 'Channel', track: 'Lagu', album: 'Album', unknown: 'Link',
+  video: 'Video', playlist: 'Playlist', channel: 'Channel', get track() { return L('Lagu', 'Track') }, album: 'Album', unknown: 'Link',
 }
 
-export const tabLabel: Record<string, string> = { videos: 'Video', shorts: 'Shorts', streams: 'Live' }
+export const tabLabel: Record<string, string> = { get videos() { return L('Video', 'Videos') }, shorts: 'Shorts', streams: 'Live' }
 
 /** Adds every link found in text and reads them one by one. */
 export async function addLinks(text: string) {
@@ -69,7 +70,7 @@ export async function addLinks(text: string) {
     return
   }
   if (links.length === 0) {
-    toast('Tidak ada link yang dikenali. Tempel link YouTube atau Spotify.', 'err')
+    toast(L('Tidak ada link yang dikenali. Tempel link YouTube atau Spotify.', 'No recognizable links. Paste a YouTube or Spotify link.'), 'err')
     return
   }
   const known = new Set(dl.rows.map((r) => r.link.url))
@@ -101,7 +102,7 @@ export async function addLinks(text: string) {
     added++
     analyze(row.id)
   }
-  if (added === 0) toast('Link sudah ada di daftar', 'info')
+  if (added === 0) toast(L('Link sudah ada di daftar', 'The link is already in the list'), 'info')
 }
 
 function findRow(id: string) {
@@ -115,7 +116,7 @@ export async function analyze(id: string) {
   row.error = ''
   if (row.link.type === 'unknown') {
     row.status = 'error'
-    row.error = row.link.source === 'spotify' ? 'Gunakan link lagu, album, atau playlist Spotify' : 'Link tidak dikenali'
+    row.error = row.link.source === 'spotify' ? L('Gunakan link lagu, album, atau playlist Spotify', 'Use a Spotify track, album or playlist link') : L('Link tidak dikenali', 'Link not recognized')
     return
   }
   try {
@@ -245,7 +246,7 @@ export async function startAll() {
         toast(`${row.col.title}: ${errText(e)}`, 'err')
       }
     }
-    if (queued === 0) toast('Belum ada item baru yang dipilih', 'info')
+    if (queued === 0) toast(L('Belum ada item baru yang dipilih', 'No new items selected'), 'info')
   } finally {
     dl.starting = false
   }
