@@ -68,6 +68,9 @@ type Info struct {
 	OutSize  int64   `json:"outSize"`
 	Started  int64   `json:"started"`  // unix ms
 	Finished int64   `json:"finished"` // unix ms
+	// Seq grows with every published update of the task. Events can reach the UI out of order
+	// (they are sent after the lock is released), so the UI keeps the snapshot with the highest Seq.
+	Seq uint64 `json:"seq"`
 }
 
 // Reporter lets a running task publish progress.
@@ -338,6 +341,7 @@ func (m *Manager) publish(t *task, force bool) {
 		return
 	}
 	t.lastEmt = now
+	t.info.Seq++
 	info := t.info
 	t.mu.Unlock()
 	if m.emit != nil {

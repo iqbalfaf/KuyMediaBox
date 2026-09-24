@@ -15,6 +15,7 @@ export interface TaskInfo {
   outSize: number
   started: number
   finished: number
+  seq: number
 }
 
 export interface FileItem {

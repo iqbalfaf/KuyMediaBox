@@ -98,7 +98,9 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Link Facebook** | **Video**, **reel**, link `fb.watch` / `/share/v/`, dan **foto** |
 | **Situs lain** | Link video lain yang didukung yt-dlp juga bisa dicoba |
 | **Banyak link sekaligus** | Tempel beberapa link (satu per baris), tombol **Tempel**, atau Ctrl+V di halaman Download. Jenis link terdeteksi otomatis. |
-| **Pratinjau isi** | Judul, thumbnail, durasi, dan daftar video/lagu sebelum mengunduh. Setiap link punya tab dan pengaturan sendiri. |
+| **Kategori per platform** | Link otomatis masuk ke tab **YouTube, TikTok, Instagram, Facebook, atau Spotify**. Menempel link Instagram lagi menambahkannya ke daftar Instagram yang sama (tidak membuat tab baru). Tiap tab menampilkan jumlah item terpilih. |
+| **Pratinjau isi** | Judul, thumbnail, durasi, dan daftar video/lagu sebelum mengunduh. Di dalam kategori, playlist/channel/album/carousel tampil sebagai grup (bisa dicentang sekaligus), link berisi satu item tampil sebagai satu baris. |
+| **Pengaturan per kategori** | Format, kualitas, dan opsi lain berlaku untuk semua link dalam kategori itu (misalnya semua YouTube jadi MP3, TikTok tetap video). |
 | **Pilih item** | Centang satu per satu, **Pilih semua**, atau **rentang** seperti `1-20` / `3,5,7-9` |
 | **Channel** | Pilih jenis konten (**Video / Shorts / Live**) dan cakupan (**Semua / N terbaru / Sejak tanggal**). Nama file diawali tanggal upload. |
 | **YouTube: video** | Kualitas Terbaik / 1080p / 720p / 480p, format MP4 atau MKV |
@@ -190,12 +192,13 @@ Cek manual kapan saja lewat **Pengaturan › Tentang & update › Cek update**.
 
 1. Buka menu **Download**.
 2. Tempel link (bisa banyak, satu per baris), lalu klik **Periksa link**. Tombol **Tempel** mengambil langsung dari clipboard.
-3. Tiap link muncul sebagai **tab**. Pilih item yang mau diunduh:
+3. Link otomatis masuk ke **tab kategorinya** (YouTube, TikTok, Instagram, Facebook, Spotify) dan tab itu langsung terbuka. Pilih item yang mau diunduh:
+   - **Pilih semua** untuk seluruh isi kategori, atau centang per grup/per item
    - **Playlist/album**: centang item atau isi **Rentang** (`1-20`)
    - **Channel**: pilih Video/Shorts/Live dan Semua / N terbaru / Sejak tanggal
    - **Post TikTok/Instagram/Facebook**: semua foto, video, dan musik di post tampil sebagai item terpisah
-4. Di panel kanan pilih **Video** atau **Audio**, kualitas, dan format (untuk foto: **Asli** atau **JPG**). Pengaturan ini berlaku per link.
-5. Klik **Unduh semua**. Semua link diproses dalam satu antrian.
+4. Di panel kanan pilih **Video** atau **Audio**, kualitas, dan format (untuk foto: **Asli** atau **JPG**). Pengaturan ini berlaku untuk **semua link di kategori** yang sedang dibuka.
+5. Klik **Unduh semua**. Item terpilih dari semua kategori diproses dalam satu antrian. **Hapus semua link …** mengosongkan satu kategori.
 
 > Playlist, channel, album, dan post berisi banyak item (carousel) otomatis dibuatkan subfolder sesuai namanya (bisa dimatikan di Pengaturan).
 
