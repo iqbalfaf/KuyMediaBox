@@ -21,6 +21,7 @@ export namespace config {
 	    conflict: string;
 	    notify: boolean;
 	    skipDownloaded: boolean;
+	    autoUpdate: boolean;
 	    toolPaths: Record<string, string>;
 	
 	    static createFrom(source: any = {}) {
@@ -35,6 +36,7 @@ export namespace config {
 	        this.conflict = source["conflict"];
 	        this.notify = source["notify"];
 	        this.skipDownloaded = source["skipDownloaded"];
+	        this.autoUpdate = source["autoUpdate"];
 	        this.toolPaths = source["toolPaths"];
 	    }
 	
@@ -477,6 +479,39 @@ export namespace tools {
 	        this.progress = source["progress"];
 	        this.error = source["error"];
 	        this.required = source["required"];
+	    }
+	}
+
+}
+
+export namespace updater {
+	
+	export class Info {
+	    current: string;
+	    latest: string;
+	    available: boolean;
+	    notes: string;
+	    url: string;
+	    publishedAt: string;
+	    mode: string;
+	    assetName: string;
+	    assetSize: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Info(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.current = source["current"];
+	        this.latest = source["latest"];
+	        this.available = source["available"];
+	        this.notes = source["notes"];
+	        this.url = source["url"];
+	        this.publishedAt = source["publishedAt"];
+	        this.mode = source["mode"];
+	        this.assetName = source["assetName"];
+	        this.assetSize = source["assetSize"];
 	    }
 	}
 

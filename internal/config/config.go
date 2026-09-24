@@ -43,6 +43,7 @@ type Settings struct {
 	Conflict           string            `json:"conflict"`
 	Notify             bool              `json:"notify"`
 	SkipDownloaded     bool              `json:"skipDownloaded"`
+	AutoUpdate         bool              `json:"autoUpdate"`
 	ToolPaths          map[string]string `json:"toolPaths"`
 }
 
@@ -55,6 +56,7 @@ func Defaults() Settings {
 		Conflict:           ConflictRename,
 		Notify:             true,
 		SkipDownloaded:     true,
+		AutoUpdate:         true,
 		ToolPaths:          map[string]string{},
 	}
 	for _, k := range OutputKinds {
@@ -191,6 +193,9 @@ func parse(data []byte) Settings {
 	}
 	if _, ok := raw["skipDownloaded"]; ok {
 		s.SkipDownloaded = parsed.SkipDownloaded
+	}
+	if _, ok := raw["autoUpdate"]; ok {
+		s.AutoUpdate = parsed.AutoUpdate
 	}
 	if parsed.ToolPaths != nil {
 		s.ToolPaths = parsed.ToolPaths

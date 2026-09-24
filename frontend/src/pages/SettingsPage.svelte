@@ -4,11 +4,12 @@
   import Switch from '../components/Switch.svelte'
   import OutputPicker from '../components/OutputPicker.svelte'
   import Icon from '../components/Icon.svelte'
-  import { api, errText } from '../lib/api'
+  import { api, errText, runtime } from '../lib/api'
   import {
     defaultDirs, fixedFolder, outputOf, saveSettings, setOutput, settings, shortPath, toast, toolState,
   } from '../lib/stores/app.svelte'
   import type { OutputKind, ToolStatus } from '../lib/types'
+  import { checkNow, upd } from '../lib/stores/update.svelte'
 
   const icons: Record<string, string> = { ffmpeg: 'video', ytdlp: 'download', jsruntime: 'code', spotdl: 'music' }
   const sourceLabel: Record<string, string> = {
@@ -192,6 +193,31 @@
     </section>
   </div>
 
+  <div class="col-side">
+  <section class="card" aria-label="Tentang dan update">
+    <div class="head"><h2>Tentang & update</h2></div>
+    <div class="gbody">
+      <div class="about">
+        <div class="logo"><Icon name="box" size={22} stroke={2.2} /></div>
+        <div class="about-t">
+          <b>KuyMediaBox</b>
+          <span>Versi {upd.version || '—'}</span>
+        </div>
+        {#if upd.info?.available}
+          <button class="btn-accent" onclick={() => (upd.open = true)}><Icon name="download" size={14} stroke={2.5} />Update v{upd.info.latest}</button>
+        {:else}
+          <button class="btn" onclick={checkNow} disabled={upd.checking}>
+            <Icon name={upd.checking ? 'loader' : 'refresh'} size={16} class={upd.checking ? 'spin' : ''} />{upd.checking ? 'Mengecek…' : 'Cek update'}
+          </button>
+        {/if}
+      </div>
+      {#if settings.value}
+        <Switch checked={settings.value.autoUpdate} onchange={(v) => saveSettings({ autoUpdate: v })} label="Cek update otomatis" hint="Saat aplikasi dibuka, dari GitHub Releases" />
+      {/if}
+      <button class="link" onclick={() => runtime.openURL('https://github.com/iqbalfaf/KuyMediaBox/releases')}>Lihat semua rilis di GitHub</button>
+    </div>
+  </section>
+
   <section class="card general" aria-label="Pengaturan umum">
     <div class="head"><h2>Umum</h2></div>
     {#if settings.value}
@@ -220,9 +246,46 @@
       </div>
     {/if}
   </section>
+  </div>
 </div>
 
 <style>
+  .col-side {
+    width: 360px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .about {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 12px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .about-t {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .about-t b {
+    font-size: 15px;
+  }
+  .about-t span {
+    font-size: 12px;
+    color: var(--text-3);
+  }
   .body {
     flex-grow: 1;
     min-height: 0;
@@ -241,10 +304,6 @@
   }
   .col-main .card {
     overflow: visible;
-  }
-  .general {
-    width: 360px;
-    flex-shrink: 0;
   }
   .head {
     display: flex;

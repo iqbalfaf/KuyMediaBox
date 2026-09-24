@@ -18,6 +18,10 @@ export function CancelTask(arg1) {
   return window['go']['main']['App']['CancelTask'](arg1);
 }
 
+export function CheckUpdate() {
+  return window['go']['main']['App']['CheckUpdate']();
+}
+
 export function CollectionDir(arg1) {
   return window['go']['main']['App']['CollectionDir'](arg1);
 }
@@ -50,8 +54,16 @@ export function GetTools() {
   return window['go']['main']['App']['GetTools']();
 }
 
+export function GetVersion() {
+  return window['go']['main']['App']['GetVersion']();
+}
+
 export function InstallTool(arg1) {
   return window['go']['main']['App']['InstallTool'](arg1);
+}
+
+export function InstallUpdate() {
+  return window['go']['main']['App']['InstallUpdate']();
 }
 
 export function ListTasks() {
