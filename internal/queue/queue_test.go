@@ -159,3 +159,62 @@ func TestConcurrencyLimit(t *testing.T) {
 		t.Fatalf("peak %d exceeds limit %d", peak, Limits[KindAudio])
 	}
 }
+
+// Updates are emitted after the task lock is released, so they can arrive out of order.
+// The snapshot with the highest Seq must always be the final state.
+func TestSeqOrdersUpdates(t *testing.T) {
+	var mu sync.Mutex
+	var all []Info
+	m := New(func(i Info) {
+		mu.Lock()
+		all = append(all, i)
+		mu.Unlock()
+	}, nil)
+	for round := 0; round < 20; round++ {
+		all = nil
+		id := m.Add(KindImage, "x", func(ctx context.Context, r Reporter) error {
+			var wg sync.WaitGroup
+			for g := 0; g < 8; g++ {
+				wg.Add(1)
+				go func(g int) {
+					defer wg.Done()
+					for i := 0; i < 50; i++ {
+						r.Progress(float64(i) / 50)
+						r.Message(string(rune('a' + (g+i)%26)))
+					}
+				}(g)
+			}
+			wg.Wait()
+			return nil
+		})
+		deadline := time.Now().Add(5 * time.Second)
+		for {
+			if info, _ := m.Get(id); info.Status == StatusDone || time.Now().After(deadline) {
+				break
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+		mu.Lock()
+		seen := map[uint64]bool{}
+		var best Info
+		for _, i := range all {
+			if i.ID != id {
+				continue
+			}
+			if seen[i.Seq] {
+				t.Fatalf("round %d: duplicate seq %d", round, i.Seq)
+			}
+			seen[i.Seq] = true
+			if i.Seq > best.Seq {
+				best = i
+			}
+		}
+		mu.Unlock()
+		if best.Status != StatusDone {
+			t.Fatalf("round %d: highest seq %d has status %s", round, best.Seq, best.Status)
+		}
+		if snap, _ := m.Get(id); snap.Seq != best.Seq {
+			t.Fatalf("round %d: snapshot seq %d, last emitted %d", round, snap.Seq, best.Seq)
+		}
+	}
+}

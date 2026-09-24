@@ -7,6 +7,12 @@ import { isActive, tasks, trackBatch } from './tasks.svelte'
 
 export type Scope = 'all' | 'latest' | 'since'
 
+/** A download category: one per platform. */
+export type Category = 'youtube' | 'tiktok' | 'instagram' | 'facebook' | 'spotify' | 'other'
+
+/** Display order of the category tabs. */
+export const categoryOrder: Category[] = ['youtube', 'tiktok', 'instagram', 'facebook', 'spotify', 'other']
+
 export interface LinkRow {
   id: string
   raw: string
@@ -14,7 +20,6 @@ export interface LinkRow {
   status: 'loading' | 'ready' | 'error'
   error: string
   col: Collection | null
-  opts: DownloadOptions
   selected: Record<string, boolean>
   types: Record<string, boolean> // channel tabs: videos, shorts, streams
   scope: Scope
@@ -48,7 +53,12 @@ export const sourceName: Record<string, string> = {
 
 /** Short badge class per source. */
 export const sourceClass: Record<string, string> = {
-  youtube: 'yt', spotify: 'sp', tiktok: 'tt', instagram: 'ig', facebook: 'fb', other: 'yt',
+  youtube: 'yt', spotify: 'sp', tiktok: 'tt', instagram: 'ig', facebook: 'fb', other: 'ot',
+}
+
+/** Icon shown in a category badge. */
+export const sourceIcon: Record<string, string> = {
+  youtube: 'play', spotify: 'music', tiktok: 'play', instagram: 'image', facebook: 'play', other: 'link',
 }
 
 /** "3 foto · 1 video · musik" for a social post. */
@@ -62,26 +72,83 @@ export function kindSummary(entries: Entry[]): string {
   return parts.join(' · ')
 }
 
-export const dl = $state<{ rows: LinkRow[]; active: string; input: string; starting: boolean }>({
+/** The category a link belongs to. */
+export function categoryOf(source: string): Category {
+  return (categoryOrder as string[]).includes(source) ? (source as Category) : 'other'
+}
+
+function optsKey(cat: Category) {
+  switch (cat) {
+    case 'youtube':
+    case 'other':
+      return 'kmb.dl.youtube'
+    case 'spotify':
+      return 'kmb.dl.spotify'
+  }
+  return `kmb.dl.${cat}`
+}
+
+function defaultsFor(cat: Category): DownloadOptions {
+  if (isSocial(cat)) return socialDefaults
+  return cat === 'spotify' ? spotifyDefaults : youtubeDefaults
+}
+
+export const dl = $state<{
+  rows: LinkRow[]
+  cat: Category | ''
+  input: string
+  starting: boolean
+  opts: Partial<Record<Category, DownloadOptions>>
+}>({
   rows: [],
-  active: '',
+  cat: '',
   input: '',
   starting: false,
+  opts: {},
 })
 
 let rowSeq = 0
 
-export function activeRow(): LinkRow | undefined {
-  return dl.rows.find((r) => r.id === dl.active) ?? dl.rows[0]
+/** Loads a category's saved settings into state. Call outside markup/$derived (it writes state). */
+function ensureOpts(cat: Category) {
+  if (dl.opts[cat]) return
+  const loaded = load(optsKey(cat), defaultsFor(cat))
+  if (settings.value && loaded.skipExisting === undefined) loaded.skipExisting = settings.value.skipDownloaded
+  dl.opts[cat] = loaded
 }
 
-function optsKey(source: string) {
-  if (isSocial(source)) return 'kmb.dl.social'
-  return source === 'spotify' ? 'kmb.dl.spotify' : 'kmb.dl.youtube'
+/** Download settings of a category (one set for all its links). Read-only, safe in markup. */
+export function optsOf(cat: Category): DownloadOptions {
+  return dl.opts[cat] ?? defaultsFor(cat)
 }
 
-export function rememberOpts(row: LinkRow) {
-  save(optsKey(row.link.source), row.opts)
+export function rowOpts(row: LinkRow): DownloadOptions {
+  return optsOf(categoryOf(row.link.source))
+}
+
+export function rememberOpts(cat: Category) {
+  save(optsKey(cat), $state.snapshot(optsOf(cat)))
+}
+
+/** Categories that have at least one link, in display order. */
+export function categories(): { id: Category; rows: LinkRow[] }[] {
+  const out: { id: Category; rows: LinkRow[] }[] = []
+  for (const id of categoryOrder) {
+    const rows = dl.rows.filter((r) => categoryOf(r.link.source) === id)
+    if (rows.length) out.push({ id, rows })
+  }
+  return out
+}
+
+/** The open category tab (falls back to the first category that has links). */
+export function activeCategory(): Category | '' {
+  const cats = categories()
+  if (cats.some((c) => c.id === dl.cat)) return dl.cat
+  return cats[0]?.id ?? ''
+}
+
+export function rowsOf(cat: Category | ''): LinkRow[] {
+  return dl.rows.filter((r) => categoryOf(r.link.source) === cat)
 }
 
 export const typeLabel: Record<string, string> = {
@@ -91,7 +158,7 @@ export const typeLabel: Record<string, string> = {
 
 export const tabLabel: Record<string, string> = { get videos() { return L('Video', 'Videos') }, shorts: 'Shorts', streams: 'Live' }
 
-/** Adds every link found in text and reads them one by one. */
+/** Adds every link found in text to its platform category and reads them one by one. */
 export async function addLinks(text: string) {
   let links: Link[]
   try {
@@ -106,12 +173,12 @@ export async function addLinks(text: string) {
   }
   const known = new Set(dl.rows.map((r) => r.link.url))
   let added = 0
+  let firstCat: Category | '' = ''
   for (const link of links) {
     if (known.has(link.url)) continue
     known.add(link.url)
-    const defaults = isSocial(link.source) ? socialDefaults : link.source === 'spotify' ? spotifyDefaults : youtubeDefaults
-    const opts = load(optsKey(link.source), defaults)
-    if (settings.value) opts.skipExisting = opts.skipExisting ?? settings.value.skipDownloaded
+    const cat = categoryOf(link.source)
+    ensureOpts(cat)
     const row: LinkRow = {
       id: `l${++rowSeq}`,
       raw: link.url,
@@ -119,7 +186,6 @@ export async function addLinks(text: string) {
       status: 'loading',
       error: '',
       col: null,
-      opts,
       selected: {},
       types: { videos: true, shorts: false, streams: false },
       scope: 'all',
@@ -129,15 +195,30 @@ export async function addLinks(text: string) {
       taskOf: {},
     }
     dl.rows.push(row)
-    if (!dl.active) dl.active = row.id
+    if (!firstCat) firstCat = cat
     added++
     analyze(row.id)
   }
+  if (firstCat) dl.cat = firstCat // jump to the category the new link went into
   if (added === 0) toast(L('Link sudah ada di daftar', 'The link is already in the list'), 'info')
 }
 
 function findRow(id: string) {
   return dl.rows.find((r) => r.id === id)
+}
+
+function unknownLinkText(source: string): string {
+  switch (source) {
+    case 'spotify':
+      return L('Gunakan link lagu, album, atau playlist Spotify', 'Use a Spotify track, album or playlist link')
+    case 'tiktok':
+      return L('Gunakan link video, foto, atau profil TikTok', 'Use a TikTok video, photo or profile link')
+    case 'instagram':
+      return L('Gunakan link post atau reel Instagram (story & profil butuh login)', 'Use an Instagram post or reel link (stories & profiles need a login)')
+    case 'facebook':
+      return L('Gunakan link video, reel, atau foto Facebook', 'Use a Facebook video, reel or photo link')
+  }
+  return L('Link tidak dikenali', 'Link not recognized')
 }
 
 export async function analyze(id: string) {
@@ -175,20 +256,6 @@ export async function analyze(id: string) {
   }
 }
 
-function unknownLinkText(source: string): string {
-  switch (source) {
-    case 'spotify':
-      return L('Gunakan link lagu, album, atau playlist Spotify', 'Use a Spotify track, album or playlist link')
-    case 'tiktok':
-      return L('Gunakan link video, foto, atau profil TikTok', 'Use a TikTok video, photo or profile link')
-    case 'instagram':
-      return L('Gunakan link post atau reel Instagram (story & profil butuh login)', 'Use an Instagram post or reel link (stories & profiles need a login)')
-    case 'facebook':
-      return L('Gunakan link video, reel, atau foto Facebook', 'Use a Facebook video, reel or photo link')
-  }
-  return L('Link tidak dikenali', 'Link not recognized')
-}
-
 export function removeRow(id: string) {
   const row = findRow(id)
   if (!row) return
@@ -197,7 +264,11 @@ export function removeRow(id: string) {
   }
   if (row.col) api.forgetCollection(row.col.key)
   dl.rows = dl.rows.filter((r) => r.id !== id)
-  if (dl.active === id) dl.active = dl.rows[0]?.id ?? ''
+}
+
+/** Removes every link of a category. */
+export function clearCategory(cat: Category) {
+  for (const r of rowsOf(cat)) removeRow(r.id)
 }
 
 /** Entries shown for a row (channel: only the chosen content types). */
@@ -208,7 +279,7 @@ export function visible(row: LinkRow): Entry[] {
 }
 
 export function selectable(e: Entry, row: LinkRow): boolean {
-  return !e.unavailable && !(row.opts.skipExisting && e.archived)
+  return !e.unavailable && !(rowOpts(row).skipExisting && e.archived)
 }
 
 export function selectedEntries(row: LinkRow): Entry[] {
@@ -242,6 +313,11 @@ export function setAll(row: LinkRow, on: boolean) {
   const sel: Record<string, boolean> = {}
   if (on) for (const e of visible(row)) if (selectable(e, row)) sel[e.id] = true
   row.selected = sel
+}
+
+/** Selects or clears every item of every ready link in a category. */
+export function setAllInCategory(cat: Category, on: boolean) {
+  for (const r of rowsOf(cat)) if (r.status === 'ready') setAll(r, on)
 }
 
 /** Applies a "1-20" / "3,5,7-9" range to a playlist or album. */
@@ -283,7 +359,7 @@ export async function startAll() {
       const list = toQueue(row)
       if (list.length === 0) continue
       try {
-        const refs = await api.startDownloads(row.col.key, list.map((e) => e.id), $state.snapshot(row.opts) as DownloadOptions)
+        const refs = await api.startDownloads(row.col.key, list.map((e) => e.id), $state.snapshot(rowOpts(row)) as DownloadOptions)
         for (const r of refs) row.taskOf[r.itemId] = r.taskId
         trackBatch('download', refs.map((r) => r.taskId))
         queued += refs.length

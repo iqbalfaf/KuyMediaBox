@@ -1,6 +1,7 @@
 <script lang="ts">
   import { L } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
+  import AppLogo from './AppLogo.svelte'
   import { nav, toolAttention, toolState } from '../lib/stores/app.svelte'
   import { clock, summarize } from '../lib/stores/tasks.svelte'
   import { upd } from '../lib/stores/update.svelte'
@@ -34,7 +35,7 @@
 
 <nav aria-label={L('Navigasi utama', 'Main navigation')}>
   <div class="brand drag">
-    <div class="logo"><Icon name="box" size={20} stroke={2.2} /></div>
+    <AppLogo size={36} />
     <div class="name">
       <span class="title">KuyMediaBox</span>
       <span class="ver">{upd.version ? `v${upd.version}` : ''}</span>
@@ -98,16 +99,6 @@
     align-items: center;
     gap: 10px;
     padding: 4px 8px 20px;
-  }
-  .logo {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: var(--accent);
-    color: var(--accent-ink);
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
   .name {
     display: flex;

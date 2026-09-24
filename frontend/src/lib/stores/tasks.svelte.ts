@@ -70,18 +70,33 @@ export function summarize(kind: Kind): BatchSummary {
 
 let started = false
 
+/** Stores a task snapshot unless a newer one (higher seq) is already known. Events can arrive
+ *  out of order, and a late "running" must never overwrite "done". */
+function apply(info: TaskInfo) {
+  const cur = tasks[info.id]
+  if (cur && (info.seq ?? 0) < (cur.seq ?? 0)) return
+  tasks[info.id] = info
+}
+
+async function reconcile() {
+  try {
+    for (const t of await api.listTasks()) apply(t)
+  } catch {
+    /* backend not ready yet; events will fill in */
+  }
+}
+
 /** Subscribes to backend task events (idempotent). */
 export async function initTasks() {
   if (started) return
   started = true
-  runtime.on('task:update', (info: TaskInfo) => {
-    tasks[info.id] = info
-  })
-  try {
-    for (const t of await api.listTasks()) tasks[t.id] = t
-  } catch {
-    /* backend not ready yet; events will fill in */
-  }
+  runtime.on('task:update', (info: TaskInfo) => apply(info))
+  await reconcile()
+  // Safety net: while something runs, re-read the task list now and then so a lost event
+  // can never leave the UI showing a finished task as still running.
+  setInterval(() => {
+    if (Object.values(tasks).some(isActive)) reconcile()
+  }, 2000)
 }
 
 /** A clock that ticks every second so ETA texts refresh. */

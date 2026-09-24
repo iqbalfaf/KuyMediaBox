@@ -428,6 +428,7 @@ export namespace queue {
 	    outSize: number;
 	    started: number;
 	    finished: number;
+	    seq: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Info(source);
@@ -446,6 +447,7 @@ export namespace queue {
 	        this.outSize = source["outSize"];
 	        this.started = source["started"];
 	        this.finished = source["finished"];
+	        this.seq = source["seq"];
 	    }
 	}
 
