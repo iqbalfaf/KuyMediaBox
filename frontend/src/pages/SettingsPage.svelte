@@ -5,6 +5,7 @@
   import Switch from '../components/Switch.svelte'
   import OutputPicker from '../components/OutputPicker.svelte'
   import Icon from '../components/Icon.svelte'
+  import AppLogo from '../components/AppLogo.svelte'
   import { api, errText, runtime } from '../lib/api'
   import {
     defaultDirs, fixedFolder, outputOf, saveSettings, setOutput, settings, shortPath, toast, toolState,
@@ -199,7 +200,7 @@
     <div class="head"><h2>{L('Tentang & update', 'About & updates')}</h2></div>
     <div class="gbody">
       <div class="about">
-        <div class="logo"><Icon name="box" size={22} stroke={2.2} /></div>
+        <AppLogo size={44} />
         <div class="about-t">
           <b>KuyMediaBox</b>
           <span>{L('Versi', 'Version')} {upd.version || '—'}</span>
@@ -274,17 +275,6 @@
     display: flex;
     align-items: center;
     gap: 12px;
-  }
-  .logo {
-    width: 44px;
-    height: 44px;
-    flex-shrink: 0;
-    border-radius: 12px;
-    background: var(--accent);
-    color: var(--accent-ink);
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
   .about .btn,
   .about .btn-accent {
