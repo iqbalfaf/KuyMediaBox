@@ -28,7 +28,7 @@
     { page: 'image', label: L('Gambar', 'Images'), icon: 'image', group: L('KONVERSI', 'CONVERT') },
     { page: 'video', label: 'Video', icon: 'video', group: L('KONVERSI', 'CONVERT') },
     { page: 'audio', label: 'Audio', icon: 'music', group: L('KONVERSI', 'CONVERT') },
-    { page: 'download', label: 'YouTube & Spotify', icon: 'download', group: L('UNDUH', 'DOWNLOAD') },
+    { page: 'download', label: 'Download', icon: 'download', group: 'ONLINE' },
   ])
 </script>
 

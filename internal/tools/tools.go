@@ -25,6 +25,7 @@ const (
 	YtDlp     = "ytdlp"
 	JSRuntime = "jsruntime"
 	SpotDL    = "spotdl"
+	GalleryDL = "gallerydl"
 )
 
 // Status is shown on the Settings page.
@@ -54,13 +55,14 @@ type meta struct {
 
 var metas = map[string]meta{
 	FFmpeg:    {"FFmpeg", [2]string{"Mesin konversi video, audio & gambar", "Video, audio & image conversion engine"}, [2]string{"Video, Audio, Download", "Video, Audio, Download"}, []string{"ffmpeg.exe"}},
-	YtDlp:     {"yt-dlp", [2]string{"Download dari YouTube", "Downloads from YouTube"}, [2]string{"Download YouTube & Spotify", "YouTube & Spotify downloads"}, []string{"yt-dlp.exe"}},
+	YtDlp:     {"yt-dlp", [2]string{"Download video & audio dari YouTube, TikTok, Instagram & Facebook", "Downloads video & audio from YouTube, TikTok, Instagram & Facebook"}, [2]string{"semua Download", "all downloads"}, []string{"yt-dlp.exe"}},
 	JSRuntime: {"JS runtime", [2]string{"Dibutuhkan yt-dlp untuk YouTube", "Needed by yt-dlp for YouTube"}, [2]string{"Download YouTube", "YouTube downloads"}, []string{"deno.exe", "node.exe"}},
 	SpotDL:    {"spotDL", [2]string{"Membaca playlist, album & lagu Spotify", "Reads Spotify playlists, albums & tracks"}, [2]string{"Download Spotify", "Spotify downloads"}, []string{"spotdl.exe"}},
+	GalleryDL: {"gallery-dl", [2]string{"Membaca foto dari post TikTok & Facebook", "Reads pictures from TikTok & Facebook posts"}, [2]string{"foto TikTok & Facebook", "TikTok & Facebook pictures"}, []string{"gallery-dl.exe"}},
 }
 
 // Order is the display order.
-var Order = []string{FFmpeg, YtDlp, JSRuntime, SpotDL}
+var Order = []string{FFmpeg, YtDlp, JSRuntime, SpotDL, GalleryDL}
 
 // Manager keeps the current status of every tool.
 type Manager struct {
@@ -259,7 +261,7 @@ func readVersion(ctx context.Context, id, path string) (string, error) {
 			return "", err
 		}
 		return reVersion.FindString(firstLine(out)), nil
-	case SpotDL:
+	case SpotDL, GalleryDL:
 		out, err := proc.Output(ctx, path, "--version")
 		if err != nil {
 			return "", err

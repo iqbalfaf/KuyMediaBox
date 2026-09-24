@@ -46,6 +46,16 @@ type ytInfo struct {
 	IEKey       string    `json:"ie_key"`
 	Extractor   string    `json:"extractor_key"`
 	Availabilty string    `json:"availability"`
+	Description string    `json:"description"`
+	UploaderID  string    `json:"uploader_id"`
+	Formats     []ytFmt   `json:"formats"`
+	PlaylistIdx int       `json:"playlist_index"`
+}
+
+type ytFmt struct {
+	VCodec string `json:"vcodec"`
+	ACodec string `json:"acodec"`
+	Ext    string `json:"ext"`
 }
 
 type ytThumb struct {
@@ -248,6 +258,7 @@ type ytJob struct {
 	Archive  bool
 	Phases   int
 	NoEmbed  bool
+	Item     int    // >0: download only this item of a multi-item post (--playlist-items)
 	PathFile string // yt-dlp appends the final file path here
 }
 
@@ -256,8 +267,13 @@ func escapeTemplate(s string) string { return strings.ReplaceAll(s, "%", "%%") }
 func (e Env) ytArgs(job ytJob) []string {
 	o := job.Opts
 	args := e.commonArgs()
+	if job.Item > 0 {
+		args = append(args, "--playlist-items", strconv.Itoa(job.Item))
+	} else {
+		args = append(args, "--no-playlist")
+	}
 	args = append(args,
-		"--newline", "--progress", "--no-playlist", "--no-mtime", "--no-overwrites", "--continue",
+		"--newline", "--progress", "--no-mtime", "--no-overwrites", "--continue",
 		"--progress-template", "download:[KMB] %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s %(progress.speed)s %(progress.eta)s",
 		"--print-to-file", "after_move:%(filepath)s", escapeTemplate(job.PathFile),
 		"-P", job.Dir,
