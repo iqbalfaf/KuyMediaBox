@@ -16,6 +16,8 @@ func knownFolder(kind string) string {
 		id = windows.FOLDERID_Music
 	case "download":
 		id = windows.FOLDERID_Downloads
+	case "pdf":
+		id = windows.FOLDERID_Documents
 	default:
 		return ""
 	}

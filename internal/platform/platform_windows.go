@@ -5,7 +5,12 @@ package platform
 import (
 	"os/exec"
 	"strconv"
+	"strings"
 	"syscall"
+	"unsafe"
+
+	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 )
 
 const createNoWindow = 0x08000000
@@ -43,4 +48,42 @@ func RevealFile(path string) error {
 	c.SysProcAttr.CmdLine = `explorer /select,"` + path + `"`
 	_ = c.Run()
 	return nil
+}
+
+// ComRegistered reports whether a COM automation class (e.g. "Word.Application") exists.
+func ComRegistered(progID string) bool {
+	k, err := registry.OpenKey(registry.CLASSES_ROOT, progID+`\CLSID`, registry.QUERY_VALUE)
+	if err != nil {
+		return false
+	}
+	k.Close()
+	return true
+}
+
+// ProcessIDs returns the IDs of running processes with the given executable name.
+func ProcessIDs(exe string) map[uint32]bool {
+	out := map[uint32]bool{}
+	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	if err != nil {
+		return out
+	}
+	defer windows.CloseHandle(snap)
+	var e windows.ProcessEntry32
+	e.Size = uint32(unsafe.Sizeof(e))
+	for err = windows.Process32First(snap, &e); err == nil; err = windows.Process32Next(snap, &e) {
+		if strings.EqualFold(windows.UTF16ToString(e.ExeFile[:]), exe) {
+			out[e.ProcessID] = true
+		}
+	}
+	return out
+}
+
+// KillNew ends processes named exe that were not running before (orphans of a cancelled
+// Office automation).
+func KillNew(exe string, before map[uint32]bool) {
+	for pid := range ProcessIDs(exe) {
+		if !before[pid] {
+			_ = KillTree(int(pid))
+		}
+	}
 }

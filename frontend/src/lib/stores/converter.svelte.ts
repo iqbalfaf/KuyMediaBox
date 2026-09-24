@@ -9,13 +9,18 @@ export type ItemState = 'invalid' | 'ready' | 'queued' | 'running' | 'done' | 'f
 /** File list + task mapping for one converter page (image, video or audio). */
 export class Converter {
   kind: Kind
+  /** File filter for adding files (defaults to the kind). */
+  input: string
   items = $state<FileItem[]>([])
   taskOf = $state<Record<string, string>>({})
+  /** Passwords of protected PDFs, by item id. */
+  passwords = $state<Record<string, string>>({})
   adding = $state(false)
   starting = $state(false)
 
-  constructor(kind: Kind) {
+  constructor(kind: Kind, input: string = kind) {
     this.kind = kind
+    this.input = input
   }
 
   task(item: FileItem): TaskInfo | undefined {
@@ -81,7 +86,7 @@ export class Converter {
     if (paths.length === 0) return
     this.adding = true
     try {
-      this.merge(await api.addPaths(this.kind, paths))
+      this.merge(await api.addPaths(this.input, paths))
     } catch (e) {
       toast(errText(e), 'err')
     } finally {
@@ -92,7 +97,7 @@ export class Converter {
   async pickFiles() {
     this.adding = true
     try {
-      const list = await api.pickFiles(this.kind)
+      const list = await api.pickFiles(this.input)
       if (list.length) this.merge(list)
     } catch (e) {
       toast(errText(e), 'err')
@@ -104,7 +109,7 @@ export class Converter {
   async pickFolder() {
     this.adding = true
     try {
-      const list = await api.pickFolder(this.kind)
+      const list = await api.pickFolder(this.input)
       if (list.length) this.merge(list)
       else if (list.length === 0) {
         /* cancelled or empty folder: nothing to do */
@@ -160,7 +165,24 @@ export class Converter {
   }
 
   cancelAll() {
-    api.cancelKind(this.kind)
+    if (this.kind !== 'pdf') {
+      api.cancelKind(this.kind)
+      return
+    }
+    // PDF tools share one queue kind; stop only this tool's tasks.
+    for (const it of this.items) {
+      const t = this.task(it)
+      if (isActive(t)) api.cancelTask(t!.id)
+    }
+  }
+
+  /** Moves an item (for tools where order matters). */
+  move(from: number, to: number) {
+    if (from === to || from < 0 || to < 0 || from >= this.items.length || to >= this.items.length) return
+    const list = [...this.items]
+    const [it] = list.splice(from, 1)
+    list.splice(to, 0, it)
+    this.items = list
   }
 
   /** The output folder of the most recent finished file, for "Buka folder hasil". */

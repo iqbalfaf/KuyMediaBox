@@ -3,8 +3,8 @@ import { L } from './i18n.svelte'
 import * as App from '../../wailsjs/go/main/App'
 import * as RT from '../../wailsjs/runtime/runtime'
 import type {
-  AudioOptions, Capabilities, Collection, DownloadOptions, FileItem, ImageOptions, JobRef, Link,
-  Settings, TaskInfo, ToolStatus, UpdateInfo, VideoOptions,
+  AudioOptions, Capabilities, Collection, CompareResult, DocInfo, DownloadOptions, EditItem, FileItem, ImageOptions, JobRef, Link,
+  OcrLanguage, PageRef, PdfEnv, PdfJob, PdfOptions, PdfRect, Settings, TaskInfo, ToolStatus, UpdateInfo, VideoOptions,
 } from './types'
 
 const call = App as any
@@ -46,6 +46,35 @@ export const api = {
   forgetCollection: (key: string): Promise<void> => call.ForgetCollection(key),
   collectionDir: (key: string): Promise<string> => call.CollectionDir(key),
   startDownloads: (key: string, ids: string[], o: DownloadOptions): Promise<JobRef[]> => call.StartDownloads(key, ids, o),
+
+  pdfWarmup: (): Promise<void> => call.PdfWarmup(),
+  pdfDoc: (path: string, password = ''): Promise<DocInfo> => call.PdfDoc(path, password),
+  pdfFind: (path: string, query: string, matchCase: boolean): Promise<PdfRect[]> => call.PdfFind(path, query, matchCase),
+  pdfCompare: (a: string, b: string): Promise<CompareResult> => call.PdfCompare(a, b),
+  pdfOcrLanguages: (): Promise<OcrLanguage[]> => call.PdfOcrLanguages(),
+  pdfEnvironment: (): Promise<PdfEnv> => call.PdfEnvironment(),
+  pdfScan: (): Promise<FileItem | null> => call.PdfScan(),
+  pdfSaveCapture: (dataUrl: string): Promise<FileItem | null> => call.PdfSaveCapture(dataUrl),
+  startPdf: (tool: string, items: PdfJob[], o: PdfOptions): Promise<JobRef[]> => call.StartPdf(tool, items, o),
+  startPdfCombine: (tool: string, items: PdfJob[], o: PdfOptions): Promise<JobRef> => call.StartPdfCombine(tool, items, o),
+  startPdfEdit: (req: {
+    tool: string
+    sources: { path: string; password: string }[]
+    pages?: PageRef[]
+    items?: EditItem[]
+    redact?: { boxes: PdfRect[]; dpi: number; color: string }
+    crop?: PdfOptions['crop']
+  }): Promise<JobRef> => call.StartPdfEdit(req),
+}
+
+/** URL of a rendered page preview (0-based page, width in pixels). */
+export function pageUrl(path: string, page: number, width: number, bust = ''): string {
+  return `/kmb/page?path=${encodeURIComponent(path)}&i=${page}&w=${Math.round(width)}${bust ? '&v=' + bust : ''}`
+}
+
+/** URL of an image file preview. */
+export function imageUrl(path: string, width: number): string {
+  return `/kmb/img?path=${encodeURIComponent(path)}&w=${Math.round(width)}`
 }
 
 export const runtime = {

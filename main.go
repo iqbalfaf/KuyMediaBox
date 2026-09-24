@@ -8,6 +8,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
+
+	"kuymediabox/internal/pdf"
 )
 
 //go:embed all:frontend/dist
@@ -23,9 +25,13 @@ func main() {
 		MinHeight:        700,
 		Frameless:        true,
 		BackgroundColour: &options.RGBA{R: 14, G: 16, B: 20, A: 255},
-		AssetServer:      &assetserver.Options{Assets: assets},
-		OnStartup:        app.startup,
-		OnShutdown:       app.shutdown,
+		AssetServer: &assetserver.Options{
+			Assets: assets,
+			// Page and image previews for the PDF tools (/kmb/page, /kmb/img).
+			Middleware: pdf.Middleware,
+		},
+		OnStartup:  app.startup,
+		OnShutdown: app.shutdown,
 		// File drops are handled by the Wails runtime (OnFileDrop), which also blocks the
 		// WebView's own navigation. DisableWebViewDrop must stay off: on WebView2 runtimes that
 		// support it, it blocks external drops completely and file drag & drop stops working.

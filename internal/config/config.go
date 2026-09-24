@@ -27,7 +27,7 @@ const (
 )
 
 // OutputKinds are the modules that have their own result folder.
-var OutputKinds = []string{"image", "video", "audio", "download"}
+var OutputKinds = []string{"image", "video", "audio", "download", "pdf"}
 
 // Output is where one module saves its results.
 type Output struct {
