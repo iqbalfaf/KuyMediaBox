@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { L } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
   import { dismiss, toasts } from '../lib/stores/app.svelte'
 </script>
@@ -8,7 +9,7 @@
     <div class="toast {t.tone}">
       <Icon name={t.tone === 'ok' ? 'check' : t.tone === 'err' ? 'alert' : 'info'} size={16} />
       <span>{t.text}</span>
-      <button aria-label="Tutup" onclick={() => dismiss(t.id)}><Icon name="x" size={14} /></button>
+      <button aria-label={L('Tutup', 'Close')} onclick={() => dismiss(t.id)}><Icon name="x" size={14} /></button>
     </div>
   {/each}
 </div>

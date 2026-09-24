@@ -28,6 +28,7 @@ import (
 	"golang.org/x/image/bmp"
 	"golang.org/x/image/tiff"
 
+	"kuymediabox/internal/i18n"
 	"kuymediabox/internal/proc"
 )
 
@@ -171,7 +172,7 @@ func Convert(ctx context.Context, in, out string, o Options, ffmpegPath string, 
 	bg, _ := parseHex(o.Background)
 	f, err := os.Create(out)
 	if err != nil {
-		return fmt.Errorf("tidak bisa membuat file hasil: %w", err)
+		return fmt.Errorf(i18n.L("tidak bisa membuat file hasil: %w", "can't create the output file: %w"), err)
 	}
 	w := bufio.NewWriterSize(f, 1<<20)
 	err = encode(w, img, o, bg)
@@ -192,7 +193,7 @@ func Convert(ctx context.Context, in, out string, o Options, ffmpegPath string, 
 func decode(ctx context.Context, path string, autoRotate bool, ffmpegPath string) (image.Image, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("file tidak bisa dibuka: %w", err)
+		return nil, fmt.Errorf(i18n.L("file tidak bisa dibuka: %w", "file can't be opened: %w"), err)
 	}
 	_, format, cfgErr := image.DecodeConfig(bytes.NewReader(data))
 	var img image.Image
@@ -224,7 +225,7 @@ func decode(ctx context.Context, path string, autoRotate bool, ffmpegPath string
 	if err == nil {
 		err = cfgErr
 	}
-	return nil, fmt.Errorf("format gambar tidak didukung atau file rusak (%v)", err)
+	return nil, fmt.Errorf(i18n.L("format gambar tidak didukung atau file rusak (%v)", "unsupported image format or damaged file (%v)"), err)
 }
 
 func decodeWithFFmpeg(ctx context.Context, path, ffmpegPath string) (image.Image, error) {
@@ -265,7 +266,7 @@ func encode(w io.Writer, img image.Image, o Options, bg color.Color) error {
 	case "pdf":
 		return encodePDF(w, flatten(img, bg), o.Quality)
 	}
-	return errors.New("format hasil tidak dikenal")
+	return errors.New(i18n.L("format hasil tidak dikenal", "unknown output format"))
 }
 
 // flatten draws img over a solid background (for formats without alpha).

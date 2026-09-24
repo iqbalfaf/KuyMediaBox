@@ -12,6 +12,8 @@ import (
 
 	"github.com/disintegration/imaging"
 	"golang.org/x/image/bmp"
+
+	"kuymediabox/internal/i18n"
 )
 
 // encodeICO writes a single-image ICO with PNG payload (supported since Windows Vista).
@@ -50,7 +52,7 @@ func encodeICO(w io.Writer, img image.Image) error {
 // decodeICO picks the largest image in an ICO file (PNG or BMP payload).
 func decodeICO(data []byte) (image.Image, error) {
 	if len(data) < 6 || binary.LittleEndian.Uint16(data[2:]) != 1 {
-		return nil, errors.New("bukan file ICO")
+		return nil, errors.New(i18n.L("bukan file ICO", "not an ICO file"))
 	}
 	count := int(binary.LittleEndian.Uint16(data[4:]))
 	bestSize, bestOff, bestLen := -1, 0, 0
@@ -76,7 +78,7 @@ func decodeICO(data []byte) (image.Image, error) {
 		}
 	}
 	if bestSize < 0 {
-		return nil, errors.New("ICO kosong")
+		return nil, errors.New(i18n.L("ICO kosong", "empty ICO"))
 	}
 	payload := data[bestOff : bestOff+bestLen]
 	if bytes.HasPrefix(payload, []byte("\x89PNG")) {
@@ -84,7 +86,7 @@ func decodeICO(data []byte) (image.Image, error) {
 	}
 	// BMP payload without file header and with doubled height (XOR + AND masks).
 	if len(payload) < 40 {
-		return nil, errors.New("ICO rusak")
+		return nil, errors.New(i18n.L("ICO rusak", "damaged ICO"))
 	}
 	hdrSize := binary.LittleEndian.Uint32(payload[0:])
 	fixed := append([]byte(nil), payload...)

@@ -14,6 +14,7 @@ import (
 
 	"kuymediabox/internal/appdir"
 	"kuymediabox/internal/config"
+	"kuymediabox/internal/i18n"
 	"kuymediabox/internal/proc"
 )
 
@@ -45,15 +46,17 @@ type Status struct {
 }
 
 type meta struct {
-	name, desc, required string
-	exes                 []string // candidate executable names in priority order
+	name     string
+	desc     [2]string // Indonesian, English
+	required [2]string
+	exes     []string // candidate executable names in priority order
 }
 
 var metas = map[string]meta{
-	FFmpeg:    {"FFmpeg", "Mesin konversi video, audio & gambar", "Video, Audio, Download", []string{"ffmpeg.exe"}},
-	YtDlp:     {"yt-dlp", "Download dari YouTube", "Download YouTube & Spotify", []string{"yt-dlp.exe"}},
-	JSRuntime: {"JS runtime", "Dibutuhkan yt-dlp untuk YouTube", "Download YouTube", []string{"deno.exe", "node.exe"}},
-	SpotDL:    {"spotDL", "Membaca playlist, album & lagu Spotify", "Download Spotify", []string{"spotdl.exe"}},
+	FFmpeg:    {"FFmpeg", [2]string{"Mesin konversi video, audio & gambar", "Video, audio & image conversion engine"}, [2]string{"Video, Audio, Download", "Video, Audio, Download"}, []string{"ffmpeg.exe"}},
+	YtDlp:     {"yt-dlp", [2]string{"Download dari YouTube", "Downloads from YouTube"}, [2]string{"Download YouTube & Spotify", "YouTube & Spotify downloads"}, []string{"yt-dlp.exe"}},
+	JSRuntime: {"JS runtime", [2]string{"Dibutuhkan yt-dlp untuk YouTube", "Needed by yt-dlp for YouTube"}, [2]string{"Download YouTube", "YouTube downloads"}, []string{"deno.exe", "node.exe"}},
+	SpotDL:    {"spotDL", [2]string{"Membaca playlist, album & lagu Spotify", "Reads Spotify playlists, albums & tracks"}, [2]string{"Download Spotify", "Spotify downloads"}, []string{"spotdl.exe"}},
 }
 
 // Order is the display order.
@@ -73,7 +76,7 @@ func New(cfg *config.Store, onChange func([]Status)) *Manager {
 	m := &Manager{cfg: cfg, statuses: map[string]*Status{}, onChange: onChange}
 	for _, id := range Order {
 		md := metas[id]
-		m.statuses[id] = &Status{ID: id, Name: md.name, Description: md.desc, Required: md.required}
+		m.statuses[id] = &Status{ID: id, Name: md.name}
 	}
 	return m
 }
@@ -84,7 +87,12 @@ func (m *Manager) List() []Status {
 	defer m.mu.Unlock()
 	out := make([]Status, 0, len(Order))
 	for _, id := range Order {
-		out = append(out, *m.statuses[id])
+		st := *m.statuses[id]
+		md := metas[id]
+		// Resolved on every call so a language switch shows up without a restart.
+		st.Description = i18n.L(md.desc[0], md.desc[1])
+		st.Required = i18n.L(md.required[0], md.required[1])
+		out = append(out, st)
 	}
 	return out
 }
@@ -188,7 +196,7 @@ func (m *Manager) detectOne(ctx context.Context, id string) {
 		v, err := readVersion(ctx, id, path)
 		if err != nil {
 			st.Found = false
-			st.Error = "Tidak bisa dijalankan: " + firstLine(err.Error())
+			st.Error = i18n.L("Tidak bisa dijalankan: ", "Can't be run: ") + firstLine(err.Error())
 		} else {
 			st.Version = v
 		}
@@ -203,7 +211,7 @@ func (m *Manager) detectOne(ctx context.Context, id string) {
 		}
 		if probe == "" {
 			st.Found = false
-			st.Error = "ffprobe.exe tidak ditemukan di samping ffmpeg.exe"
+			st.Error = i18n.L("ffprobe.exe tidak ditemukan di samping ffmpeg.exe", "ffprobe.exe not found next to ffmpeg.exe")
 		}
 	}
 	m.mu.Lock()

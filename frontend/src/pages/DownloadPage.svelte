@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { L } from '../lib/i18n.svelte'
   import PageHeader from '../components/PageHeader.svelte'
   import Chips from '../components/Chips.svelte'
   import Segmented from '../components/Segmented.svelte'
@@ -53,7 +54,7 @@
     try {
       const text = (await runtime.clipboardText()) ?? ''
       if (!text.trim()) {
-        toast('Clipboard kosong', 'info')
+        toast(L('Clipboard kosong', 'The clipboard is empty'), 'info')
         return
       }
       await addLinks(text)
@@ -66,9 +67,9 @@
     const col = r.col
     if (!col) return typeLabel[r.link.type] ?? 'Link'
     const n = col.entries.length
-    const noun = col.source === 'spotify' ? 'lagu' : 'video'
+    const noun = col.source === 'spotify' ? L('lagu', n === 1 ? 'track' : 'tracks') : L('video', n === 1 ? 'video' : 'videos')
     if (col.type === 'video' || col.type === 'track') return typeLabel[col.type]
-    if (col.type === 'channel') return `Channel · ${n} konten`
+    if (col.type === 'channel') return `Channel · ${n} ${L('konten', 'items')}`
     return `${typeLabel[col.type] ?? 'Link'} · ${n} ${noun}`
   }
 
@@ -78,8 +79,8 @@
 
   function tabText(r: LinkRow): string {
     const name = r.col?.title || typeLabel[r.link.type]
-    if (r.status === 'loading') return `${typeLabel[r.link.type] ?? 'Link'} · membaca…`
-    if (r.status === 'error') return `${typeLabel[r.link.type] ?? 'Link'} · gagal`
+    if (r.status === 'loading') return `${typeLabel[r.link.type] ?? 'Link'} · ${L('membaca…', 'reading…')}`
+    if (r.status === 'error') return `${typeLabel[r.link.type] ?? 'Link'} · ${L('gagal', 'failed')}`
     const total = visible(r).length
     return `${name.length > 22 ? name.slice(0, 21) + '…' : name} · ${selectedEntries(r).length}/${total}`
   }
@@ -93,7 +94,7 @@
     if (!r.col) return
     const set = parseRange(r.range, r.col.entries.length)
     if (!set) {
-      toast('Format rentang tidak valid. Contoh: 1-20 atau 3,5,7-9', 'err')
+      toast(L('Format rentang tidak valid. Contoh: 1-20 atau 3,5,7-9', 'Invalid range. Example: 1-20 or 3,5,7-9'), 'err')
       return
     }
     applyRange(r, set)
@@ -111,9 +112,9 @@
   /** Where this link's files land, relative to the Download folder. */
   function destLabel(col: Collection, dir: string): string {
     const sub = settings.value?.downloadSubfolders && (col.type === 'playlist' || col.type === 'channel' || col.type === 'album')
-    if (!sub) return 'Langsung ke folder download'
+    if (!sub) return L('Langsung ke folder download', 'Straight into the download folder')
     const name = dir.split(/[\\/]/).pop() ?? ''
-    return `Subfolder: ${name}`
+    return `${L('Subfolder', 'Subfolder')}: ${name}`
   }
 
   const breakdown = $derived.by(() => {
@@ -122,7 +123,7 @@
       if (r.status !== 'ready' || !r.col) continue
       const n = toQueue(r).length
       if (!n) continue
-      const what = r.col.source === 'spotify' ? `lagu ${r.col.type === 'album' ? 'album' : 'Spotify'}` : r.col.type === 'channel' ? 'channel' : r.col.type === 'playlist' ? 'playlist' : 'video'
+      const what = r.col.source === 'spotify' ? L(`lagu ${r.col.type === 'album' ? 'album' : 'Spotify'}`, `${r.col.type === 'album' ? 'album' : 'Spotify'} ${n === 1 ? 'track' : 'tracks'}`) : r.col.type === 'channel' ? 'channel' : r.col.type === 'playlist' ? 'playlist' : L('video', n === 1 ? 'video' : 'videos')
       parts.push(`${n} ${what}`)
     }
     return parts.join(' + ')
@@ -145,8 +146,8 @@
   const totalDur = $derived(entries.reduce((s, e) => s + (e.duration || 0), 0))
 </script>
 
-<PageHeader title="Download YouTube & Spotify" subtitle="Video, playlist, channel, lagu, album — tempel link-nya, jenisnya terdeteksi otomatis." />
-<ToolBanner ids={toolIds} why="Dibutuhkan untuk membaca link dan mengunduh. Sekali pasang, dipakai seterusnya." />
+<PageHeader title={L('Download YouTube & Spotify', 'YouTube & Spotify Downloader')} subtitle={L('Video, playlist, channel, lagu, album — tempel link-nya, jenisnya terdeteksi otomatis.', 'Videos, playlists, channels, tracks, albums — paste the link and the type is detected automatically.')} />
+<ToolBanner ids={toolIds} why={L('Dibutuhkan untuk membaca link dan mengunduh. Sekali pasang, dipakai seterusnya.', 'Needed to read links and download. Install once, use forever.')} />
 
 <div class="body">
   <div class="left">
@@ -154,10 +155,10 @@
       <form class="input-row" onsubmit={(e) => { e.preventDefault(); submit() }}>
         <div class="input-wrap">
           <span class="lic"><Icon name="link" /></span>
-          <input class="url" aria-label="Link YouTube atau Spotify" placeholder="Tempel link video, playlist, channel, lagu, atau album…" bind:value={dl.input} />
+          <input class="url" aria-label={L('Link YouTube atau Spotify', 'YouTube or Spotify link')} placeholder={L('Tempel link video, playlist, channel, lagu, atau album…', 'Paste a video, playlist, channel, track or album link…')} bind:value={dl.input} />
         </div>
-        <button type="button" class="btn tall" onclick={paste}><Icon name="clipboard" size={16} />Tempel</button>
-        <button type="submit" class="btn-accent tall" disabled={!dl.input.trim()}>Periksa link</button>
+        <button type="button" class="btn tall" onclick={paste}><Icon name="clipboard" size={16} />{L('Tempel', 'Paste')}</button>
+        <button type="submit" class="btn-accent tall" disabled={!dl.input.trim()}>{L('Periksa link', 'Check link')}</button>
       </form>
 
       {#if dl.rows.length > 0}
@@ -170,33 +171,33 @@
               <span class="ltype">{countLabel(r)}</span>
               <span class="lurl ellipsis" title={r.link.url}>{shortUrl(r.link.url)}</span>
               {#if r.status === 'loading'}
-                <span class="lst load"><Icon name="loader" size={12} stroke={3} class="spin" />Membaca…</span>
+                <span class="lst load"><Icon name="loader" size={12} stroke={3} class="spin" />{L('Membaca…', 'Reading…')}</span>
               {:else if r.status === 'ready'}
-                <span class="lst ok"><Icon name="check" size={12} stroke={3} />Terbaca</span>
+                <span class="lst ok"><Icon name="check" size={12} stroke={3} />{L('Terbaca', 'Ready')}</span>
               {:else}
-                <button class="lst err" title={r.error} onclick={() => showDetail(r.link.url, r.error, '')}>Gagal</button>
-                <button class="mini" aria-label="Coba lagi" title="Coba lagi" onclick={() => analyze(r.id)}><Icon name="refresh" size={14} /></button>
+                <button class="lst err" title={r.error} onclick={() => showDetail(r.link.url, r.error, '')}>{L('Gagal', 'Failed')}</button>
+                <button class="mini" aria-label={L('Coba lagi', 'Try again')} title={L('Coba lagi', 'Try again')} onclick={() => analyze(r.id)}><Icon name="refresh" size={14} /></button>
               {/if}
-              <button class="mini" aria-label="Hapus link" title="Hapus link" onclick={() => removeRow(r.id)}><Icon name="x" size={14} /></button>
+              <button class="mini" aria-label={L('Hapus link', 'Remove link')} title={L('Hapus link', 'Remove link')} onclick={() => removeRow(r.id)}><Icon name="x" size={14} /></button>
             </div>
           {/each}
         </div>
       {/if}
     </section>
 
-    <section class="card content" aria-label="Isi link">
+    <section class="card content" aria-label={L('Isi link', 'Link contents')}>
       {#if dl.rows.length === 0}
         <div class="empty">
           <div class="big-ic"><Icon name="download" size={34} stroke={1.8} /></div>
-          <h2>Tempel link untuk mulai</h2>
-          <p>Bisa beberapa link sekaligus, satu per baris.</p>
+          <h2>{L('Tempel link untuk mulai', 'Paste a link to start')}</h2>
+          <p>{L('Bisa beberapa link sekaligus, satu per baris.', 'Several links at once work too, one per line.')}</p>
           <div class="examples">
-            <div><span class="badge yt"><Icon name="play" size={10} stroke={3} />YouTube</span> video · Shorts · playlist · channel (@nama)</div>
-            <div><span class="badge sp"><Icon name="music" size={10} stroke={3} />Spotify</span> lagu · album · playlist</div>
+            <div><span class="badge yt"><Icon name="play" size={10} stroke={3} />YouTube</span> {L('video · Shorts · playlist · channel (@nama)', 'videos · Shorts · playlists · channels (@name)')}</div>
+            <div><span class="badge sp"><Icon name="music" size={10} stroke={3} />Spotify</span> {L('lagu · album · playlist', 'tracks · albums · playlists')}</div>
           </div>
         </div>
       {:else}
-        <div class="tabs" role="tablist" aria-label="Link yang dibaca">
+        <div class="tabs" role="tablist" aria-label={L('Link yang dibaca', 'Checked links')}>
           {#each dl.rows as r (r.id)}
             <button role="tab" aria-selected={row?.id === r.id} class:on={row?.id === r.id} onclick={() => (dl.active = r.id)}>
               <span class="dot" class:sp={r.link.source === 'spotify'}></span>{tabText(r)}
@@ -205,12 +206,12 @@
         </div>
 
         {#if row?.status === 'loading'}
-          <div class="state"><Icon name="loader" size={28} class="spin" /><span>Membaca isi link… {row.link.type === 'channel' ? 'Channel besar bisa butuh beberapa menit.' : ''}</span></div>
+          <div class="state"><Icon name="loader" size={28} class="spin" /><span>{L('Membaca isi link…', 'Reading the link…')} {row.link.type === 'channel' ? L('Channel besar bisa butuh beberapa menit.', 'Large channels can take a few minutes.') : ''}</span></div>
         {:else if row?.status === 'error'}
           <div class="state err">
             <Icon name="alert" size={28} />
             <span>{row.error}</span>
-            <button class="btn" onclick={() => analyze(row.id)}><Icon name="refresh" size={16} />Coba lagi</button>
+            <button class="btn" onclick={() => analyze(row.id)}><Icon name="refresh" size={16} />{L('Coba lagi', 'Try again')}</button>
           </div>
         {:else if row?.col}
           {@const col = row.col}
@@ -224,18 +225,18 @@
               <div class="cover blank"><Icon name={col.source === 'spotify' ? 'music' : 'play'} /></div>
             {/if}
             <div class="ch-text">
-              <span class="ch-title ellipsis" title={col.title}>{col.title || 'Tanpa judul'}</span>
+              <span class="ch-title ellipsis" title={col.title}>{col.title || L('Tanpa judul', 'Untitled')}</span>
               <span class="ch-sub ellipsis">
                 {#if col.type === 'channel'}
-                  Channel YouTube{col.subtitle ? ` · ${col.subtitle}` : ''} · {col.entries.length} konten ({Object.entries(col.tabCounts ?? {}).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${tabLabel[k] ?? k}`).join(' · ')})
+                  {L('Channel YouTube', 'YouTube channel')}{col.subtitle ? ` · ${col.subtitle}` : ''} · {col.entries.length} {L('konten', 'items')} ({Object.entries(col.tabCounts ?? {}).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${tabLabel[k] ?? k}`).join(' · ')})
                 {:else}
-                  {col.source === 'spotify' ? `${typeLabel[col.type]} Spotify` : `${typeLabel[col.type]} YouTube`}{col.subtitle ? ` · ${col.subtitle}` : ''}{entries.length > 1 ? ` · ${entries.length} ${col.source === 'spotify' ? 'lagu' : 'video'}` : ''}{totalDur ? ` · ± ${longDuration(totalDur)}` : ''}
+                  {col.source === 'spotify' ? L(`${typeLabel[col.type]} Spotify`, `Spotify ${typeLabel[col.type].toLowerCase()}`) : L(`${typeLabel[col.type]} YouTube`, `YouTube ${typeLabel[col.type].toLowerCase()}`)}{col.subtitle ? ` · ${col.subtitle}` : ''}{entries.length > 1 ? ` · ${entries.length} ${col.source === 'spotify' ? L('lagu', 'tracks') : L('video', 'videos')}` : ''}{totalDur ? ` · ± ${longDuration(totalDur)}` : ''}
                 {/if}
               </span>
             </div>
             {#if col.type === 'playlist' || col.type === 'album'}
               <form class="range" onsubmit={(e) => { e.preventDefault(); onRange(row) }}>
-                <label for="rentang">Rentang</label>
+                <label for="rentang">{L('Rentang', 'Range')}</label>
                 <input id="rentang" class="text-input" bind:value={row.range} onblur={() => onRange(row)} />
               </form>
             {/if}
@@ -249,9 +250,9 @@
               indeterminate={selCount > 0 && selCount < selectableCount}
               onchange={(e) => setAll(row, (e.currentTarget as HTMLInputElement).checked)}
             />
-            <label for="semua">Pilih semua</label>
-            <span class="selinfo">{selCount} dari {entries.length} dipilih{col.type === 'channel' ? ' · urut dari terbaru' : ''}</span>
-            {#if archivedCount > 0}<span class="arch">{archivedCount} sudah pernah diunduh · dilewati</span>{/if}
+            <label for="semua">{L('Pilih semua', 'Select all')}</label>
+            <span class="selinfo">{L(`${selCount} dari ${entries.length} dipilih`, `${selCount} of ${entries.length} selected`)}{col.type === 'channel' ? L(' · urut dari terbaru', ' · newest first') : ''}</span>
+            {#if archivedCount > 0}<span class="arch">{archivedCount} {L('sudah pernah diunduh · dilewati', 'downloaded before · skipped')}</span>{/if}
           </div>
 
           <div class="entries">
@@ -260,7 +261,7 @@
               {@const t = tid ? tasks[tid] : undefined}
               {@const can = selectable(e, row)}
               <div class="entry" class:dim={!can} class:active={t?.status === 'running'}>
-                <input type="checkbox" aria-label="Pilih {e.title}" checked={!!row.selected[e.id] && can} disabled={!can} onchange={() => toggle(row, e)} />
+                <input type="checkbox" aria-label={L(`Pilih ${e.title}`, `Select ${e.title}`)} checked={!!row.selected[e.id] && can} disabled={!can} onchange={() => toggle(row, e)} />
                 <span class="idx">{String(e.index).padStart(2, '0')}</span>
                 {#if e.thumbnail}
                   <img class="th" class:sq={col.source === 'spotify'} src={e.thumbnail} alt="" loading="lazy" onerror={(ev) => ((ev.currentTarget as HTMLImageElement).style.visibility = 'hidden')} />
@@ -275,7 +276,7 @@
                   {:else if e.artist}
                     <span class="esub ellipsis">{e.artist}{e.album ? ` · ${e.album}` : ''}</span>
                   {:else if e.unavailable}
-                    <span class="esub">Tidak tersedia (privat/dihapus)</span>
+                    <span class="esub">{L('Tidak tersedia (privat/dihapus)', 'Unavailable (private/deleted)')}</span>
                   {/if}
                 </div>
                 <div class="eright">
@@ -286,23 +287,23 @@
                         <div class="bar thin" class:indeterminate={t.progress < 0}><div style="width: {Math.max(0, t.progress) * 100}%"></div></div>
                       </div>
                     {:else if t.status === 'queued'}
-                      <span class="pill muted">Menunggu</span>
+                      <span class="pill muted">{L('Menunggu', 'Waiting')}</span>
                     {:else if t.status === 'done'}
-                      <button class="pill ok as-btn" title="Tampilkan file" onclick={() => api.revealFile(t.output)}><Icon name="check" size={12} stroke={3} />Selesai</button>
+                      <button class="pill ok as-btn" title={L('Tampilkan file', 'Show file')} onclick={() => api.revealFile(t.output)}><Icon name="check" size={12} stroke={3} />{L('Selesai', 'Done')}</button>
                     {:else if t.status === 'failed'}
-                      <button class="pill err as-btn" title={t.message} onclick={() => showDetail(e.title, t.message, t.detail)}>Gagal · detail</button>
+                      <button class="pill err as-btn" title={t.message} onclick={() => showDetail(e.title, t.message, t.detail)}>{L('Gagal · detail', 'Failed · details')}</button>
                     {:else if t.status === 'skipped'}
-                      <span class="pill muted" title={t.message}>{t.message || 'Dilewati'}</span>
+                      <span class="pill muted" title={t.message}>{t.message || L('Dilewati', 'Skipped')}</span>
                     {:else}
-                      <span class="pill muted">Dibatalkan</span>
+                      <span class="pill muted">{L('Dibatalkan', 'Canceled')}</span>
                     {/if}
                   {:else}
-                    {#if e.date && col.type === 'channel'}<span class="edate">{e.archived && row.opts.skipExisting ? 'Sudah ada' : ymd(e.date)}</span>{:else if e.archived && row.opts.skipExisting}<span class="edate">Sudah ada</span>{/if}
+                    {#if e.date && col.type === 'channel'}<span class="edate">{e.archived && row.opts.skipExisting ? L('Sudah ada', 'Already have') : ymd(e.date)}</span>{:else if e.archived && row.opts.skipExisting}<span class="edate">{L('Sudah ada', 'Already have')}</span>{/if}
                     <span class="edur">{duration(e.duration)}</span>
                   {/if}
                 </div>
                 {#if t && isActive(t)}
-                  <button class="mini" aria-label="Batalkan" title="Batalkan" onclick={() => api.cancelTask(t.id)}><Icon name="x" size={14} /></button>
+                  <button class="mini" aria-label={L('Batalkan', 'Cancel')} title={L('Batalkan', 'Cancel')} onclick={() => api.cancelTask(t.id)}><Icon name="x" size={14} /></button>
                 {:else}
                   <span></span>
                 {/if}
@@ -314,35 +315,35 @@
     </section>
   </div>
 
-  <aside class="card panel" aria-label="Pengaturan download">
+  <aside class="card panel" aria-label={L('Pengaturan download', 'Download settings')}>
     {#if row?.col && row.status === 'ready'}
       {@const col = row.col}
       <div class="ph">
-        <span class="ph-k">PENGATURAN UNTUK</span>
-        <span class="ph-v ellipsis" title={col.title}>{col.type === 'channel' ? `Channel ${col.subtitle || col.title}` : `${typeLabel[col.type]} ${col.source === 'spotify' ? 'Spotify' : 'YouTube'}`}</span>
+        <span class="ph-k">{L('PENGATURAN UNTUK', 'SETTINGS FOR')}</span>
+        <span class="ph-v ellipsis" title={col.title}>{col.type === 'channel' ? `Channel ${col.subtitle || col.title}` : L(`${typeLabel[col.type]} ${col.source === 'spotify' ? 'Spotify' : 'YouTube'}`, `${col.source === 'spotify' ? 'Spotify' : 'YouTube'} ${typeLabel[col.type].toLowerCase()}`)}</span>
       </div>
       <div class="scroll">
         {#if col.source === 'spotify'}
           <div class="info">
             <Icon name="info" size={16} />
-            <span>Spotify selalu diunduh sebagai audio. Lagunya dicocokkan dari YouTube, lalu diberi judul, artis, album &amp; cover dari Spotify.</span>
+            <span>{L('Spotify selalu diunduh sebagai audio. Lagunya dicocokkan dari YouTube, lalu diberi judul, artis, album & cover dari Spotify.', 'Spotify is always downloaded as audio. Songs are matched on YouTube, then tagged with the title, artist, album & cover from Spotify.')}</span>
           </div>
           <div class="sec">
-            <span class="label">Format audio</span>
+            <span class="label">{L('Format audio', 'Audio format')}</span>
             <Chips bind:value={row.opts.audioFormat} columns={3} onchange={() => optsChanged(row)} options={[{ value: 'mp3', label: 'MP3' }, { value: 'm4a', label: 'M4A' }, { value: 'opus', label: 'OPUS' }]} />
           </div>
           <div class="sec">
-            <span class="label">Kualitas</span>
-            <Segmented label="Kualitas" bind:value={row.opts.audioQuality} onchange={() => optsChanged(row)} options={[{ value: 'auto', label: 'Otomatis' }, { value: '192', label: '192 kbps' }, { value: '320', label: '320 kbps' }]} />
-            <p class="hint">Otomatis mengikuti kualitas sumber — angka lebih tinggi tidak membuat suara lebih bagus.</p>
+            <span class="label">{L('Kualitas', 'Quality')}</span>
+            <Segmented label={L('Kualitas', 'Quality')} bind:value={row.opts.audioQuality} onchange={() => optsChanged(row)} options={[{ value: 'auto', label: L('Otomatis', 'Auto') }, { value: '192', label: '192 kbps' }, { value: '320', label: '320 kbps' }]} />
+            <p class="hint">{L('Otomatis mengikuti kualitas sumber — angka lebih tinggi tidak membuat suara lebih bagus.', 'Auto follows the source quality — a higher number does not make it sound better.')}</p>
           </div>
           {#if col.type !== 'track'}
-            <Switch bind:checked={row.opts.numbering} onchange={() => optsChanged(row)} label="Nomor urut di nama file" hint="Urutan sama seperti di Spotify" />
+            <Switch bind:checked={row.opts.numbering} onchange={() => optsChanged(row)} label={L('Nomor urut di nama file', 'Track numbers in file names')} hint={L('Urutan sama seperti di Spotify', 'Same order as on Spotify')} />
           {/if}
         {:else}
           {#if col.type === 'channel'}
             <div class="sec">
-              <span class="label">Jenis konten</span>
+              <span class="label">{L('Jenis konten', 'Content types')}</span>
               <div class="multi">
                 {#each ['videos', 'shorts', 'streams'] as k}
                   {@const n = col.tabCounts?.[k] ?? 0}
@@ -353,71 +354,71 @@
               </div>
             </div>
             <div class="sec">
-              <span class="label">Ambil yang mana</span>
-              <Segmented label="Cakupan" bind:value={row.scope} onchange={() => applyScope(row)} options={[{ value: 'all', label: 'Semua' }, { value: 'latest', label: 'N terbaru' }, { value: 'since', label: 'Sejak tanggal' }]} />
+              <span class="label">{L('Ambil yang mana', 'Which ones')}</span>
+              <Segmented label={L('Cakupan', 'Scope')} bind:value={row.scope} onchange={() => applyScope(row)} options={[{ value: 'all', label: L('Semua', 'All') }, { value: 'latest', label: L('N terbaru', 'Latest N') }, { value: 'since', label: L('Sejak tanggal', 'Since date') }]} />
               {#if row.scope === 'latest'}
                 <div class="inline">
-                  <input class="text-input" aria-label="Jumlah terbaru" inputmode="numeric" value={row.latestN} oninput={(e) => { const v = parseInt((e.currentTarget as HTMLInputElement).value, 10); row.latestN = isNaN(v) ? 1 : Math.max(1, Math.min(5000, v)); applyScope(row) }} />
-                  <span class="t12">terbaru per jenis</span>
+                  <input class="text-input" aria-label={L('Jumlah terbaru', 'How many latest')} inputmode="numeric" value={row.latestN} oninput={(e) => { const v = parseInt((e.currentTarget as HTMLInputElement).value, 10); row.latestN = isNaN(v) ? 1 : Math.max(1, Math.min(5000, v)); applyScope(row) }} />
+                  <span class="t12">{L('terbaru per jenis', 'latest per type')}</span>
                 </div>
               {:else if row.scope === 'since'}
-                <input class="text-input" type="date" aria-label="Sejak tanggal" bind:value={row.since} onchange={() => applyScope(row)} />
-                <p class="hint">Tanggal dari YouTube bersifat perkiraan.</p>
+                <input class="text-input" type="date" aria-label={L('Sejak tanggal', 'Since date')} bind:value={row.since} onchange={() => applyScope(row)} />
+                <p class="hint">{L('Tanggal dari YouTube bersifat perkiraan.', 'Dates from YouTube are approximate.')}</p>
               {/if}
             </div>
           {/if}
 
           <div class="sec">
-            <span class="label">Unduh sebagai</span>
-            <Segmented label="Unduh sebagai" bind:value={row.opts.mode} onchange={() => optsChanged(row)} options={[{ value: 'video', label: 'Video', icon: 'video' }, { value: 'audio', label: 'Audio', icon: 'music' }]} />
+            <span class="label">{L('Unduh sebagai', 'Download as')}</span>
+            <Segmented label={L('Unduh sebagai', 'Download as')} bind:value={row.opts.mode} onchange={() => optsChanged(row)} options={[{ value: 'video', label: 'Video', icon: 'video' }, { value: 'audio', label: 'Audio', icon: 'music' }]} />
           </div>
 
           {#if row.opts.mode === 'video'}
             <div class="sec">
-              <span class="label">Kualitas video</span>
-              <Chips bind:value={row.opts.quality} columns={4} small onchange={() => optsChanged(row)} options={[{ value: 'best', label: 'Terbaik' }, { value: '1080', label: '1080p' }, { value: '720', label: '720p' }, { value: '480', label: '480p' }]} />
+              <span class="label">{L('Kualitas video', 'Video quality')}</span>
+              <Chips bind:value={row.opts.quality} columns={4} small onchange={() => optsChanged(row)} options={[{ value: 'best', label: L('Terbaik', 'Best') }, { value: '1080', label: '1080p' }, { value: '720', label: '720p' }, { value: '480', label: '480p' }]} />
             </div>
             <div class="sec">
-              <span class="label">Format file</span>
+              <span class="label">{L('Format file', 'File format')}</span>
               <Chips bind:value={row.opts.container} columns={2} onchange={() => optsChanged(row)} options={[{ value: 'mp4', label: 'MP4' }, { value: 'mkv', label: 'MKV' }]} />
             </div>
           {:else}
             <div class="sec">
-              <span class="label">Format audio</span>
+              <span class="label">{L('Format audio', 'Audio format')}</span>
               <Chips bind:value={row.opts.audioFormat} columns={4} small onchange={() => optsChanged(row)} options={[{ value: 'mp3', label: 'MP3' }, { value: 'm4a', label: 'M4A' }, { value: 'opus', label: 'OPUS' }, { value: 'flac', label: 'FLAC' }]} />
             </div>
           {/if}
 
-          <Switch bind:checked={row.opts.embed} onchange={() => optsChanged(row)} label="Sematkan info & thumbnail" hint="Judul, channel, dan gambar sampul" />
-          <Switch bind:checked={row.opts.skipExisting} onchange={() => skipChanged(row)} label="Lewati yang sudah ada" hint="Unduh ulang hanya ambil yang baru" />
+          <Switch bind:checked={row.opts.embed} onchange={() => optsChanged(row)} label={L('Sematkan info & thumbnail', 'Embed info & thumbnail')} hint={L('Judul, channel, dan gambar sampul', 'Title, channel and cover image')} />
+          <Switch bind:checked={row.opts.skipExisting} onchange={() => skipChanged(row)} label={L('Lewati yang sudah ada', 'Skip existing')} hint={L('Unduh ulang hanya ambil yang baru', 'Downloading again only fetches new items')} />
           {#if col.type === 'playlist'}
-            <Switch bind:checked={row.opts.numbering} onchange={() => optsChanged(row)} label="Nomor urut di nama file" hint="01 - judul, 02 - judul, …" />
+            <Switch bind:checked={row.opts.numbering} onchange={() => optsChanged(row)} label={L('Nomor urut di nama file', 'Numbers in file names')} hint={L('01 - judul, 02 - judul, …', '01 - title, 02 - title, …')} />
           {/if}
         {/if}
 
         <div class="sec">
-          <span class="label">Simpan ke</span>
+          <span class="label">{L('Simpan ke', 'Save to')}</span>
           <OutputPicker kind="download" />
           {#if dirOf[col.key]}
             <div class="dest">
               <span class="ellipsis" title={dirOf[col.key]}>{destLabel(col, dirOf[col.key])}</span>
-              <button class="link" onclick={() => api.openFolder(dirOf[col.key])}>Buka folder</button>
+              <button class="link" onclick={() => api.openFolder(dirOf[col.key])}>{L('Buka folder', 'Open folder')}</button>
             </div>
           {/if}
         </div>
       </div>
     {:else}
       <div class="ph">
-        <span class="ph-k">PENGATURAN</span>
+        <span class="ph-k">{L('PENGATURAN', 'SETTINGS')}</span>
         <span class="ph-v">Download</span>
       </div>
       <div class="scroll">
-        <p class="hint">Tempel link lalu klik <b>Periksa link</b>. Pengaturan kualitas dan format akan muncul di sini untuk setiap link.</p>
+        <p class="hint">{L('Tempel link lalu klik', 'Paste a link, then click')} <b>{L('Periksa link', 'Check link')}</b>. {L('Pengaturan kualitas dan format akan muncul di sini untuk setiap link.', 'Quality and format settings for each link show up here.')}</p>
         <div class="sec">
-          <span class="label">Simpan ke</span>
+          <span class="label">{L('Simpan ke', 'Save to')}</span>
           <OutputPicker kind="download" />
           <p class="hint">
-            {settings.value?.downloadSubfolders ?? true ? 'Playlist, channel & album otomatis dibuat subfolder sendiri.' : 'Semua file langsung masuk ke folder ini.'} Bisa diubah di Pengaturan.
+            {settings.value?.downloadSubfolders ?? true ? L('Playlist, channel & album otomatis dibuat subfolder sendiri.', 'Playlists, channels & albums get their own subfolder automatically.') : L('Semua file langsung masuk ke folder ini.', 'All files go straight into this folder.')} {L('Bisa diubah di Pengaturan.', 'You can change this in Settings.')}
           </p>
         </div>
       </div>
@@ -428,9 +429,9 @@
       {running}
       busy={dl.starting}
       startIcon="download"
-      startLabel={pending > 0 ? `Unduh semua · ${pending} item` : 'Unduh semua'}
+      startLabel={pending > 0 ? `${L('Unduh semua', 'Download all')} · ${pending} item${L('', pending === 1 ? '' : 's')}` : L('Unduh semua', 'Download all')}
       disabled={pending === 0 || missingTools}
-      disabledHint={missingTools ? 'Pasang tools yang dibutuhkan dulu (lihat banner).' : dl.rows.length === 0 ? '' : 'Pilih minimal satu item.'}
+      disabledHint={missingTools ? L('Pasang tools yang dibutuhkan dulu (lihat banner).', 'Install the required tools first (see the banner).') : dl.rows.length === 0 ? '' : L('Pilih minimal satu item.', 'Select at least one item.')}
       note={pending > 0 ? breakdown : ''}
       {lastOutput}
       queueMore={running ? pending : 0}

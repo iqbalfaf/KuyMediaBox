@@ -10,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"kuymediabox/internal/i18n"
 )
 
 // Task kinds.
@@ -258,7 +260,7 @@ func (m *Manager) exec(ctx context.Context, t *task) {
 	func() {
 		defer func() {
 			if rec := recover(); rec != nil {
-				err = Fail("Terjadi kesalahan internal", fmt.Sprint(rec))
+				err = Fail(i18n.L("Terjadi kesalahan internal", "Internal error"), fmt.Sprint(rec))
 			}
 		}()
 		err = t.run(ctx, &reporter{m: m, t: t})
@@ -280,7 +282,7 @@ func (m *Manager) finish(t *task, err error) {
 		t.info.Progress = 1
 	case errors.Is(err, context.Canceled):
 		t.info.Status = StatusCanceled
-		t.info.Message = "Dibatalkan"
+		t.info.Message = i18n.L("Dibatalkan", "Canceled")
 	case errors.As(err, &se):
 		t.info.Status = StatusSkipped
 		t.info.Progress = 1

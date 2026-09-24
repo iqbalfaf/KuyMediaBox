@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { L } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
   import { api, errText } from '../lib/api'
   import { nav, toast, tool, toolState } from '../lib/stores/app.svelte'
@@ -13,7 +14,7 @@
     for (const t of missing) {
       try {
         await api.installTool(t!.id)
-        toast(`${t!.name} berhasil dipasang`, 'ok')
+        toast(L(`${t!.name} berhasil dipasang`, `${t!.name} installed`), 'ok')
       } catch (e) {
         toast(`${t!.name}: ${errText(e)}`, 'err')
         return
@@ -26,14 +27,14 @@
   <div class="banner" role="status">
     <Icon name="alert" />
     <div class="txt">
-      <b>{missing.map((t) => t!.name).join(' & ')} belum terpasang.</b>
+      <b>{missing.map((t) => t!.name).join(' & ')} {L('belum terpasang.', missing.length > 1 ? 'are not installed.' : 'is not installed.')}</b>
       <span>{why}</span>
     </div>
     {#if busy}
       <div class="prog"><div class="bar"><div style="width: {progress * 100}%"></div></div><span>{Math.round(progress * 100)}%</span></div>
     {:else}
-      <button class="btn-accent" onclick={installAll}><Icon name="download" size={14} stroke={2.5} />Unduh sekarang</button>
-      <button class="btn" onclick={() => (nav.page = 'settings')}>Pengaturan</button>
+      <button class="btn-accent" onclick={installAll}><Icon name="download" size={14} stroke={2.5} />{L('Unduh sekarang', 'Download now')}</button>
+      <button class="btn" onclick={() => (nav.page = 'settings')}>{L('Pengaturan', 'Settings')}</button>
     {/if}
   </div>
 {/if}

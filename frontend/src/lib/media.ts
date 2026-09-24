@@ -1,3 +1,4 @@
+import { L } from './i18n.svelte'
 import type { VideoOptions } from './types'
 
 /** Codecs each container accepts, first = default (mirrors internal/mediaconv). */
@@ -10,12 +11,20 @@ export const videoFormats: Record<string, string[]> = {
   gif: [],
 }
 
-export const codecOptionLabel: Record<string, string> = {
-  h264: 'H.264 — paling kompatibel',
-  h265: 'H.265 — lebih kecil',
-  vp9: 'VP9 — untuk web',
-  av1: 'AV1 — paling kecil, lambat',
-  copy: 'Salin tanpa encode ulang (tercepat)',
+export function codecOptionLabel(c: string): string {
+  switch (c) {
+    case 'h264':
+      return L('H.264 — paling kompatibel', 'H.264 — most compatible')
+    case 'h265':
+      return L('H.265 — lebih kecil', 'H.265 — smaller')
+    case 'vp9':
+      return L('VP9 — untuk web', 'VP9 — for the web')
+    case 'av1':
+      return L('AV1 — paling kecil, lambat', 'AV1 — smallest, slow')
+    case 'copy':
+      return L('Salin tanpa encode ulang (tercepat)', 'Copy without re-encoding (fastest)')
+  }
+  return c
 }
 
 export const crfTable: Record<string, [number, number, number]> = {

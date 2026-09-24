@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"kuymediabox/internal/config"
+	"kuymediabox/internal/i18n"
 )
 
 // ErrExists is returned when the conflict policy is "skip" and the target already exists.
@@ -42,7 +43,7 @@ func (n *Namer) Reserve(input string, spec OutputSpec, suffix, ext, conflict str
 		return "", nil, err
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", nil, fmt.Errorf("tidak bisa membuat folder hasil: %w", err)
+		return "", nil, fmt.Errorf(i18n.L("tidak bisa membuat folder hasil: %w", "can't create the output folder: %w"), err)
 	}
 	base := strings.TrimSuffix(filepath.Base(input), filepath.Ext(input))
 	name := SanitizeFileName(base + suffix)
@@ -92,7 +93,7 @@ func OutputDir(input string, spec OutputSpec) (string, error) {
 		return src, nil
 	case config.OutputCustom:
 		if strings.TrimSpace(spec.Dir) == "" {
-			return "", errors.New("folder hasil belum dipilih")
+			return "", errors.New(i18n.L("folder hasil belum dipilih", "no output folder chosen"))
 		}
 		return spec.Dir, nil
 	default:
@@ -109,11 +110,11 @@ func TempPath(final string) string {
 // Commit moves a finished temp file into place, replacing an existing target.
 func Commit(tmp, final string) error {
 	if _, err := os.Stat(tmp); err != nil {
-		return fmt.Errorf("file hasil tidak ditemukan: %w", err)
+		return fmt.Errorf(i18n.L("file hasil tidak ditemukan: %w", "output file not found: %w"), err)
 	}
 	if exists(final) {
 		if err := os.Remove(final); err != nil {
-			return fmt.Errorf("tidak bisa menimpa file lama: %w", err)
+			return fmt.Errorf(i18n.L("tidak bisa menimpa file lama: %w", "can't overwrite the old file: %w"), err)
 		}
 	}
 	return os.Rename(tmp, final)

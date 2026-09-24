@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"kuymediabox/internal/appdir"
+	"kuymediabox/internal/i18n"
 )
 
 var httpClient = &http.Client{Timeout: 0} // downloads can be long; contexts cancel them
@@ -40,7 +41,7 @@ func latestRelease(ctx context.Context, repo string) (*ghRelease, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub menjawab %s", resp.Status)
+		return nil, fmt.Errorf(i18n.L("GitHub menjawab %s", "GitHub replied %s"), resp.Status)
 	}
 	var rel ghRelease
 	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
@@ -70,11 +71,11 @@ func (m *Manager) Install(ctx context.Context, id string) error {
 	s := m.statuses[id]
 	if s == nil {
 		m.mu.Unlock()
-		return errors.New("tool tidak dikenal")
+		return errors.New(i18n.L("tool tidak dikenal", "unknown tool"))
 	}
 	if s.Busy {
 		m.mu.Unlock()
-		return errors.New("sedang diproses")
+		return errors.New(i18n.L("sedang diproses", "already in progress"))
 	}
 	s.Busy, s.Progress, s.Error = true, 0, ""
 	m.mu.Unlock()
@@ -98,7 +99,7 @@ func (m *Manager) Install(ctx context.Context, id string) error {
 	found := m.statuses[id].Found
 	m.mu.Unlock()
 	if !found {
-		return errors.New("terpasang, tapi tidak bisa dijalankan")
+		return errors.New(i18n.L("terpasang, tapi tidak bisa dijalankan", "installed, but it can't be run"))
 	}
 	return nil
 }
@@ -127,16 +128,16 @@ func (m *Manager) install(ctx context.Context, id string) error {
 	case SpotDL:
 		rel, err := latestRelease(ctx, "spotDL/spotify-downloader")
 		if err != nil {
-			return fmt.Errorf("tidak bisa membaca rilis spotDL: %w", err)
+			return fmt.Errorf(i18n.L("tidak bisa membaca rilis spotDL: %w", "can't read the spotDL release: %w"), err)
 		}
 		for _, a := range rel.Assets {
 			if strings.HasSuffix(strings.ToLower(a.Name), "win32.exe") {
 				return downloadFile(ctx, a.URL, filepath.Join(dir, "spotdl.exe"), progress)
 			}
 		}
-		return errors.New("file spotDL untuk Windows tidak ditemukan di rilis terbaru")
+		return errors.New(i18n.L("file spotDL untuk Windows tidak ditemukan di rilis terbaru", "spotDL for Windows not found in the latest release"))
 	}
-	return errors.New("tool tidak dikenal")
+	return errors.New(i18n.L("tool tidak dikenal", "unknown tool"))
 }
 
 // downloadFile saves url to dest atomically, reporting 0..1 progress.
@@ -149,7 +150,7 @@ func downloadFile(ctx context.Context, url, dest string, progress func(float64))
 	_ = os.Remove(dest)
 	if err := os.Rename(tmp, dest); err != nil {
 		_ = os.Remove(tmp)
-		return fmt.Errorf("tidak bisa memasang file (sedang dipakai?): %w", err)
+		return fmt.Errorf(i18n.L("tidak bisa memasang file (sedang dipakai?): %w", "can't install the file (in use?): %w"), err)
 	}
 	return nil
 }
@@ -165,11 +166,11 @@ func fetch(ctx context.Context, url, dest string, progress func(float64)) error 
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		return fmt.Errorf("gagal mengunduh, periksa koneksi internet: %w", err)
+		return fmt.Errorf(i18n.L("gagal mengunduh, periksa koneksi internet: %w", "download failed, check your internet connection: %w"), err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("gagal mengunduh (%s)", resp.Status)
+		return fmt.Errorf(i18n.L("gagal mengunduh (%s)", "download failed (%s)"), resp.Status)
 	}
 	f, err := os.Create(dest)
 	if err != nil {
@@ -200,12 +201,12 @@ func fetch(ctx context.Context, url, dest string, progress func(float64)) error 
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			return fmt.Errorf("unduhan terputus: %w", rerr)
+			return fmt.Errorf(i18n.L("unduhan terputus: %w", "download interrupted: %w"), rerr)
 		}
 	}
 	if total > 0 && done != total {
 		f.Close()
-		return errors.New("unduhan tidak lengkap")
+		return errors.New(i18n.L("unduhan tidak lengkap", "incomplete download"))
 	}
 	return f.Close()
 }
@@ -224,7 +225,7 @@ func downloadZip(ctx context.Context, url, dir string, want map[string]string, p
 	}
 	zr, err := zip.OpenReader(name)
 	if err != nil {
-		return fmt.Errorf("arsip rusak: %w", err)
+		return fmt.Errorf(i18n.L("arsip rusak: %w", "damaged archive: %w"), err)
 	}
 	defer zr.Close()
 	found := map[string]bool{}
@@ -241,7 +242,7 @@ func downloadZip(ctx context.Context, url, dir string, want map[string]string, p
 	}
 	for base := range want {
 		if !found[base] {
-			return fmt.Errorf("%s tidak ada di dalam arsip", base)
+			return fmt.Errorf(i18n.L("%s tidak ada di dalam arsip", "%s is missing from the archive"), base)
 		}
 	}
 	progress(1)
@@ -271,7 +272,7 @@ func extract(f *zip.File, dest string) error {
 	_ = os.Remove(dest)
 	if err := os.Rename(tmp, dest); err != nil {
 		os.Remove(tmp)
-		return fmt.Errorf("tidak bisa memasang %s (sedang dipakai?): %w", filepath.Base(dest), err)
+		return fmt.Errorf(i18n.L("tidak bisa memasang %s (sedang dipakai?): %w", "can't install %s (in use?): %w"), filepath.Base(dest), err)
 	}
 	return nil
 }

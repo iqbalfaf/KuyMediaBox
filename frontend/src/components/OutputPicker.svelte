@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { L } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
   import { api, errText } from '../lib/api'
   import { defaultDirs, fixedFolder, outputOf, setOutput, shortPath, toast } from '../lib/stores/app.svelte'
@@ -17,19 +18,19 @@
     cur.mode === 'custom'
       ? shortPath(cur.dir)
       : cur.mode === 'subfolder'
-        ? 'Folder asal › converted'
+        ? L('Folder asal › converted', 'Source folder › converted')
         : cur.mode === 'same'
-          ? 'Sama dengan folder file asli'
-          : shortPath(defDir) || 'Folder default',
+          ? L('Sama dengan folder file asli', 'Same folder as the source file')
+          : shortPath(defDir) || L('Folder default', 'Default folder'),
   )
   const sub = $derived(
     cur.mode === 'custom'
-      ? 'Folder pilihan Anda'
+      ? L('Folder pilihan Anda', 'Your chosen folder')
       : cur.mode === 'subfolder'
-        ? 'Dinamis · subfolder di samping file asli'
+        ? L('Dinamis · subfolder di samping file asli', 'Dynamic · subfolder next to the source file')
         : cur.mode === 'same'
-          ? 'Dinamis · di samping file asli'
-          : 'Folder default',
+          ? L('Dinamis · di samping file asli', 'Dynamic · next to the source file')
+          : L('Folder default', 'Default folder'),
   )
   const fullPath = $derived(fixedFolder(kind))
 
@@ -37,7 +38,7 @@
     open = false
     if (mode === 'custom') {
       try {
-        const dir = await api.pickDirectory('Pilih folder hasil', cur.mode === 'custom' ? cur.dir : defDir)
+        const dir = await api.pickDirectory(L('Pilih folder hasil', 'Choose the output folder'), cur.mode === 'custom' ? cur.dir : defDir)
         if (dir) await setOutput(kind, { mode: 'custom', dir })
       } catch (e) {
         toast(errText(e), 'err')
@@ -64,27 +65,27 @@
       <span class="t ellipsis">{title}</span>
       <span class="s ellipsis">{sub}</span>
     </span>
-    <span class="change">Ubah</span>
+    <span class="change">{L('Ubah', 'Change')}</span>
   </button>
   {#if open}
     <div class="menu {placement}" role="menu">
       <button role="menuitemradio" aria-checked={cur.mode === 'default'} class:on={cur.mode === 'default'} onclick={() => choose('default')}>
-        <span class="mt">Folder default</span>
+        <span class="mt">{L('Folder default', 'Default folder')}</span>
         <span class="ms" title={defDir}>{defDir || '—'}</span>
       </button>
       {#if !isDownload}
         <button role="menuitemradio" aria-checked={cur.mode === 'subfolder'} class:on={cur.mode === 'subfolder'} onclick={() => choose('subfolder')}>
-          <span class="mt">Dinamis: folder asal › converted</span>
-          <span class="ms">Subfolder baru di samping setiap file asli</span>
+          <span class="mt">{L('Dinamis: folder asal › converted', 'Dynamic: source folder › converted')}</span>
+          <span class="ms">{L('Subfolder baru di samping setiap file asli', 'A new subfolder next to each source file')}</span>
         </button>
         <button role="menuitemradio" aria-checked={cur.mode === 'same'} class:on={cur.mode === 'same'} onclick={() => choose('same')}>
-          <span class="mt">Dinamis: sama dengan folder file asli</span>
-          <span class="ms">Nama file diberi tambahan agar tidak menimpa</span>
+          <span class="mt">{L('Dinamis: sama dengan folder file asli', 'Dynamic: same folder as the source file')}</span>
+          <span class="ms">{L('Nama file diberi tambahan agar tidak menimpa', 'File names get a suffix so nothing is overwritten')}</span>
         </button>
       {/if}
       <button role="menuitemradio" aria-checked={cur.mode === 'custom'} class:on={cur.mode === 'custom'} onclick={() => choose('custom')}>
-        <span class="mt">{cur.mode === 'custom' ? 'Ganti folder pilihan…' : 'Pilih folder sendiri…'}</span>
-        <span class="ms" title={cur.mode === 'custom' ? cur.dir : ''}>{cur.mode === 'custom' ? cur.dir : 'Semua hasil ke satu folder pilihan Anda'}</span>
+        <span class="mt">{cur.mode === 'custom' ? L('Ganti folder pilihan…', 'Change chosen folder…') : L('Pilih folder sendiri…', 'Choose my own folder…')}</span>
+        <span class="ms" title={cur.mode === 'custom' ? cur.dir : ''}>{cur.mode === 'custom' ? cur.dir : L('Semua hasil ke satu folder pilihan Anda', 'All results go to one folder you choose')}</span>
       </button>
     </div>
   {/if}

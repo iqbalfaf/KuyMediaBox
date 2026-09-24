@@ -5,7 +5,7 @@
 # KuyMediaBox
 
 **Satu aplikasi desktop untuk konversi gambar, video, audio, dan download YouTube & Spotify.**
-Ringan, offline, tanpa iklan, dan tanpa batas ukuran file.
+Ringan, offline, tanpa iklan, dan tanpa batas ukuran file. Tersedia dalam **Bahasa Indonesia** dan **English**.
 
 [![Release](https://img.shields.io/github/v/release/iqbalfaf/KuyMediaBox?label=download&color=ff7a45)](https://github.com/iqbalfaf/KuyMediaBox/releases/latest)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-2b3a55)
@@ -119,7 +119,8 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
   - **Folder pilihan** sendiri
   - Bisa diubah dari tombol **Simpan ke** di tiap halaman maupun di **Pengaturan**, dan keduanya selalu sinkron
 - **Aturan nama file**: tambahan nama (default `_converted`) dan pilihan jika nama sudah ada: *nama baru* (`foto (1).jpg`), *lewati*, atau *timpa*.
-- **Pesan error yang jelas** dalam bahasa Indonesia, plus tombol **Lihat detail** untuk log lengkap (bisa disalin).
+- **Dua bahasa: Indonesia & English.** Ganti di **Pengaturan › Umum › Bahasa / Language**. Seluruh tampilan, pesan error, dan notifikasi Windows langsung berganti tanpa perlu membuka ulang aplikasi.
+- **Pesan error yang jelas** (sesuai bahasa yang dipilih), plus tombol **Lihat detail** untuk log lengkap (bisa disalin).
 - **Notifikasi Windows** saat antrian selesai (bisa dimatikan).
 - **Tools Manager**: deteksi, unduh, update, atau pilih manual FFmpeg, yt-dlp, JS runtime (memakai Node.js/Deno yang sudah terpasang bila ada), dan spotDL. Update yt-dlp/spotDL dicek otomatis.
 - **Pengaturan terakhir diingat** per halaman (format, kualitas, resolusi, dll.).
@@ -149,6 +150,7 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
    - **JS runtime**: dipakai yt-dlp untuk YouTube; kalau Node.js sudah terpasang di PC, tidak perlu mengunduh apa pun
    - **spotDL**: khusus Spotify
 3. (Opsional) Atur **Folder hasil** untuk tiap menu di halaman yang sama.
+4. (Opsional) Prefer English? Pilih **English** di **Pengaturan › Umum › Bahasa / Language**.
 
 > Halaman Gambar sudah bisa dipakai tanpa tools tambahan.
 
@@ -329,12 +331,13 @@ KuyMediaBox/
 │   ├── downloader/         # deteksi link, yt-dlp (YouTube), spotDL (Spotify)
 │   ├── tools/              # Tools Manager: cari, unduh, update
 │   ├── updater/            # update aplikasi dari GitHub Releases
+│   ├── i18n/               # teks Indonesia/English untuk pesan dari backend
 │   ├── proc/ platform/     # proses tersembunyi & utilitas Windows
 │   └── integration/        # test nyata dengan tools asli
 ├── frontend/src/
 │   ├── pages/              # Gambar, Video, Audio, Download, Pengaturan
 │   ├── components/         # Sidebar, FileList, OutputPicker, RunFooter, …
-│   └── lib/                # API, store, format
+│   └── lib/                # API, store, format, i18n (L('id', 'en'))
 ├── build/                  # ikon & konfigurasi build Windows
 └── .github/workflows/      # release otomatis
 ```

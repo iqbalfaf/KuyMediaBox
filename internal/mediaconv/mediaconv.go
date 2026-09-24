@@ -2,12 +2,14 @@
 package mediaconv
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 
 	"kuymediabox/internal/ffmpeg"
+	"kuymediabox/internal/i18n"
 )
 
 // VideoOptions come from the Video page.
@@ -180,7 +182,7 @@ func OutputSize(w, h int, o VideoOptions) (int, int) {
 func VideoArgs(in, out string, info ffmpeg.Info, o VideoOptions, encoders map[string]bool) ([]string, error) {
 	o.Normalize()
 	if !info.HasVideo {
-		return nil, fmt.Errorf("file ini tidak punya video")
+		return nil, errors.New(i18n.L("file ini tidak punya video", "this file has no video"))
 	}
 	args := []string{"-i", in}
 
@@ -201,7 +203,7 @@ func VideoArgs(in, out string, info ffmpeg.Info, o VideoOptions, encoders map[st
 
 	if o.Codec == "copy" {
 		if !CanCopyVideo(info.VideoCodec, o.Format) {
-			return nil, fmt.Errorf("Video %s tidak bisa disalin ke %s tanpa encode ulang. Pilih codec lain (misalnya %s).",
+			return nil, fmt.Errorf(i18n.L("Video %s tidak bisa disalin ke %s tanpa encode ulang. Pilih codec lain (misalnya %s).", "%s video can't be copied into %s without re-encoding. Choose another codec (e.g. %s)."),
 				codecName(info.VideoCodec), strings.ToUpper(o.Format), strings.ToUpper(VideoFormats[o.Format][0]))
 		}
 		args = append(args, "-map", "0:v:0")
@@ -224,7 +226,7 @@ func VideoArgs(in, out string, info ffmpeg.Info, o VideoOptions, encoders map[st
 
 	enc := PickEncoder(o.Codec, encoders)
 	if enc == "" {
-		return nil, fmt.Errorf("encoder %s tidak tersedia di FFmpeg ini", strings.ToUpper(o.Codec))
+		return nil, fmt.Errorf(i18n.L("encoder %s tidak tersedia di FFmpeg ini", "the %s encoder isn't available in this FFmpeg"), strings.ToUpper(o.Codec))
 	}
 	crf := crfFor(o.Codec, o.Quality)
 	if o.Manual && o.CRF > 0 && o.CRF <= 63 {
@@ -312,7 +314,7 @@ func codecName(c string) string {
 		return n
 	}
 	if c == "" {
-		return "sumber"
+		return i18n.L("sumber", "source")
 	}
 	return strings.ToUpper(c)
 }
@@ -346,7 +348,7 @@ func (o *AudioOptions) Normalize() {
 func AudioArgs(in, out string, info ffmpeg.Info, o AudioOptions) ([]string, error) {
 	o.Normalize()
 	if !info.HasAudio {
-		return nil, fmt.Errorf("file ini tidak punya audio")
+		return nil, errors.New(i18n.L("file ini tidak punya audio", "this file has no audio"))
 	}
 	args := []string{"-i", in, "-map", "0:a:0"}
 

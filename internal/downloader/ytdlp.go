@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"kuymediabox/internal/i18n"
 	"kuymediabox/internal/proc"
 	"kuymediabox/internal/queue"
 )
@@ -64,7 +65,7 @@ func (e Env) dumpJSON(ctx context.Context, url string, extra ...string) (*ytInfo
 	}
 	var info ytInfo
 	if err := json.Unmarshal([]byte(out), &info); err != nil {
-		return nil, fmt.Errorf("jawaban yt-dlp tidak bisa dibaca: %w", err)
+		return nil, fmt.Errorf(i18n.L("jawaban yt-dlp tidak bisa dibaca: %w", "yt-dlp response can't be read: %w"), err)
 	}
 	return &info, nil
 }
@@ -72,7 +73,7 @@ func (e Env) dumpJSON(ctx context.Context, url string, extra ...string) (*ytInfo
 // AnalyzeYouTube reads a video, playlist or channel (and other yt-dlp supported pages).
 func AnalyzeYouTube(ctx context.Context, env Env, link Link) (*Collection, error) {
 	if env.YtDlp == "" {
-		return nil, errors.New("yt-dlp belum terpasang. Buka Pengaturan untuk mengunduhnya.")
+		return nil, errors.New(i18n.L("yt-dlp belum terpasang. Buka Pengaturan untuk mengunduhnya.", "yt-dlp is not installed. Open Settings to download it."))
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
@@ -120,7 +121,7 @@ func AnalyzeYouTube(ctx context.Context, env Env, link Link) (*Collection, error
 					return nil, err
 				}
 			}
-			return nil, errors.New("channel tidak bisa dibaca")
+			return nil, errors.New(i18n.L("channel tidak bisa dibaca", "channel can't be read"))
 		}
 		col.Subtitle = link.ID
 	case TypePlaylist:
@@ -192,7 +193,7 @@ func flatEntry(en ytInfo, tab string) (Entry, bool) {
 	low := strings.ToLower(en.Title)
 	if e.ID == "" || low == "[private video]" || low == "[deleted video]" || strings.Contains(en.Availabilty, "private") {
 		if e.Title == "" {
-			e.Title = "Video tidak tersedia"
+			e.Title = i18n.L("Video tidak tersedia", "Video unavailable")
 		}
 		return e, false
 	}
@@ -291,7 +292,7 @@ func (e Env) ytArgs(job ytJob) []string {
 // runYtDlp executes a job, reporting progress, and returns the output path.
 func (e Env) runYtDlp(ctx context.Context, job ytJob, r queue.Reporter, progressScale float64) (string, error) {
 	if e.YtDlp == "" {
-		return "", queue.Fail("yt-dlp belum terpasang", "")
+		return "", queue.Fail(i18n.L("yt-dlp belum terpasang", "yt-dlp is not installed"), "")
 	}
 	pf, err := os.CreateTemp(e.TempDir, "path-*.txt")
 	if err != nil {
@@ -310,7 +311,7 @@ func (e Env) runYtDlp(ctx context.Context, job ytJob, r queue.Reporter, progress
 		return "", err
 	}
 	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("yt-dlp tidak bisa dijalankan: %w", err)
+		return "", fmt.Errorf(i18n.L("yt-dlp tidak bisa dijalankan: %w", "yt-dlp can't be started: %w"), err)
 	}
 	tail := proc.NewTail(60)
 	var (
@@ -348,33 +349,33 @@ func (e Env) runYtDlp(ctx context.Context, job ytJob, r queue.Reporter, progress
 			mu.Unlock()
 			r.Progress(overall * progressScale)
 			if pct >= 0.999 {
-				r.Message("Memproses…")
+				r.Message(i18n.L("Memproses…", "Processing…"))
 				return
 			}
-			msg := "Mengunduh"
+			msg := i18n.L("Mengunduh", "Downloading")
 			if sp := num(f[3]); sp > 0 {
 				msg += " · " + humanBytes(sp) + "/s"
 			}
 			if eta := num(f[4]); eta > 0 {
-				msg += " · sisa " + humanDuration(eta)
+				msg += i18n.L(" · sisa ", " · ETA ") + humanDuration(eta)
 			}
 			r.Message(msg)
 		case strings.Contains(line, "has already been recorded in the archive"):
 			mu.Lock()
-			skipped = "Sudah pernah diunduh"
+			skipped = i18n.L("Sudah pernah diunduh", "Already downloaded before")
 			mu.Unlock()
 		case strings.Contains(line, "has already been downloaded"):
 			mu.Lock()
-			skipped = "File sudah ada"
+			skipped = i18n.L("File sudah ada", "File already exists")
 			mu.Unlock()
 		case strings.HasPrefix(line, "[Merger]"):
-			r.Message("Menggabungkan video & audio…")
+			r.Message(i18n.L("Menggabungkan video & audio…", "Merging video & audio…"))
 		case strings.HasPrefix(line, "[ExtractAudio]"):
-			r.Message("Mengubah ke " + strings.ToUpper(job.Opts.AudioFormat) + "…")
+			r.Message(i18n.L("Mengubah ke ", "Converting to ") + strings.ToUpper(job.Opts.AudioFormat) + "…")
 		case strings.HasPrefix(line, "[VideoRemuxer]"), strings.HasPrefix(line, "[VideoConvertor]"):
-			r.Message("Menyesuaikan format…")
+			r.Message(i18n.L("Menyesuaikan format…", "Adjusting format…"))
 		case strings.HasPrefix(line, "[EmbedThumbnail]"), strings.HasPrefix(line, "[Metadata]"):
-			r.Message("Menyematkan info & thumbnail…")
+			r.Message(i18n.L("Menyematkan info & thumbnail…", "Embedding info & thumbnail…"))
 		}
 	}
 	var wg sync.WaitGroup
@@ -399,9 +400,9 @@ func (e Env) runYtDlp(ctx context.Context, job ytJob, r queue.Reporter, progress
 		return "", queue.Skip(skipped)
 	}
 	if output == "" {
-		return "", queue.Fail("yt-dlp selesai tanpa file hasil", tail.String())
+		return "", queue.Fail(i18n.L("yt-dlp selesai tanpa file hasil", "yt-dlp finished without an output file"), tail.String())
 	}
-	if skipped == "File sudah ada" {
+	if skipped == i18n.L("File sudah ada", "File already exists") {
 		return output, queue.Skip(skipped)
 	}
 	return output, nil
@@ -410,7 +411,7 @@ func (e Env) runYtDlp(ctx context.Context, job ytJob, r queue.Reporter, progress
 // DownloadYouTube downloads one entry into dir. prefix is a literal file-name prefix.
 func DownloadYouTube(ctx context.Context, env Env, entry Entry, dir, prefix string, datePrefix bool, o Options, r queue.Reporter) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", queue.Fail("Tidak bisa membuat folder tujuan", err.Error())
+		return "", queue.Fail(i18n.L("Tidak bisa membuat folder tujuan", "Can't create the destination folder"), err.Error())
 	}
 	tpl := escapeTemplate(prefix)
 	if datePrefix {
@@ -421,7 +422,7 @@ func DownloadYouTube(ctx context.Context, env Env, entry Entry, dir, prefix stri
 	if o.Mode == "video" {
 		phases = 2
 	}
-	r.Message("Menyiapkan…")
+	r.Message(i18n.L("Menyiapkan…", "Preparing…"))
 	r.Progress(-1)
 	out, err := env.runYtDlp(ctx, ytJob{URL: entry.URL, Dir: dir, Template: tpl, Opts: o, Archive: o.SkipExisting, Phases: phases}, r, 1)
 	if out != "" {
@@ -468,34 +469,34 @@ func friendlyYtError(out string) error {
 	var msg string
 	switch {
 	case strings.Contains(low, "not a bot"):
-		msg = "YouTube meminta verifikasi \"bukan bot\". Coba lagi beberapa saat lagi."
+		msg = i18n.L("YouTube meminta verifikasi \"bukan bot\". Coba lagi beberapa saat lagi.", "YouTube asked to confirm you are not a bot. Try again in a moment.")
 	case strings.Contains(low, "confirm your age") || strings.Contains(low, "age-restricted") || strings.Contains(low, "inappropriate for some users"):
-		msg = "Video dibatasi umur (perlu login YouTube)"
+		msg = i18n.L("Video dibatasi umur (perlu login YouTube)", "Age-restricted video (YouTube sign-in required)")
 	case strings.Contains(low, "private video"):
-		msg = "Video privat"
+		msg = i18n.L("Video privat", "Private video")
 	case strings.Contains(low, "members-only") || strings.Contains(low, "join this channel"):
-		msg = "Khusus member channel"
+		msg = i18n.L("Khusus member channel", "Channel members only")
 	case strings.Contains(low, "http error 429") || strings.Contains(low, "too many requests"):
-		msg = "Terlalu banyak permintaan ke YouTube. Coba lagi nanti."
+		msg = i18n.L("Terlalu banyak permintaan ke YouTube. Coba lagi nanti.", "Too many requests to YouTube. Try again later.")
 	case strings.Contains(low, "requested format is not available"):
-		msg = "Kualitas/format yang dipilih tidak tersedia untuk video ini"
+		msg = i18n.L("Kualitas/format yang dipilih tidak tersedia untuk video ini", "The chosen quality/format isn't available for this video")
 	case strings.Contains(low, "javascript runtime") || strings.Contains(low, "challenge solving failed") || strings.Contains(low, "n challenge"):
-		msg = "yt-dlp butuh JS runtime yang berfungsi. Cek Pengaturan › Tools."
+		msg = i18n.L("yt-dlp butuh JS runtime yang berfungsi. Cek Pengaturan › Tools.", "yt-dlp needs a working JS runtime. Check Settings › Tools.")
 	case strings.Contains(low, "ffmpeg not found") || strings.Contains(low, "ffprobe and ffmpeg not found") || strings.Contains(low, "ffmpeg is not installed"):
-		msg = "FFmpeg belum terpasang. Buka Pengaturan untuk mengunduhnya."
+		msg = i18n.L("FFmpeg belum terpasang. Buka Pengaturan untuk mengunduhnya.", "FFmpeg is not installed. Open Settings to download it.")
 	case strings.Contains(low, "does not have a") && strings.Contains(low, "tab"):
-		msg = "Channel ini tidak punya konten jenis tersebut"
+		msg = i18n.L("Channel ini tidak punya konten jenis tersebut", "This channel has no content of that type")
 	case strings.Contains(low, "video unavailable") || strings.Contains(low, "this video is not available") || strings.Contains(low, "has been removed"):
-		msg = "Video tidak tersedia"
+		msg = i18n.L("Video tidak tersedia", "Video unavailable")
 	case strings.Contains(low, "unsupported url"):
-		msg = "Link ini tidak didukung"
+		msg = i18n.L("Link ini tidak didukung", "This link isn't supported")
 	case strings.Contains(low, "unable to download") || strings.Contains(low, "getaddrinfo") || strings.Contains(low, "timed out") || strings.Contains(low, "connection"):
-		msg = "Koneksi bermasalah. Periksa internet lalu coba lagi."
+		msg = i18n.L("Koneksi bermasalah. Periksa internet lalu coba lagi.", "Connection problem. Check your internet and try again.")
 	case strings.Contains(low, "no space left"):
-		msg = "Ruang disk penuh"
+		msg = i18n.L("Ruang disk penuh", "Disk is full")
 	}
 	if msg == "" {
-		msg = "Gagal: " + lastErrorLine(detail)
+		msg = i18n.L("Gagal: ", "Failed: ") + lastErrorLine(detail)
 	}
 	return queue.Fail(msg, detail)
 }
@@ -517,7 +518,7 @@ func lastErrorLine(s string) string {
 		l = string([]rune(l)[:140]) + "…"
 	}
 	if l == "" {
-		l = "kesalahan tidak diketahui"
+		l = i18n.L("kesalahan tidak diketahui", "unknown error")
 	}
 	return l
 }

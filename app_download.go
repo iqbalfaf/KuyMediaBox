@@ -11,6 +11,7 @@ import (
 
 	"kuymediabox/internal/appdir"
 	"kuymediabox/internal/downloader"
+	"kuymediabox/internal/i18n"
 	"kuymediabox/internal/naming"
 	"kuymediabox/internal/queue"
 	"kuymediabox/internal/tools"
@@ -48,9 +49,9 @@ func (a *App) AnalyzeLink(raw string) (*downloader.Collection, error) {
 	var err error
 	switch {
 	case link.Type == downloader.TypeUnknown && link.Source == downloader.SourceSpotify:
-		return nil, errors.New("Link Spotify ini belum didukung. Gunakan link lagu, album, atau playlist.")
+		return nil, errors.New(i18n.L("Link Spotify ini belum didukung. Gunakan link lagu, album, atau playlist.", "This Spotify link isn't supported yet. Use a track, album or playlist link."))
 	case link.Type == downloader.TypeUnknown:
-		return nil, errors.New("Link tidak dikenali. Tempel link video, playlist, channel, lagu, album, atau playlist.")
+		return nil, errors.New(i18n.L("Link tidak dikenali. Tempel link video, playlist, channel, lagu, album, atau playlist.", "Link not recognized. Paste a video, playlist, channel, track or album link."))
 	case link.Source == downloader.SourceSpotify:
 		col, err = downloader.AnalyzeSpotify(context.Background(), env, link)
 	default:
@@ -60,7 +61,7 @@ func (a *App) AnalyzeLink(raw string) (*downloader.Collection, error) {
 		return nil, err
 	}
 	if len(col.Entries) == 0 {
-		return nil, errors.New("Tidak ada video/lagu yang bisa diunduh di link ini")
+		return nil, errors.New(i18n.L("Tidak ada video/lagu yang bisa diunduh di link ini", "There are no videos/songs to download in this link"))
 	}
 	a.colMu.Lock()
 	a.colSeq++
@@ -111,18 +112,18 @@ func (a *App) StartDownloads(key string, ids []string, o downloader.Options) ([]
 	col := a.collections[key]
 	a.colMu.Unlock()
 	if col == nil {
-		return nil, errors.New("Data link sudah kedaluwarsa, periksa link lagi")
+		return nil, errors.New(i18n.L("Data link sudah kedaluwarsa, periksa link lagi", "Link data expired, check the link again"))
 	}
 	o.Normalize(col.Source)
 	env := a.env()
 	if env.YtDlp == "" {
-		return nil, errors.New("yt-dlp belum terpasang. Buka Pengaturan untuk mengunduhnya.")
+		return nil, errors.New(i18n.L("yt-dlp belum terpasang. Buka Pengaturan untuk mengunduhnya.", "yt-dlp is not installed. Open Settings to download it."))
 	}
 	if env.FFmpeg == "" {
-		return nil, errors.New("FFmpeg belum terpasang. Buka Pengaturan untuk mengunduhnya.")
+		return nil, errors.New(i18n.L("FFmpeg belum terpasang. Buka Pengaturan untuk mengunduhnya.", "FFmpeg is not installed. Open Settings to download it."))
 	}
 	if col.Source == downloader.SourceSpotify && env.SpotDL == "" {
-		return nil, errors.New("spotDL belum terpasang. Buka Pengaturan untuk mengunduhnya.")
+		return nil, errors.New(i18n.L("spotDL belum terpasang. Buka Pengaturan untuk mengunduhnya.", "spotDL is not installed. Open Settings to download it."))
 	}
 	want := map[string]bool{}
 	for _, id := range ids {
@@ -135,12 +136,12 @@ func (a *App) StartDownloads(key string, ids []string, o downloader.Options) ([]
 		}
 	}
 	if len(chosen) == 0 {
-		return nil, errors.New("Belum ada item yang dipilih")
+		return nil, errors.New(i18n.L("Belum ada item yang dipilih", "No items selected"))
 	}
 
 	dir := collectionDir(a.downloadBase(), col, a.cfg.Get().DownloadSubfolders)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, fmt.Errorf("Folder download tidak bisa dipakai (%s): %w", dir, err)
+		return nil, fmt.Errorf(i18n.L("Folder download tidak bisa dipakai (%s): %w", "Download folder can't be used (%s): %w"), dir, err)
 	}
 	width := len(strconv.Itoa(len(col.Entries)))
 	if width < 2 {
