@@ -1,0 +1,371 @@
+<script lang="ts">
+  import PageHeader from '../components/PageHeader.svelte'
+  import FileList from '../components/FileList.svelte'
+  import EmptyDrop from '../components/EmptyDrop.svelte'
+  import Chips from '../components/Chips.svelte'
+  import Segmented from '../components/Segmented.svelte'
+  import Select from '../components/Select.svelte'
+  import OutputPicker from '../components/OutputPicker.svelte'
+  import RunFooter from '../components/RunFooter.svelte'
+  import ToolBanner from '../components/ToolBanner.svelte'
+  import AudioFormatPanel from '../components/AudioFormatPanel.svelte'
+  import Icon from '../components/Icon.svelte'
+  import { api } from '../lib/api'
+  import { caps, hasTool } from '../lib/stores/app.svelte'
+  import { videoConv as conv } from '../lib/stores/converter.svelte'
+  import { load, save } from '../lib/stores/persist'
+  import { bytes, codec, duration, fps, tile } from '../lib/format'
+  import { codecOptionLabel, crfFor, lossyAudio, maxCrf, outputSize, videoFormats } from '../lib/media'
+  import type { AudioOptions, FileItem, VideoOptions } from '../lib/types'
+
+  const defaults: { mode: 'video' | 'audio'; v: VideoOptions; a: AudioOptions } = {
+    mode: 'video',
+    v: { format: 'mp4', codec: 'h264', quality: 'seimbang', manual: false, crf: 23, preset: 'medium', resolution: '720', custom: 540 },
+    a: { format: 'mp3', bitrate: 192, channels: 'source', sampleRate: 'source', keepMetadata: true },
+  }
+  const st = $state(load('kmb.video', defaults))
+  $effect(() => save('kmb.video', $state.snapshot(st)))
+
+  const available = (c: string) => c === 'copy' || !caps.ffmpeg || !!caps.encoders[c]
+  const codecs = $derived(videoFormats[st.v.format] ?? [])
+
+  // Keep the codec valid for the chosen container and installed encoders.
+  $effect(() => {
+    const list = videoFormats[st.v.format] ?? []
+    if (st.v.format === 'gif') return
+    if (!list.includes(st.v.codec) || !available(st.v.codec)) {
+      st.v.codec = list.find((c) => c !== 'copy' && available(c)) ?? 'copy'
+    }
+  })
+  $effect(() => {
+    const m = maxCrf(st.v.codec)
+    if (st.v.crf > m) st.v.crf = m
+  })
+
+  const isCopy = $derived(st.v.format !== 'gif' && st.v.codec === 'copy')
+  const isGif = $derived(st.v.format === 'gif')
+  const speed: Record<string, string> = { fast: 'cepat', medium: 'sedang', slow: 'lambat' }
+
+  function meta(it: FileItem): string {
+    const p: string[] = []
+    if (it.width) p.push(`${it.width}×${it.height}`)
+    if (it.videoCodec) p.push(codec(it.videoCodec))
+    if (it.fps) p.push(fps(it.fps))
+    p.push(bytes(it.size))
+    if (it.height > it.width) p.push('vertikal')
+    return p.join(' · ')
+  }
+
+  function resultLine(it: FileItem): [string, string] {
+    if (st.mode === 'audio') {
+      const f = st.a.format.toUpperCase()
+      return [lossyAudio[st.a.format] ? `${f} · ${st.a.bitrate} kbps` : `${f} · lossless`, 'Audio saja']
+    }
+    if (isGif) {
+      const [w, h] = outputSize(it.width, it.height, st.v)
+      return [`GIF · ${w}×${h}`, '12 fps']
+    }
+    if (isCopy) return [`${st.v.format.toUpperCase()} · salin`, 'Tanpa encode ulang']
+    const [w, h] = outputSize(it.width, it.height, st.v)
+    const res = w && h ? `${Math.min(w, h)}p` : ''
+    const q = st.v.manual ? `CRF ${crfFor(st.v)}` : `Kualitas ${st.v.quality}`
+    return [`${st.v.format.toUpperCase()} · ${codec(st.v.codec)}${res ? ` · ${res}` : ''}`, w && h && (w !== it.width || h !== it.height) ? `Menjadi ${w}×${h}` : q]
+  }
+
+  const pending = $derived(conv.pending())
+  const invalidCustom = $derived(st.mode === 'video' && !isCopy && st.v.resolution === 'custom' && !(st.v.custom >= 16))
+  const noFFmpeg = $derived(!hasTool('ffmpeg'))
+
+  function start() {
+    conv.start(pending, (items) =>
+      api.startVideo(items, { mode: st.mode, video: $state.snapshot(st.v), audio: $state.snapshot(st.a) }),
+    )
+  }
+
+  const totalDuration = $derived(conv.items.reduce((s, it) => s + (it.duration || 0), 0))
+</script>
+
+<PageHeader title="Konversi Video" subtitle="Ubah format, kecilkan ukuran, atau ambil audionya saja." />
+<ToolBanner ids={['ffmpeg']} why="FFmpeg dibutuhkan untuk membaca dan mengonversi video." />
+
+<div class="body">
+  {#if conv.items.length === 0}
+    <EmptyDrop
+      {conv}
+      title="Tarik & lepas video ke sini"
+      subtitle="Bisa banyak file sekaligus, atau satu folder penuh."
+      pickLabel="Pilih video"
+      formats={['MP4', 'MKV', 'MOV', 'AVI', 'WEBM', 'FLV', 'WMV', '3GP', 'TS']}
+      steps={[
+        ['Tambahkan video', 'Tarik ke sini atau klik tombol'],
+        ['Pilih format & kualitas', 'Di panel sebelah kanan'],
+        ['Klik Mulai', 'File asli tidak akan diubah'],
+      ]}
+    />
+  {:else}
+    <FileList
+      {conv}
+      noun="video"
+      dropText="Tarik & lepas video di sini"
+      formats="MP4 · MKV · MOV · AVI · WEBM · FLV · WMV · 3GP"
+      resultWidth={190}
+      rowHeight={76}
+      {meta}
+    >
+      {#snippet thumb(it)}
+        {@const t = tile(it.name)}
+        <div class="vthumb" style="background: {t.bg}; color: {t.fg}">
+          <Icon name="play" size={18} />
+          {#if it.duration}<span class="dur">{duration(it.duration)}</span>{/if}
+        </div>
+      {/snippet}
+      {#snippet result(it)}
+        {@const task = conv.task(it)}
+        {@const s = conv.state(it)}
+        {@const r = resultLine(it)}
+        <span class="r1">{r[0]}</span>
+        {#if s === 'done' && task}
+          {@const diff = it.size ? Math.round(((task.outSize - it.size) / it.size) * 100) : 0}
+          <span class="r2">{bytes(task.outSize)} <span class={diff <= 0 ? 'saved' : 'grew'}>{diff <= 0 ? `−${Math.abs(diff)}%` : `+${diff}%`}</span></span>
+        {:else if s === 'running' && task?.message}
+          <span class="r2">{task.message}</span>
+        {:else}
+          <span class="r2">{r[1]}</span>
+        {/if}
+      {/snippet}
+    </FileList>
+  {/if}
+
+  <aside class="card panel" aria-label="Pengaturan output">
+    <div class="scroll">
+      <Segmented
+        label="Jenis hasil"
+        bind:value={st.mode}
+        options={[
+          { value: 'video', label: 'Jadi video' },
+          { value: 'audio', label: 'Ambil audio saja' },
+        ]}
+      />
+
+      {#if st.mode === 'video'}
+        <div class="sec">
+          <span class="label">Format</span>
+          <Chips
+            bind:value={st.v.format}
+            columns={3}
+            options={[
+              { value: 'mp4', label: 'MP4' }, { value: 'mkv', label: 'MKV' }, { value: 'webm', label: 'WEBM' },
+              { value: 'mov', label: 'MOV' }, { value: 'avi', label: 'AVI' }, { value: 'gif', label: 'GIF' },
+            ]}
+          />
+        </div>
+
+        {#if !isGif}
+          <div class="sec">
+            <span class="label">Codec</span>
+            <Select
+              label="Codec video"
+              bind:value={st.v.codec}
+              options={codecs.map((c) => ({ value: c, label: codecOptionLabel[c] + (available(c) ? '' : ' — tidak tersedia'), disabled: !available(c) }))}
+            />
+            {#if isCopy}<p class="hint">Sangat cepat & tanpa turun kualitas, tapi resolusi dan ukuran tetap. Hanya bisa jika codec sumber cocok dengan format tujuan.</p>{/if}
+          </div>
+        {:else}
+          <p class="hint">GIF dibuat 12 fps dengan palet warna optimal. Cocok untuk klip pendek.</p>
+        {/if}
+
+        {#if !isCopy && !isGif}
+          <div class="sec">
+            <span class="label">Kualitas</span>
+            {#if !st.v.manual}
+              <Segmented
+                label="Kualitas"
+                bind:value={st.v.quality}
+                options={[
+                  { value: 'hemat', label: 'Hemat' },
+                  { value: 'seimbang', label: 'Seimbang' },
+                  { value: 'tinggi', label: 'Tinggi' },
+                ]}
+              />
+            {:else}
+              <div class="row-between">
+                <label class="t12" for="crf">CRF (angka kecil = lebih bagus & besar)</label>
+                <span class="val">{st.v.crf}</span>
+              </div>
+              <input id="crf" type="range" min="10" max={maxCrf(st.v.codec)} bind:value={st.v.crf} />
+              <Select
+                label="Kecepatan encode"
+                bind:value={st.v.preset}
+                options={[
+                  { value: 'fast', label: 'Cepat (file sedikit lebih besar)' },
+                  { value: 'medium', label: 'Sedang (disarankan)' },
+                  { value: 'slow', label: 'Lambat (file lebih kecil)' },
+                ]}
+              />
+            {/if}
+            <div class="row-between t12">
+              <span>CRF {crfFor(st.v)} · kecepatan {speed[st.v.preset]}</span>
+              <button
+                class="link"
+                onclick={() => {
+                  if (!st.v.manual) st.v.crf = crfFor(st.v)
+                  st.v.manual = !st.v.manual
+                }}>{st.v.manual ? 'Pakai pilihan mudah' : 'Atur manual'}</button
+              >
+            </div>
+          </div>
+        {/if}
+
+        {#if !isCopy}
+          <div class="sec">
+            <span class="label">Resolusi</span>
+            <Chips
+              bind:value={st.v.resolution}
+              columns={5}
+              small
+              options={[
+                { value: 'original', label: 'Asli' }, { value: '1080', label: '1080p' }, { value: '720', label: '720p' },
+                { value: '480', label: '480p' }, { value: 'custom', label: 'Lain' },
+              ]}
+            />
+            {#if st.v.resolution === 'custom'}
+              <div class="num">
+                <input
+                  class="text-input"
+                  aria-label="Sisi pendek dalam piksel"
+                  inputmode="numeric"
+                  value={st.v.custom || ''}
+                  oninput={(e) => {
+                    const v = parseInt((e.currentTarget as HTMLInputElement).value.replace(/\D/g, ''), 10)
+                    st.v.custom = isNaN(v) ? 0 : Math.min(4320, v)
+                  }}
+                /><span>px sisi pendek</span>
+              </div>
+            {/if}
+            <p class="hint">Video tidak pernah diperbesar. Video vertikal ikut disesuaikan.</p>
+          </div>
+        {/if}
+      {:else}
+        <AudioFormatPanel bind:o={st.a} />
+      {/if}
+
+      <div class="sec">
+        <span class="label">Simpan ke</span>
+        <OutputPicker kind="video" />
+      </div>
+    </div>
+
+    <RunFooter
+      kind="video"
+      running={conv.running}
+      busy={conv.starting}
+      startLabel={conv.hasUnprocessed() || pending.length === 0 ? `Mulai konversi${pending.length ? ` (${pending.length})` : ''}` : `Konversi ulang (${pending.length})`}
+      disabled={pending.length === 0 || invalidCustom || noFFmpeg}
+      disabledHint={noFFmpeg ? 'Pasang FFmpeg dulu (lihat banner di atas).' : conv.items.length === 0 ? 'Tambahkan video dulu untuk memulai.' : invalidCustom ? 'Isi resolusi yang valid (minimal 16 px).' : ''}
+      note={conv.items.length && !conv.running && totalDuration ? `Total durasi ${duration(totalDuration)}` : ''}
+      lastOutput={conv.lastOutput()}
+      queueMore={conv.running ? conv.fresh().filter((it) => !it.error).length : 0}
+      onstart={start}
+      oncancel={() => conv.cancelAll()}
+    />
+  </aside>
+</div>
+
+<style>
+  .body {
+    flex-grow: 1;
+    min-height: 0;
+    display: flex;
+    gap: 20px;
+    padding: 0 24px 24px 28px;
+  }
+  .panel {
+    width: 344px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .scroll {
+    flex-grow: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .sec {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .row-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .t12 {
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .val {
+    font-size: 14px;
+    font-weight: 800;
+  }
+  input[type='range'] {
+    width: 100%;
+    margin: 0;
+    accent-color: var(--accent);
+  }
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-text-2);
+    white-space: nowrap;
+  }
+  .link:hover {
+    color: var(--accent-text);
+  }
+  .num {
+    position: relative;
+  }
+  .num input {
+    padding-right: 110px;
+    font-weight: 700;
+  }
+  .num span {
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    font-size: 12px;
+    color: var(--text-3);
+    pointer-events: none;
+  }
+  .vthumb {
+    width: 88px;
+    height: 52px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dur {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 10px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+</style>

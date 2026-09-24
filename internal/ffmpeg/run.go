@@ -1,0 +1,155 @@
+package ffmpeg
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"kuymediabox/internal/proc"
+	"kuymediabox/internal/queue"
+)
+
+// Progress receives 0..1 progress and ffmpeg's speed string (e.g. "2.1x").
+type Progress func(p float64, speed string)
+
+// Run executes ffmpeg with args (input/output included) and reports progress based on duration.
+func Run(ctx context.Context, ffmpegPath string, args []string, duration float64, onProgress Progress) error {
+	full := append([]string{"-hide_banner", "-nostdin", "-y", "-loglevel", "error", "-progress", "pipe:1", "-nostats"}, args...)
+	cmd := proc.Command(ctx, ffmpegPath, full...)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("ffmpeg tidak bisa dijalankan: %w", err)
+	}
+
+	tail := proc.NewTail(40)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		proc.ScanLines(stderr, tail.Add)
+	}()
+	go func() {
+		defer wg.Done()
+		var speed string
+		proc.ScanLines(stdout, func(line string) {
+			k, v, ok := strings.Cut(line, "=")
+			if !ok {
+				return
+			}
+			switch k {
+			case "out_time_us", "out_time_ms": // both are microseconds in ffmpeg
+				us, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+				if err != nil || us < 0 || onProgress == nil {
+					return
+				}
+				if duration > 0 {
+					onProgress(float64(us)/1e6/duration, speed)
+				} else {
+					onProgress(-1, speed)
+				}
+			case "speed":
+				speed = strings.TrimSpace(v)
+			case "progress":
+				if strings.TrimSpace(v) == "end" && onProgress != nil {
+					onProgress(1, speed)
+				}
+			}
+		})
+	}()
+	wg.Wait()
+	err = cmd.Wait()
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if err != nil {
+		return friendly(tail.String(), err)
+	}
+	return nil
+}
+
+var reNoise = regexp.MustCompile(`^\[[^\]]+ @ [0-9a-fx]+\]\s*`)
+
+// friendly turns ffmpeg stderr into a short Indonesian message plus the raw detail.
+func friendly(stderr string, err error) error {
+	detail := strings.TrimSpace(stderr)
+	if detail == "" {
+		detail = err.Error()
+	}
+	low := strings.ToLower(detail)
+	msg := ""
+	switch {
+	case strings.Contains(low, "could not find tag for codec") ||
+		strings.Contains(low, "not currently supported in container") ||
+		strings.Contains(low, "codec not currently supported") ||
+		strings.Contains(low, "are supported for webm") ||
+		strings.Contains(low, "could not write header") ||
+		strings.Contains(low, "incompatible with output"):
+		msg = "Codec tidak cocok dengan format ini. Pilih encode ulang atau format lain."
+	case strings.Contains(low, "invalid data found when processing input") || strings.Contains(low, "moov atom not found"):
+		msg = "File rusak atau tidak bisa dibaca"
+	case strings.Contains(low, "unknown encoder") || strings.Contains(low, "encoder not found"):
+		msg = "Encoder tidak tersedia di FFmpeg ini"
+	case strings.Contains(low, "no space left"):
+		msg = "Ruang disk penuh"
+	case strings.Contains(low, "permission denied") || strings.Contains(low, "access is denied"):
+		msg = "Tidak punya izin menulis ke folder hasil"
+	case strings.Contains(low, "does not contain any stream") || strings.Contains(low, "output file does not contain"):
+		msg = "Tidak ada stream yang bisa dikonversi di file ini"
+	case strings.Contains(low, "matches no streams"):
+		msg = "File ini tidak punya audio/video yang dibutuhkan"
+	}
+	if msg == "" {
+		lines := strings.Split(detail, "\n")
+		last := strings.TrimSpace(reNoise.ReplaceAllString(lines[len(lines)-1], ""))
+		if last == "" || strings.HasPrefix(strings.ToLower(last), "conversion failed") && len(lines) > 1 {
+			last = strings.TrimSpace(reNoise.ReplaceAllString(lines[max(0, len(lines)-2)], ""))
+		}
+		msg = "Konversi gagal: " + last
+		if len([]rune(msg)) > 140 {
+			msg = string([]rune(msg)[:140]) + "…"
+		}
+	}
+	return queue.Fail(msg, detail)
+}
+
+// Encoders lists the encoder names ffmpeg supports.
+func Encoders(ctx context.Context, ffmpegPath string) (map[string]bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	out, err := proc.Output(ctx, ffmpegPath, "-hide_banner", "-encoders")
+	if err != nil {
+		return nil, err
+	}
+	set := map[string]bool{}
+	started := false
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "------") {
+			started = true
+			continue
+		}
+		if !started {
+			continue
+		}
+		f := strings.Fields(line)
+		if len(f) >= 2 {
+			set[f[1]] = true
+		}
+	}
+	if len(set) == 0 {
+		return nil, errors.New("daftar encoder kosong")
+	}
+	return set, nil
+}

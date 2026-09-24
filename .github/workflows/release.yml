@@ -1,0 +1,84 @@
+# Build KuyMediaBox dan terbitkan ke GitHub Releases setiap kali tag versi (v*) di-push.
+#   git tag v0.1.0
+#   git push origin v0.1.0
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Pasang Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
+
+      - name: Pasang NSIS (untuk installer)
+        shell: pwsh
+        run: |
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+            choco install nsis -y --no-progress
+            "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
+
+      - name: Build aplikasi + installer
+        run: wails build -clean -trimpath -tags nodynamic -ldflags "-s -w" -nsis
+
+      - name: Unit test
+        run: go test -tags nodynamic ./...
+
+      - name: Cek tipe frontend
+        working-directory: frontend
+        run: npx svelte-check --tsconfig ./tsconfig.json
+
+      - name: Siapkan file release
+        shell: pwsh
+        run: |
+          $ver = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { 'dev' }
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build/bin/KuyMediaBox.exe "dist/KuyMediaBox-$ver-windows-x64-portable.exe"
+          Compress-Archive -Path build/bin/KuyMediaBox.exe -DestinationPath "dist/KuyMediaBox-$ver-windows-x64-portable.zip"
+          $installer = Get-ChildItem build/bin -Filter '*installer*.exe' | Select-Object -First 1
+          if ($installer) { Copy-Item $installer.FullName "dist/KuyMediaBox-$ver-windows-x64-setup.exe" }
+          Get-ChildItem dist | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } | Out-File dist/SHA256SUMS.txt -Encoding utf8
+          Get-ChildItem dist
+
+      - name: Simpan sebagai artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KuyMediaBox-windows
+          path: dist/*
+
+      - name: Terbitkan GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: KuyMediaBox ${{ github.ref_name }}
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            ## Unduh
+            - **KuyMediaBox-${{ github.ref_name }}-windows-x64-setup.exe** — installer (shortcut Desktop & Start Menu, bisa di-uninstall)
+            - **KuyMediaBox-${{ github.ref_name }}-windows-x64-portable.exe** — langsung jalan tanpa instal
+            - **…-portable.zip** — versi portable dalam zip
+
+            Butuh Windows 10/11 64-bit. Saat pertama dibuka, buka **Pengaturan › Tools pendukung** lalu klik **Unduh** untuk FFmpeg, yt-dlp, dan spotDL.
+            Cek keaslian file dengan `SHA256SUMS.txt`.
