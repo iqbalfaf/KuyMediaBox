@@ -39,6 +39,7 @@ type App struct {
 	colSeq      int
 
 	notifyOK bool
+	upd      updateState
 }
 
 // NewApp creates the application state.
@@ -65,6 +66,7 @@ func (a *App) startup(ctx context.Context) {
 		a.tools.Detect(context.Background())
 		a.tools.CheckUpdates(context.Background())
 	}()
+	go a.autoCheckUpdate()
 }
 
 func (a *App) shutdown(ctx context.Context) {

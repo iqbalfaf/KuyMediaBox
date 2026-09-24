@@ -3,7 +3,7 @@ import * as App from '../../wailsjs/go/main/App'
 import * as RT from '../../wailsjs/runtime/runtime'
 import type {
   AudioOptions, Capabilities, Collection, DownloadOptions, FileItem, ImageOptions, JobRef, Link,
-  Settings, TaskInfo, ToolStatus, VideoOptions,
+  Settings, TaskInfo, ToolStatus, UpdateInfo, VideoOptions,
 } from './types'
 
 const call = App as any
@@ -31,6 +31,9 @@ export const api = {
   startAudio: (items: { id: string; path: string }[], o: AudioOptions): Promise<JobRef[]> => call.StartAudio(items, o),
   getDefaultDirs: (): Promise<Record<string, string>> => call.GetDefaultDirs(),
   outputFolder: (kind: string): Promise<string> => call.OutputFolder(kind),
+  getVersion: (): Promise<string> => call.GetVersion(),
+  checkUpdate: (): Promise<UpdateInfo> => call.CheckUpdate(),
+  installUpdate: (): Promise<void> => call.InstallUpdate(),
 
   listTasks: (): Promise<TaskInfo[]> => call.ListTasks(),
   cancelTask: (id: string): Promise<void> => call.CancelTask(id),

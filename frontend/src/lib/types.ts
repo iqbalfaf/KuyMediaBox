@@ -85,7 +85,20 @@ export interface Settings {
   conflict: 'rename' | 'skip' | 'overwrite'
   notify: boolean
   skipDownloaded: boolean
+  autoUpdate: boolean
   toolPaths: Record<string, string>
+}
+
+export interface UpdateInfo {
+  current: string
+  latest: string
+  available: boolean
+  notes: string
+  url: string
+  publishedAt: string
+  mode: 'portable' | 'installer'
+  assetName: string
+  assetSize: number
 }
 
 export interface ToolStatus {
