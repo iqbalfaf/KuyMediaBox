@@ -26,11 +26,40 @@ export interface LinkRow {
 
 const youtubeDefaults: DownloadOptions = {
   mode: 'video', quality: '1080', container: 'mp4', audioFormat: 'mp3', audioQuality: 'auto',
-  embed: true, skipExisting: true, numbering: true,
+  embed: true, skipExisting: true, numbering: true, imageFormat: 'original',
 }
 const spotifyDefaults: DownloadOptions = {
   mode: 'audio', quality: '1080', container: 'mp4', audioFormat: 'mp3', audioQuality: 'auto',
-  embed: true, skipExisting: true, numbering: true,
+  embed: true, skipExisting: true, numbering: true, imageFormat: 'original',
+}
+const socialDefaults: DownloadOptions = {
+  mode: 'video', quality: 'best', container: 'mp4', audioFormat: 'mp3', audioQuality: 'auto',
+  embed: true, skipExisting: true, numbering: false, imageFormat: 'original',
+}
+
+/** TikTok, Instagram and Facebook. */
+export function isSocial(source: string): boolean {
+  return source === 'tiktok' || source === 'instagram' || source === 'facebook'
+}
+
+export const sourceName: Record<string, string> = {
+  youtube: 'YouTube', spotify: 'Spotify', tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook', other: 'Web',
+}
+
+/** Short badge class per source. */
+export const sourceClass: Record<string, string> = {
+  youtube: 'yt', spotify: 'sp', tiktok: 'tt', instagram: 'ig', facebook: 'fb', other: 'yt',
+}
+
+/** "3 foto · 1 video · musik" for a social post. */
+export function kindSummary(entries: Entry[]): string {
+  const n = { video: 0, audio: 0, image: 0 }
+  for (const e of entries) n[e.kind === 'image' ? 'image' : e.kind === 'audio' ? 'audio' : 'video']++
+  const parts: string[] = []
+  if (n.image) parts.push(`${n.image} ${L('foto', n.image === 1 ? 'photo' : 'photos')}`)
+  if (n.video) parts.push(`${n.video} video${L('', n.video === 1 ? '' : 's')}`)
+  if (n.audio) parts.push(L('musik', 'sound'))
+  return parts.join(' · ')
 }
 
 export const dl = $state<{ rows: LinkRow[]; active: string; input: string; starting: boolean }>({
@@ -47,6 +76,7 @@ export function activeRow(): LinkRow | undefined {
 }
 
 function optsKey(source: string) {
+  if (isSocial(source)) return 'kmb.dl.social'
   return source === 'spotify' ? 'kmb.dl.spotify' : 'kmb.dl.youtube'
 }
 
@@ -56,6 +86,7 @@ export function rememberOpts(row: LinkRow) {
 
 export const typeLabel: Record<string, string> = {
   video: 'Video', playlist: 'Playlist', channel: 'Channel', get track() { return L('Lagu', 'Track') }, album: 'Album', unknown: 'Link',
+  post: 'Post', get profile() { return L('Profil', 'Profile') },
 }
 
 export const tabLabel: Record<string, string> = { get videos() { return L('Video', 'Videos') }, shorts: 'Shorts', streams: 'Live' }
@@ -70,7 +101,7 @@ export async function addLinks(text: string) {
     return
   }
   if (links.length === 0) {
-    toast(L('Tidak ada link yang dikenali. Tempel link YouTube atau Spotify.', 'No recognizable links. Paste a YouTube or Spotify link.'), 'err')
+    toast(L('Tidak ada link yang dikenali. Tempel link YouTube, TikTok, Instagram, Facebook, atau Spotify.', 'No recognizable links. Paste a YouTube, TikTok, Instagram, Facebook or Spotify link.'), 'err')
     return
   }
   const known = new Set(dl.rows.map((r) => r.link.url))
@@ -78,7 +109,7 @@ export async function addLinks(text: string) {
   for (const link of links) {
     if (known.has(link.url)) continue
     known.add(link.url)
-    const defaults = link.source === 'spotify' ? spotifyDefaults : youtubeDefaults
+    const defaults = isSocial(link.source) ? socialDefaults : link.source === 'spotify' ? spotifyDefaults : youtubeDefaults
     const opts = load(optsKey(link.source), defaults)
     if (settings.value) opts.skipExisting = opts.skipExisting ?? settings.value.skipDownloaded
     const row: LinkRow = {
@@ -116,7 +147,7 @@ export async function analyze(id: string) {
   row.error = ''
   if (row.link.type === 'unknown') {
     row.status = 'error'
-    row.error = row.link.source === 'spotify' ? L('Gunakan link lagu, album, atau playlist Spotify', 'Use a Spotify track, album or playlist link') : L('Link tidak dikenali', 'Link not recognized')
+    row.error = unknownLinkText(row.link.source)
     return
   }
   try {
@@ -142,6 +173,20 @@ export async function analyze(id: string) {
     r.status = 'error'
     r.error = errText(e)
   }
+}
+
+function unknownLinkText(source: string): string {
+  switch (source) {
+    case 'spotify':
+      return L('Gunakan link lagu, album, atau playlist Spotify', 'Use a Spotify track, album or playlist link')
+    case 'tiktok':
+      return L('Gunakan link video, foto, atau profil TikTok', 'Use a TikTok video, photo or profile link')
+    case 'instagram':
+      return L('Gunakan link post atau reel Instagram (story & profil butuh login)', 'Use an Instagram post or reel link (stories & profiles need a login)')
+    case 'facebook':
+      return L('Gunakan link video, reel, atau foto Facebook', 'Use a Facebook video, reel or photo link')
+  }
+  return L('Link tidak dikenali', 'Link not recognized')
 }
 
 export function removeRow(id: string) {

@@ -126,7 +126,7 @@
           <Switch
             checked={settings.value.downloadSubfolders}
             onchange={(v) => saveSettings({ downloadSubfolders: v })}
-            label={L('Subfolder otomatis untuk playlist, channel & album', 'Automatic subfolders for playlists, channels & albums')}
+            label={L('Subfolder otomatis untuk playlist, channel, album & carousel', 'Automatic subfolders for playlists, channels, albums & carousels')}
             hint={L('Contoh: Downloads › KuyMediaBox › Nama Playlist', 'Example: Downloads › KuyMediaBox › Playlist Name')}
           />
           <p class="hint">

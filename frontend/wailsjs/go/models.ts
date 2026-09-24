@@ -76,6 +76,7 @@ export namespace downloader {
 	    index: number;
 	    thumbnail: string;
 	    tab: string;
+	    kind: string;
 	    archived: boolean;
 	    unavailable: boolean;
 	
@@ -95,6 +96,7 @@ export namespace downloader {
 	        this.index = source["index"];
 	        this.thumbnail = source["thumbnail"];
 	        this.tab = source["tab"];
+	        this.kind = source["kind"];
 	        this.archived = source["archived"];
 	        this.unavailable = source["unavailable"];
 	    }
@@ -151,6 +153,8 @@ export namespace downloader {
 	    type: string;
 	    url: string;
 	    id: string;
+	    photo: boolean;
+	    short: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Link(source);
@@ -162,6 +166,8 @@ export namespace downloader {
 	        this.type = source["type"];
 	        this.url = source["url"];
 	        this.id = source["id"];
+	        this.photo = source["photo"];
+	        this.short = source["short"];
 	    }
 	}
 	export class Options {
@@ -173,6 +179,7 @@ export namespace downloader {
 	    embed: boolean;
 	    skipExisting: boolean;
 	    numbering: boolean;
+	    imageFormat: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Options(source);
@@ -188,6 +195,7 @@ export namespace downloader {
 	        this.embed = source["embed"];
 	        this.skipExisting = source["skipExisting"];
 	        this.numbering = source["numbering"];
+	        this.imageFormat = source["imageFormat"];
 	    }
 	}
 

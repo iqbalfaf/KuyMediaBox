@@ -126,11 +126,15 @@ export interface Capabilities {
   encoders: Record<string, boolean>
 }
 
+export type Source = 'youtube' | 'spotify' | 'tiktok' | 'instagram' | 'facebook' | 'other'
+
 export interface Link {
-  source: 'youtube' | 'spotify' | 'other' | ''
-  type: 'video' | 'playlist' | 'channel' | 'track' | 'album' | 'unknown'
+  source: Source | ''
+  type: 'video' | 'playlist' | 'channel' | 'track' | 'album' | 'post' | 'profile' | 'unknown'
   url: string
   id: string
+  photo: boolean
+  short: boolean
 }
 
 export interface Entry {
@@ -144,13 +148,14 @@ export interface Entry {
   index: number
   thumbnail: string
   tab: string
+  kind: '' | 'video' | 'audio' | 'image'
   archived: boolean
   unavailable: boolean
 }
 
 export interface Collection {
   key: string
-  source: 'youtube' | 'spotify' | 'other'
+  source: Source
   type: string
   url: string
   title: string
@@ -169,6 +174,7 @@ export interface DownloadOptions {
   embed: boolean
   skipExisting: boolean
   numbering: boolean
+  imageFormat: 'original' | 'jpg'
 }
 
 export interface JobRef {

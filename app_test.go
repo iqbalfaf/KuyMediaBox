@@ -54,4 +54,16 @@ func TestCollectionDir(t *testing.T) {
 	if got := collectionDir(`D:\Unduh`, video, true); got != `D:\Unduh` {
 		t.Errorf("single video: %s", got)
 	}
+	post := &downloader.Collection{Type: downloader.TypePost, Title: "Liburan 100%", Entries: []downloader.Entry{{ID: "a"}}}
+	if got := collectionDir(`D:\Unduh`, post, true); got != `D:\Unduh` {
+		t.Errorf("single-item post: %s", got)
+	}
+	post.Entries = append(post.Entries, downloader.Entry{ID: "b"})
+	if got := collectionDir(`D:\Unduh`, post, true); got != filepath.Join(`D:\Unduh`, "Liburan 100") {
+		t.Errorf("carousel subfolder: %s", got)
+	}
+	profile := &downloader.Collection{Type: downloader.TypeProfile, Title: "@hullcity"}
+	if got := collectionDir(`D:\Unduh`, profile, true); got != filepath.Join(`D:\Unduh`, "TikTok @hullcity") {
+		t.Errorf("profile subfolder: %s", got)
+	}
 }

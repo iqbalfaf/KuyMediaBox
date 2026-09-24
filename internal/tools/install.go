@@ -50,10 +50,41 @@ func latestRelease(ctx context.Context, repo string) (*ghRelease, error) {
 	return &rel, nil
 }
 
-// CheckUpdates asks GitHub for the newest yt-dlp and spotDL versions.
+// gallery-dl publishes its Windows builds on Codeberg (the GitHub repository has no assets).
+const galleryDLReleases = "https://codeberg.org/api/v1/repos/mikf/gallery-dl/releases/latest"
+
+// latestCodeberg reads the newest release of a Codeberg (Forgejo) repository.
+func latestCodeberg(ctx context.Context, apiURL string) (*ghRelease, error) {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Accept", "application/json")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf(i18n.L("Codeberg menjawab %s", "Codeberg replied %s"), resp.Status)
+	}
+	var rel ghRelease // Forgejo uses the same field names as GitHub
+	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+		return nil, err
+	}
+	return &rel, nil
+}
+
+// CheckUpdates asks GitHub/Codeberg for the newest yt-dlp, spotDL and gallery-dl versions.
 func (m *Manager) CheckUpdates(ctx context.Context) {
-	for id, repo := range map[string]string{YtDlp: "yt-dlp/yt-dlp", SpotDL: "spotDL/spotify-downloader"} {
-		rel, err := latestRelease(ctx, repo)
+	for id, repo := range map[string]string{YtDlp: "yt-dlp/yt-dlp", SpotDL: "spotDL/spotify-downloader", GalleryDL: ""} {
+		var rel *ghRelease
+		var err error
+		if id == GalleryDL {
+			rel, err = latestCodeberg(ctx, galleryDLReleases)
+		} else {
+			rel, err = latestRelease(ctx, repo)
+		}
 		if err != nil {
 			continue
 		}
@@ -136,6 +167,17 @@ func (m *Manager) install(ctx context.Context, id string) error {
 			}
 		}
 		return errors.New(i18n.L("file spotDL untuk Windows tidak ditemukan di rilis terbaru", "spotDL for Windows not found in the latest release"))
+	case GalleryDL:
+		rel, err := latestCodeberg(ctx, galleryDLReleases)
+		if err != nil {
+			return fmt.Errorf(i18n.L("tidak bisa membaca rilis gallery-dl: %w", "can't read the gallery-dl release: %w"), err)
+		}
+		for _, a := range rel.Assets {
+			if strings.EqualFold(a.Name, "gallery-dl.exe") {
+				return downloadFile(ctx, a.URL, filepath.Join(dir, "gallery-dl.exe"), progress)
+			}
+		}
+		return errors.New(i18n.L("file gallery-dl untuk Windows tidak ditemukan di rilis terbaru", "gallery-dl for Windows not found in the latest release"))
 	}
 	return errors.New(i18n.L("tool tidak dikenal", "unknown tool"))
 }
@@ -155,60 +197,112 @@ func downloadFile(ctx context.Context, url, dest string, progress func(float64))
 	return nil
 }
 
+// fetchAttempts is how often an interrupted download is resumed before giving up.
+var fetchAttempts = 8
+
+// fetch downloads url to dest. When the connection drops it resumes where it stopped
+// (HTTP Range), which matters for big tools on slow or flaky connections.
 func fetch(ctx context.Context, url, dest string, progress func(float64)) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("User-Agent", userAgent)
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		return fmt.Errorf(i18n.L("gagal mengunduh, periksa koneksi internet: %w", "download failed, check your internet connection: %w"), err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf(i18n.L("gagal mengunduh (%s)", "download failed (%s)"), resp.Status)
-	}
 	f, err := os.Create(dest)
 	if err != nil {
 		return err
 	}
-	total := resp.ContentLength
-	var done int64
-	buf := make([]byte, 256*1024)
-	last := time.Now()
-	for {
-		n, rerr := resp.Body.Read(buf)
-		if n > 0 {
-			if _, werr := f.Write(buf[:n]); werr != nil {
+	var (
+		done    int64
+		total   int64 = -1
+		lastErr error
+		last    = time.Now()
+	)
+	for attempt := 0; attempt < fetchAttempts; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
 				f.Close()
-				return werr
-			}
-			done += int64(n)
-			if total > 0 && time.Since(last) > 200*time.Millisecond {
-				progress(float64(done) / float64(total) * 0.95)
-				last = time.Now()
+				return ctx.Err()
+			case <-time.After(time.Duration(attempt) * time.Second):
 			}
 		}
-		if rerr == io.EOF {
-			break
-		}
-		if rerr != nil {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
 			f.Close()
+			return err
+		}
+		req.Header.Set("User-Agent", userAgent)
+		if done > 0 {
+			req.Header.Set("Range", fmt.Sprintf("bytes=%d-", done))
+		}
+		resp, err := httpClient.Do(req)
+		if err != nil {
 			if ctx.Err() != nil {
+				f.Close()
 				return ctx.Err()
 			}
-			return fmt.Errorf(i18n.L("unduhan terputus: %w", "download interrupted: %w"), rerr)
+			lastErr = fmt.Errorf(i18n.L("gagal mengunduh, periksa koneksi internet: %w", "download failed, check your internet connection: %w"), err)
+			continue
+		}
+		switch {
+		case resp.StatusCode == http.StatusPartialContent && done > 0:
+			if total < 0 && resp.ContentLength >= 0 {
+				total = done + resp.ContentLength
+			}
+		case resp.StatusCode == http.StatusOK:
+			// Fresh start (first attempt, or the server ignored the Range header).
+			if done > 0 {
+				if _, err := f.Seek(0, io.SeekStart); err != nil {
+					resp.Body.Close()
+					f.Close()
+					return err
+				}
+				if err := f.Truncate(0); err != nil {
+					resp.Body.Close()
+					f.Close()
+					return err
+				}
+				done = 0
+			}
+			total = resp.ContentLength
+		default:
+			resp.Body.Close()
+			f.Close()
+			return fmt.Errorf(i18n.L("gagal mengunduh (%s)", "download failed (%s)"), resp.Status)
+		}
+		buf := make([]byte, 256*1024)
+		var rerr error
+		for {
+			var n int
+			n, rerr = resp.Body.Read(buf)
+			if n > 0 {
+				if _, werr := f.Write(buf[:n]); werr != nil {
+					resp.Body.Close()
+					f.Close()
+					return werr
+				}
+				done += int64(n)
+				if total > 0 && time.Since(last) > 200*time.Millisecond {
+					progress(float64(done) / float64(total) * 0.95)
+					last = time.Now()
+				}
+			}
+			if rerr != nil {
+				break
+			}
+		}
+		resp.Body.Close()
+		if ctx.Err() != nil {
+			f.Close()
+			return ctx.Err()
+		}
+		if rerr == io.EOF && (total < 0 || done == total) {
+			return f.Close()
+		}
+		if rerr == io.EOF {
+			lastErr = errors.New(i18n.L("unduhan tidak lengkap", "incomplete download"))
+		} else {
+			lastErr = fmt.Errorf(i18n.L("unduhan terputus: %w", "download interrupted: %w"), rerr)
 		}
 	}
-	if total > 0 && done != total {
-		f.Close()
-		return errors.New(i18n.L("unduhan tidak lengkap", "incomplete download"))
-	}
-	return f.Close()
+	f.Close()
+	return lastErr
 }
 
 // downloadZip fetches a zip and extracts the named files (matched by base name) into dir.
