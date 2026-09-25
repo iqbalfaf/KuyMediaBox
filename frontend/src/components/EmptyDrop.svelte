@@ -64,7 +64,7 @@
     gap: 18px;
     border: 2px dashed var(--border-strong);
     border-radius: 14px;
-    background: #161a20;
+    background: var(--canvas);
     padding: 20px;
   }
   .big-ic {

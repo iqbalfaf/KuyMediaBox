@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -12,6 +13,8 @@ import (
 
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"kuymediabox/internal/appdir"
+	"kuymediabox/internal/config"
 	"kuymediabox/internal/ffmpeg"
 	"kuymediabox/internal/i18n"
 	"kuymediabox/internal/imageconv"
@@ -56,28 +59,31 @@ func acceptExt(kind, ext string) bool {
 
 // FileItem is a file added to a converter page.
 type FileItem struct {
-	ID            string  `json:"id"`
-	Path          string  `json:"path"`
-	Name          string  `json:"name"`
-	Ext           string  `json:"ext"`
-	Size          int64   `json:"size"`
-	Width         int     `json:"width"`
-	Height        int     `json:"height"`
-	Duration      float64 `json:"duration"`
-	Format        string  `json:"format"`
-	VideoCodec    string  `json:"videoCodec"`
-	FPS           float64 `json:"fps"`
-	AudioCodec    string  `json:"audioCodec"`
-	SampleRate    int     `json:"sampleRate"`
-	BitsPerSample int     `json:"bitsPerSample"`
-	Channels      int     `json:"channels"`
-	HasVideo      bool    `json:"hasVideo"`
-	HasAudio      bool    `json:"hasAudio"`
-	HasCover      bool    `json:"hasCover"`
-	Pages         int     `json:"pages"`
-	Encrypted     bool    `json:"encrypted"` // PDF uses a password or permissions
-	Locked        bool    `json:"locked"`    // PDF needs a password to open
-	Error         string  `json:"error"`
+	ID            string            `json:"id"`
+	Path          string            `json:"path"`
+	Name          string            `json:"name"`
+	Ext           string            `json:"ext"`
+	Size          int64             `json:"size"`
+	Width         int               `json:"width"`
+	Height        int               `json:"height"`
+	Duration      float64           `json:"duration"`
+	Format        string            `json:"format"`
+	VideoCodec    string            `json:"videoCodec"`
+	FPS           float64           `json:"fps"`
+	AudioCodec    string            `json:"audioCodec"`
+	SampleRate    int               `json:"sampleRate"`
+	BitsPerSample int               `json:"bitsPerSample"`
+	Channels      int               `json:"channels"`
+	HasVideo      bool              `json:"hasVideo"`
+	HasAudio      bool              `json:"hasAudio"`
+	HasCover      bool              `json:"hasCover"`
+	Pages         int               `json:"pages"`
+	Encrypted     bool              `json:"encrypted"` // PDF uses a password or permissions
+	Locked        bool              `json:"locked"`    // PDF needs a password to open
+	SubCodec      string            `json:"subCodec"`  // first subtitle track inside the file
+	SubFile       string            `json:"subFile"`   // subtitle file next to the video
+	Tags          map[string]string `json:"tags"`      // audio: title, artist, album, …
+	Error         string            `json:"error"`
 }
 
 const maxFiles = 5000
@@ -208,6 +214,15 @@ func (a *App) describe(kind, path, ffprobe string) FileItem {
 	it.Format, it.VideoCodec, it.FPS = info.Format, info.VideoCodec, info.FPS
 	it.AudioCodec, it.SampleRate, it.BitsPerSample, it.Channels = info.AudioCodec, info.SampleRate, info.BitsPerSample, info.Channels
 	it.HasVideo, it.HasAudio, it.HasCover = info.HasVideo, info.HasAudio, info.CoverIndex >= 0
+	it.SubCodec, it.Tags = info.SubCodec, map[string]string{}
+	for _, k := range []string{"title", "artist", "album", "album_artist", "date", "genre", "track"} {
+		if v := info.Tags[k]; v != "" {
+			it.Tags[k] = v
+		}
+	}
+	if kind == queue.KindVideo {
+		it.SubFile = mediaconv.FindSubtitle(path)
+	}
 	switch {
 	case kind == queue.KindVideo && !info.HasVideo:
 		it.Error = i18n.L("Tidak ada video di file ini", "This file has no video")
@@ -262,8 +277,16 @@ func (a *App) PickFolder(kind string) ([]FileItem, error) {
 
 // JobItem identifies a file to convert.
 type JobItem struct {
-	ID   string `json:"id"`
-	Path string `json:"path"`
+	ID   string          `json:"id"`
+	Path string          `json:"path"`
+	Tags *mediaconv.Tags `json:"tags,omitempty"` // audio tag editor
+}
+
+func fileSize(p string) int64 {
+	if st, err := os.Stat(p); err == nil {
+		return st.Size()
+	}
+	return 0
 }
 
 // JobRef links a page item to its queue task.
@@ -288,12 +311,20 @@ func (a *App) resolveOutput(kind string) (naming.OutputSpec, error) {
 
 // convertTask wraps the reserve → temp → commit dance shared by all converters.
 func (a *App) convertTask(item JobItem, out naming.OutputSpec, ext string, work func(ctx context.Context, tmp string, r queue.Reporter) error) queue.RunFunc {
+	return a.convertTaskSuffix(item, out, "", ext, work)
+}
+
+// convertTaskSuffix is convertTask with a fixed name suffix ("" = the user's suffix).
+func (a *App) convertTaskSuffix(item JobItem, out naming.OutputSpec, suffix, ext string, work func(ctx context.Context, tmp string, r queue.Reporter) error) queue.RunFunc {
 	return func(ctx context.Context, r queue.Reporter) error {
 		if _, err := os.Stat(item.Path); err != nil {
 			return queue.Fail(i18n.L("File asli tidak ditemukan (dipindah atau dihapus?)", "Source file not found (moved or deleted?)"), err.Error())
 		}
 		s := a.cfg.Get()
-		target, release, err := a.namer.Reserve(item.Path, out, s.Suffix, ext, s.Conflict)
+		if suffix == "" {
+			suffix = s.Suffix
+		}
+		target, release, err := a.namer.Reserve(item.Path, out, suffix, ext, s.Conflict)
 		if errors.Is(err, naming.ErrExists) {
 			r.SetOutput(target, 0)
 			return queue.Skip(i18n.L("File hasil sudah ada", "Output file already exists"))
@@ -333,7 +364,7 @@ func (a *App) StartImage(items []JobItem, o imageconv.Options) ([]JobRef, error)
 	specs := make([]queue.Spec, len(items))
 	for i, it := range items {
 		it := it
-		specs[i] = queue.Spec{Title: filepath.Base(it.Path), Run: a.convertTask(it, out, o.Format, func(ctx context.Context, tmp string, r queue.Reporter) error {
+		specs[i] = queue.Spec{Title: filepath.Base(it.Path), Input: it.Path, InSize: fileSize(it.Path), Run: a.convertTask(it, out, o.Format, func(ctx context.Context, tmp string, r queue.Reporter) error {
 			r.Message(i18n.L("Mengonversi…", "Converting…"))
 			if err := imageconv.Convert(ctx, it.Path, tmp, o, ffmpegPath, r.Progress); err != nil {
 				if ctx.Err() != nil {
@@ -349,12 +380,18 @@ func (a *App) StartImage(items []JobItem, o imageconv.Options) ([]JobRef, error)
 
 // VideoJob is what the Video page sends.
 type VideoJob struct {
-	Mode  string                 `json:"mode"` // video | audio
-	Video mediaconv.VideoOptions `json:"video"`
-	Audio mediaconv.AudioOptions `json:"audio"`
+	Mode        string                 `json:"mode"` // video | audio | merge | frames
+	Video       mediaconv.VideoOptions `json:"video"`
+	Audio       mediaconv.AudioOptions `json:"audio"`
+	FrameEvery  float64                `json:"frameEvery"`  // frames: seconds between pictures
+	FrameFormat string                 `json:"frameFormat"` // frames: jpg | png
 }
 
-// StartVideo queues video conversions (or audio extraction).
+func errNoFFmpeg() error {
+	return errors.New(i18n.L("FFmpeg belum terpasang. Buka Pengaturan untuk mengunduhnya.", "FFmpeg is not installed. Open Settings to download it."))
+}
+
+// StartVideo queues video conversions (or audio extraction, joining, frame export).
 func (a *App) StartVideo(items []JobItem, job VideoJob) ([]JobRef, error) {
 	out, err := a.resolveOutput(queue.KindVideo)
 	if err != nil {
@@ -362,79 +399,309 @@ func (a *App) StartVideo(items []JobItem, job VideoJob) ([]JobRef, error) {
 	}
 	ff, probe := a.tools.Path(tools.FFmpeg), a.tools.Path(tools.FFprobe)
 	if ff == "" || probe == "" {
-		return nil, errors.New(i18n.L("FFmpeg belum terpasang. Buka Pengaturan untuk mengunduhnya.", "FFmpeg is not installed. Open Settings to download it."))
+		return nil, errNoFFmpeg()
 	}
 	job.Video.Normalize()
 	job.Audio.Normalize()
-	enc := a.encoders()
-	if job.Mode != "audio" && job.Video.Codec != "copy" && job.Video.Format != "gif" && mediaconv.PickEncoder(job.Video.Codec, enc) == "" {
-		return nil, fmt.Errorf(i18n.L("Encoder %s tidak tersedia di FFmpeg ini. Pilih codec lain.", "The %s encoder isn't available in this FFmpeg. Choose another codec."), strings.ToUpper(job.Video.Codec))
+	if job.Audio.Format == mediaconv.FormatOriginal {
+		job.Audio.Format = "m4a"
 	}
-	kind := queue.KindVideo
+	enc := a.encoders()
+	if job.Video.HW != "" {
+		enc = a.allEncoders()
+	}
+	if job.Mode != "audio" && job.Mode != "frames" && job.Video.Codec != "copy" && job.Video.Format != "gif" {
+		if job.Video.HW != "" {
+			if e := mediaconv.HWEncoder(job.Video.HW, job.Video.Codec); e == "" || !enc[e] {
+				return nil, fmt.Errorf(i18n.L("Akselerasi GPU %s tidak mendukung codec %s di PC ini", "GPU acceleration %s doesn't support %s on this PC"), strings.ToUpper(job.Video.HW), strings.ToUpper(job.Video.Codec))
+			}
+		} else if mediaconv.PickEncoder(job.Video.Codec, enc) == "" {
+			return nil, fmt.Errorf(i18n.L("Encoder %s tidak tersedia di FFmpeg ini. Pilih codec lain.", "The %s encoder isn't available in this FFmpeg. Choose another codec."), strings.ToUpper(job.Video.Codec))
+		}
+	}
+	if err := checkTrim(job.Video.TrimStart, job.Video.TrimEnd); err != nil {
+		return nil, err
+	}
+	if job.Mode == "merge" {
+		return a.startMergeVideo(items, job, out, ff, probe, enc)
+	}
 	specs := make([]queue.Spec, len(items))
 	for i, it := range items {
 		it := it
+		spec := queue.Spec{Title: filepath.Base(it.Path), Input: it.Path, InSize: fileSize(it.Path)}
+		if job.Mode == "frames" {
+			spec.Run = a.framesTask(it, out, job, ff, probe)
+			specs[i] = spec
+			continue
+		}
 		ext := job.Video.Format
 		if job.Mode == "audio" {
 			ext = job.Audio.Format
 		}
-		specs[i] = queue.Spec{Title: filepath.Base(it.Path), Run: a.convertTask(it, out, ext, func(ctx context.Context, tmp string, r queue.Reporter) error {
+		spec.Run = a.convertTask(it, out, ext, func(ctx context.Context, tmp string, r queue.Reporter) error {
 			info, err := ffmpeg.Probe(ctx, probe, it.Path)
 			if err != nil {
 				return queue.Fail(i18n.L("File tidak bisa dibaca", "File can't be read"), err.Error())
 			}
-			var args []string
 			if job.Mode == "audio" {
-				args, err = mediaconv.AudioArgs(it.Path, tmp, info, job.Audio)
-			} else {
-				args, err = mediaconv.VideoArgs(it.Path, tmp, info, job.Video, enc)
+				o := job.Audio
+				o.TrimStart, o.TrimEnd = job.Video.TrimStart, job.Video.TrimEnd
+				plan, err := mediaconv.AudioPlan(it.Path, tmp, info, o, nil, 0, 0)
+				if err != nil {
+					return queue.Fail(err.Error(), "")
+				}
+				return runPlan(ctx, ff, plan, r)
 			}
+			vo := job.Video
+			if vo.Subtitles != "none" {
+				vo.SubFile = mediaconv.FindSubtitle(it.Path)
+				if vo.SubFile == "" && info.SubCodec == "" {
+					r.Message(i18n.L("Tidak ada subtitle — dikonversi tanpa subtitle", "No subtitles found — converting without them"))
+				}
+			}
+			work, err := os.MkdirTemp(appdir.TempDir(), "vid-*")
 			if err != nil {
 				return queue.Fail(err.Error(), "")
 			}
-			return runFFmpeg(ctx, ff, args, info.Duration, r)
-		})}
+			defer os.RemoveAll(work)
+			plan, err := mediaconv.VideoPlan(it.Path, tmp, info, vo, enc, work)
+			if err != nil {
+				return queue.Fail(err.Error(), "")
+			}
+			return runPlan(ctx, ff, plan, r)
+		})
+		specs[i] = spec
 	}
-	return refs(items, a.queue.AddMany(kind, specs)), nil
+	return refs(items, a.queue.AddMany(queue.KindVideo, specs)), nil
 }
 
-// StartAudio queues audio conversions.
-func (a *App) StartAudio(items []JobItem, o mediaconv.AudioOptions) ([]JobRef, error) {
+func checkTrim(start, end string) error {
+	s, ok1 := mediaconv.ParseTime(start)
+	e, ok2 := mediaconv.ParseTime(end)
+	if !ok1 || !ok2 {
+		return errors.New(i18n.L("Format waktu potong tidak valid. Contoh: 1:30 atau 00:01:30", "Invalid trim time. Example: 1:30 or 00:01:30"))
+	}
+	if e > 0 && e <= s {
+		return errors.New(i18n.L("Waktu akhir harus setelah waktu mulai", "The end time must be after the start time"))
+	}
+	return nil
+}
+
+// framesTask saves pictures from a video into a folder "<name>_frames".
+func (a *App) framesTask(it JobItem, out naming.OutputSpec, job VideoJob, ff, probe string) queue.RunFunc {
+	format := job.FrameFormat
+	if format != "png" {
+		format = "jpg"
+	}
+	suffix := i18n.L("_bingkai", "_frames")
+	return a.folderTask(it.Path, out, suffix, func(ctx context.Context, dir, name string, r queue.Reporter) ([]string, error) {
+		info, err := ffmpeg.Probe(ctx, probe, it.Path)
+		if err != nil {
+			return nil, queue.Fail(i18n.L("File tidak bisa dibaca", "File can't be read"), err.Error())
+		}
+		plan, err := mediaconv.FramesPlan(it.Path, filepath.Join(dir, name+"_%04d."+format), info, job.Video, job.FrameEvery, format)
+		if err != nil {
+			return nil, queue.Fail(err.Error(), "")
+		}
+		if err := runPlan(ctx, ff, plan, r); err != nil {
+			return nil, err
+		}
+		files, _ := filepath.Glob(filepath.Join(dir, "*."+format))
+		return files, nil
+	})
+}
+
+// startMergeVideo joins all items into one video named after the first one.
+func (a *App) startMergeVideo(items []JobItem, job VideoJob, out naming.OutputSpec, ff, probe string, enc map[string]bool) ([]JobRef, error) {
+	if len(items) < 2 {
+		return nil, errors.New(i18n.L("Tambahkan minimal 2 video untuk digabung", "Add at least 2 videos to join"))
+	}
+	paths := make([]string, len(items))
+	var size int64
+	for i, it := range items {
+		paths[i] = it.Path
+		size += fileSize(it.Path)
+	}
+	first := items[0]
+	run := a.convertTaskSuffix(first, out, i18n.L("_gabungan", "_joined"), job.Video.Format, func(ctx context.Context, tmp string, r queue.Reporter) error {
+		infos, err := probeAll(ctx, probe, paths)
+		if err != nil {
+			return err
+		}
+		plan, err := mediaconv.MergeVideoPlan(paths, infos, tmp, job.Video, enc)
+		if err != nil {
+			return queue.Fail(err.Error(), "")
+		}
+		return runPlan(ctx, ff, plan, r)
+	})
+	return a.addCombined(queue.KindVideo, items, size, run), nil
+}
+
+func probeAll(ctx context.Context, probe string, paths []string) ([]ffmpeg.Info, error) {
+	infos := make([]ffmpeg.Info, len(paths))
+	for i, p := range paths {
+		info, err := ffmpeg.Probe(ctx, probe, p)
+		if err != nil {
+			return nil, queue.Fail(fmt.Sprintf(i18n.L("File tidak bisa dibaca: %s", "File can't be read: %s"), filepath.Base(p)), err.Error())
+		}
+		infos[i] = info
+	}
+	return infos, nil
+}
+
+// addCombined queues one task made from all items; every item points at it.
+func (a *App) addCombined(kind string, items []JobItem, size int64, run queue.RunFunc) []JobRef {
+	title := fmt.Sprintf("%s (+%d)", filepath.Base(items[0].Path), len(items)-1)
+	id := a.queue.AddMany(kind, []queue.Spec{{Title: title, Input: items[0].Path, InSize: size, Run: run}})[0]
+	res := make([]JobRef, len(items))
+	for i, it := range items {
+		res[i] = JobRef{ItemID: it.ID, TaskID: id}
+	}
+	return res
+}
+
+// AudioJob is what the Audio page sends.
+type AudioJob struct {
+	Mode    string                 `json:"mode"` // convert | merge
+	Options mediaconv.AudioOptions `json:"options"`
+}
+
+// StartAudio queues audio conversions or one join of all items.
+func (a *App) StartAudio(items []JobItem, job AudioJob) ([]JobRef, error) {
 	out, err := a.resolveOutput(queue.KindAudio)
 	if err != nil {
 		return nil, err
 	}
 	ff, probe := a.tools.Path(tools.FFmpeg), a.tools.Path(tools.FFprobe)
 	if ff == "" || probe == "" {
-		return nil, errors.New(i18n.L("FFmpeg belum terpasang. Buka Pengaturan untuk mengunduhnya.", "FFmpeg is not installed. Open Settings to download it."))
+		return nil, errNoFFmpeg()
 	}
+	o := job.Options
 	o.Normalize()
+	if err := checkTrim(o.TrimStart, o.TrimEnd); err != nil {
+		return nil, err
+	}
+	if job.Mode == "merge" {
+		return a.startMergeAudio(items, o, out, ff, probe)
+	}
 	specs := make([]queue.Spec, len(items))
 	for i, it := range items {
 		it := it
-		specs[i] = queue.Spec{Title: filepath.Base(it.Path), Run: a.convertTask(it, out, o.Format, func(ctx context.Context, tmp string, r queue.Reporter) error {
+		ext := o.Format
+		if ext == mediaconv.FormatOriginal {
+			ext = strings.TrimPrefix(strings.ToLower(filepath.Ext(it.Path)), ".")
+		}
+		specs[i] = queue.Spec{Title: filepath.Base(it.Path), Input: it.Path, InSize: fileSize(it.Path), Run: a.convertTask(it, out, ext, func(ctx context.Context, tmp string, r queue.Reporter) error {
 			info, err := ffmpeg.Probe(ctx, probe, it.Path)
 			if err != nil {
 				return queue.Fail(i18n.L("File tidak bisa dibaca", "File can't be read"), err.Error())
 			}
-			args, err := mediaconv.AudioArgs(it.Path, tmp, info, o)
+			var lead, trail float64
+			if o.RemoveSilence {
+				r.Message(i18n.L("Mencari bagian hening…", "Looking for silence…"))
+				r.Progress(-1)
+				if lead, trail, err = ffmpeg.Silence(ctx, ff, it.Path, -50, info.Duration); err != nil {
+					return err
+				}
+			}
+			plan, err := mediaconv.AudioPlan(it.Path, tmp, info, o, it.Tags, lead, trail)
 			if err != nil {
 				return queue.Fail(err.Error(), "")
 			}
-			return runFFmpeg(ctx, ff, args, info.Duration, r)
+			return runPlan(ctx, ff, plan, r)
 		})}
 	}
 	return refs(items, a.queue.AddMany(queue.KindAudio, specs)), nil
 }
 
-func runFFmpeg(ctx context.Context, ff string, args []string, duration float64, r queue.Reporter) error {
-	r.Message(i18n.L("Mengonversi…", "Converting…"))
-	return ffmpeg.Run(ctx, ff, args, duration, func(p float64, speed string) {
-		r.Progress(p)
-		if speed != "" && speed != "N/A" {
-			r.Message(i18n.L("Mengonversi · ", "Converting · ") + speed)
+func (a *App) startMergeAudio(items []JobItem, o mediaconv.AudioOptions, out naming.OutputSpec, ff, probe string) ([]JobRef, error) {
+	if len(items) < 2 {
+		return nil, errors.New(i18n.L("Tambahkan minimal 2 file untuk digabung", "Add at least 2 files to join"))
+	}
+	if o.Format == mediaconv.FormatOriginal {
+		return nil, errors.New(i18n.L("Pilih format hasil untuk menggabung audio", "Pick an output format to join audio"))
+	}
+	paths := make([]string, len(items))
+	var size int64
+	for i, it := range items {
+		paths[i] = it.Path
+		size += fileSize(it.Path)
+	}
+	run := a.convertTaskSuffix(items[0], out, i18n.L("_gabungan", "_joined"), o.Format, func(ctx context.Context, tmp string, r queue.Reporter) error {
+		infos, err := probeAll(ctx, probe, paths)
+		if err != nil {
+			return err
 		}
+		plan, err := mediaconv.MergeAudioPlan(paths, infos, tmp, o)
+		if err != nil {
+			return queue.Fail(err.Error(), "")
+		}
+		return runPlan(ctx, ff, plan, r)
 	})
+	return a.addCombined(queue.KindAudio, items, size, run), nil
+}
+
+// runPlan executes a conversion plan, splitting progress over the passes.
+func runPlan(ctx context.Context, ff string, plan mediaconv.Plan, r queue.Reporter) error {
+	for _, args := range plan.Prep {
+		if err := ffmpeg.RunIn(ctx, ff, plan.Dir, args, 0, nil); err != nil {
+			return err
+		}
+	}
+	n := len(plan.Passes)
+	for i, args := range plan.Passes {
+		i := i
+		label := i18n.L("Mengonversi", "Converting")
+		if n > 1 {
+			label = fmt.Sprintf(i18n.L("Tahap %d dari %d", "Pass %d of %d"), i+1, n)
+		}
+		r.Message(label + "…")
+		err := ffmpeg.RunIn(ctx, ff, plan.Dir, args, plan.Duration, func(p float64, speed string) {
+			if p >= 0 {
+				r.Progress((float64(i) + p) / float64(n))
+			} else {
+				r.Progress(-1)
+			}
+			if speed != "" && speed != "N/A" {
+				r.Message(label + " · " + speed)
+			}
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// startWatched converts new files of a watched folder with the rule's saved settings.
+func (a *App) startWatched(rule config.WatchRule, paths []string) error {
+	items := make([]JobItem, len(paths))
+	for i, p := range paths {
+		items[i] = JobItem{ID: nextItemID(), Path: p}
+	}
+	var err error
+	switch rule.Kind {
+	case queue.KindImage:
+		var o imageconv.Options
+		if err = json.Unmarshal(rule.Options, &o); err == nil {
+			_, err = a.StartImage(items, o)
+		}
+	case queue.KindVideo:
+		var job VideoJob
+		if err = json.Unmarshal(rule.Options, &job); err == nil {
+			if job.Mode == "merge" || job.Mode == "" {
+				job.Mode = "video"
+			}
+			_, err = a.StartVideo(items, job)
+		}
+	case queue.KindAudio:
+		var job AudioJob
+		if err = json.Unmarshal(rule.Options, &job); err == nil {
+			job.Mode = "convert"
+			_, err = a.StartAudio(items, job)
+		}
+	}
+	return err
 }
 
 func refs(items []JobItem, ids []string) []JobRef {

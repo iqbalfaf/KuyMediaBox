@@ -31,9 +31,9 @@
     gap: 10px;
     padding: 12px 10px 12px 14px;
     border-radius: 12px;
-    background: #20252e;
+    background: var(--popup);
     border: 1px solid var(--border-strong);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 12px 32px var(--shadow);
     font-size: 13px;
     line-height: 1.45;
     animation: in 0.18s ease-out;

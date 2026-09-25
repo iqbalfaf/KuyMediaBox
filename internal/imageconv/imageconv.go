@@ -16,6 +16,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -48,6 +49,15 @@ type Options struct {
 	Height     int    `json:"height"`
 	Background string `json:"background"` // #rrggbb for formats without transparency
 	AutoRotate bool   `json:"autoRotate"`
+
+	KeepMetadata bool      `json:"keepMetadata"` // copy EXIF (camera, date, GPS) from JPG/PNG into JPG/PNG
+	TargetKB     int       `json:"targetKB"`     // >0: make the file at most this size
+	IcoSizes     []int     `json:"icoSizes"`     // ICO: sizes to include (16, 24, 32, 48, 64, 128, 256)
+	Rotate       int       `json:"rotate"`       // clockwise: 0 90 180 270
+	FlipH        bool      `json:"flipH"`
+	FlipV        bool      `json:"flipV"`
+	Crop         string    `json:"crop"` // "" or an aspect ratio "1:1", "16:9", "4:5", …
+	Watermark    Watermark `json:"watermark"`
 }
 
 // Formats lists the output formats.
@@ -81,6 +91,15 @@ func (o *Options) Normalize() {
 	if _, err := parseHex(o.Background); err != nil {
 		o.Background = "#ffffff"
 	}
+	o.Rotate = ((o.Rotate % 360) + 360) % 360 / 90 * 90
+	if _, _, ok := parseRatio(o.Crop); !ok {
+		o.Crop = ""
+	}
+	if o.TargetKB < 0 {
+		o.TargetKB = 0
+	}
+	o.IcoSizes = normalizeIcoSizes(o.IcoSizes)
+	o.Watermark.normalize()
 }
 
 // Size is width × height.
@@ -94,6 +113,12 @@ func TargetSize(w, h int, o Options) Size {
 	o.Normalize()
 	if w <= 0 || h <= 0 {
 		return Size{w, h}
+	}
+	if o.Rotate == 90 || o.Rotate == 270 {
+		w, h = h, w
+	}
+	if cw, ch := cropSize(w, h, o.Crop); cw > 0 {
+		w, h = cw, ch
 	}
 	nw, nh := w, h
 	switch o.ResizeMode {
@@ -121,6 +146,9 @@ func TargetSize(w, h int, o Options) Size {
 			scale := minF(float64(bw)/float64(w), float64(bh)/float64(h))
 			nw, nh = int(float64(w)*scale+0.5), int(float64(h)*scale+0.5)
 		}
+	}
+	if o.Format == "ico" && len(o.IcoSizes) > 0 {
+		return Size{o.IcoSizes[0], o.IcoSizes[0]}
 	}
 	if o.Format == "ico" && max(nw, nh) > 256 {
 		if nw >= nh {
@@ -157,37 +185,119 @@ func Convert(ctx context.Context, in, out string, o Options, ffmpegPath string, 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	progress(0.35)
+	progress(0.3)
 
+	img = transform(img, o)
 	b := img.Bounds()
-	ts := TargetSize(b.Dx(), b.Dy(), o)
+	ts := TargetSize(b.Dx(), b.Dy(), Options{Format: o.Format, ResizeMode: o.ResizeMode, Longest: o.Longest, Percent: o.Percent, Width: o.Width, Height: o.Height})
 	if ts.W != b.Dx() || ts.H != b.Dy() {
 		img = imaging.Resize(img, ts.W, ts.H, imaging.Lanczos)
+	}
+	if o.Watermark.Enabled {
+		if img, err = applyWatermark(ctx, img, o.Watermark, ffmpegPath); err != nil {
+			return err
+		}
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	progress(0.6)
+	progress(0.5)
+
+	var exif []byte
+	if o.KeepMetadata && (o.Format == "jpg" || o.Format == "png") {
+		exif = readExif(in)
+		if exif != nil && (o.AutoRotate || o.Rotate != 0 || o.FlipH || o.FlipV) {
+			exif = resetOrientation(exif) // pixels are already upright
+		}
+	}
 
 	bg, _ := parseHex(o.Background)
-	f, err := os.Create(out)
+	data, err := encodeBytes(ctx, img, o, bg, progress)
 	if err != nil {
-		return fmt.Errorf(i18n.L("tidak bisa membuat file hasil: %w", "can't create the output file: %w"), err)
-	}
-	w := bufio.NewWriterSize(f, 1<<20)
-	err = encode(w, img, o, bg)
-	if err == nil {
-		err = w.Flush()
-	}
-	if cerr := f.Close(); err == nil {
-		err = cerr
-	}
-	if err != nil {
-		_ = os.Remove(out)
 		return err
+	}
+	if exif != nil {
+		data = embedExif(data, o.Format, exif)
+	}
+	if err := os.WriteFile(out, data, 0o644); err != nil {
+		_ = os.Remove(out)
+		return fmt.Errorf(i18n.L("tidak bisa membuat file hasil: %w", "can't create the output file: %w"), err)
 	}
 	progress(1)
 	return nil
+}
+
+// encodeBytes encodes img, shrinking quality and then size until the file fits TargetKB.
+func encodeBytes(ctx context.Context, img image.Image, o Options, bg color.Color, progress func(float64)) ([]byte, error) {
+	enc := func(im image.Image, q int) ([]byte, error) {
+		oo := o
+		oo.Quality = q
+		var buf bytes.Buffer
+		if err := encode(&buf, im, oo, bg); err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
+	}
+	data, err := enc(img, o.Quality)
+	if err != nil || o.TargetKB <= 0 {
+		return data, err
+	}
+	target := o.TargetKB * 1024
+	if len(data) <= target {
+		return data, nil
+	}
+	lossy := o.Format == "jpg" || o.Format == "webp" || o.Format == "avif" || o.Format == "pdf"
+	best := data
+	for round := 0; round < 8; round++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		progress(0.5 + 0.45*float64(round)/8)
+		if lossy {
+			// Highest quality (down to 10) that fits.
+			lo, hi := 10, o.Quality
+			var fit []byte
+			for lo <= hi {
+				q := (lo + hi) / 2
+				d, err := enc(img, q)
+				if err != nil {
+					return nil, err
+				}
+				if len(d) <= target {
+					fit, lo = d, q+1
+				} else {
+					hi = q - 1
+					if len(d) < len(best) {
+						best = d
+					}
+				}
+			}
+			if fit != nil {
+				return fit, nil
+			}
+		}
+		// Still too big: make the picture smaller and try again.
+		b := img.Bounds()
+		f := math.Sqrt(float64(target)/float64(len(best))) * 0.95
+		if lossy {
+			f = math.Min(f, 0.85)
+		}
+		f = math.Max(0.3, math.Min(f, 0.95))
+		nw, nh := int(float64(b.Dx())*f), int(float64(b.Dy())*f)
+		if nw < 16 || nh < 16 {
+			break
+		}
+		img = imaging.Resize(img, nw, nh, imaging.Lanczos)
+		d, err := enc(img, o.Quality)
+		if err != nil {
+			return nil, err
+		}
+		if len(d) <= target {
+			return d, nil
+		}
+		best = d
+	}
+	return best, nil
 }
 
 // Decode reads any supported image (EXIF orientation applied); ffmpegPath may be empty.
@@ -270,6 +380,9 @@ func encode(w io.Writer, img image.Image, o Options, bg color.Color) error {
 	case "tiff":
 		return tiff.Encode(w, img, &tiff.Options{Compression: tiff.Deflate})
 	case "ico":
+		if len(o.IcoSizes) > 0 {
+			return encodeICOSizes(w, img, o.IcoSizes)
+		}
 		return encodeICO(w, img)
 	case "pdf":
 		return encodePDF(w, flatten(img, bg), o.Quality)

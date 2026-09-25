@@ -23,6 +23,7 @@ const (
 	TypeChannel  = "channel"
 	TypeTrack    = "track"
 	TypeAlbum    = "album"
+	TypeArtist   = "artist"
 	TypePost     = "post"    // one social post: video, pictures or both
 	TypeProfile  = "profile" // TikTok profile (list of posts)
 	TypeUnknown  = "unknown"
@@ -112,6 +113,8 @@ func Detect(raw string) Link {
 				return Link{Source: SourceSpotify, Type: TypeAlbum, ID: m[2], URL: norm}
 			case "playlist":
 				return Link{Source: SourceSpotify, Type: TypePlaylist, ID: m[2], URL: norm}
+			case "artist":
+				return Link{Source: SourceSpotify, Type: TypeArtist, ID: m[2], URL: norm}
 			}
 			return Link{Source: SourceSpotify, Type: TypeUnknown, URL: norm}
 		}

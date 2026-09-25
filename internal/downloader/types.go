@@ -1,5 +1,7 @@
 package downloader
 
+import "strings"
+
 // Entry is one downloadable item of a collection.
 type Entry struct {
 	ID          string  `json:"id"`
@@ -15,6 +17,7 @@ type Entry struct {
 	Kind        string  `json:"kind"` // video | audio | image (social posts); empty = video
 	Archived    bool    `json:"archived"`
 	Unavailable bool    `json:"unavailable"`
+	Source      string  `json:"source"` // Spotify: YouTube link chosen by hand ("" = automatic match)
 
 	song       *spotifySong // Spotify metadata used for tagging
 	archiveKey string       // yt-dlp archive line ("<extractor> <id>")
@@ -50,12 +53,19 @@ type Env struct {
 	JSPath      string
 	ArchivePath string
 	TempDir     string
+
+	CookiesBrowser string // read the login cookies of this browser (chrome, edge, firefox, …)
+	CookiesFile    string // or a cookies.txt file
+	SpotifyAuth    bool   // spotDL --user-auth: log in to Spotify (private playlists)
+	NameTemplate   string // YouTube & other sites: {title} {uploader} {date} {id} … ("" = built-in)
+	SpotifyTpl     string // Spotify: {artist} {title} {album} {year} {index}
+	RateLimitKB    int    // speed limit of one download in KB/s (0 = none)
 }
 
 // Options are the per-link download settings from the UI.
 type Options struct {
 	Mode         string `json:"mode"`         // video | audio
-	Quality      string `json:"quality"`      // best | 1080 | 720 | 480
+	Quality      string `json:"quality"`      // best | 2160 | 1440 | 1080 | 720 | 480
 	Container    string `json:"container"`    // mp4 | mkv
 	AudioFormat  string `json:"audioFormat"`  // mp3 | m4a | opus | flac | wav
 	AudioQuality string `json:"audioQuality"` // auto (best VBR) or a bitrate in kbps: 96 128 160 192 256 320
@@ -63,6 +73,13 @@ type Options struct {
 	SkipExisting bool   `json:"skipExisting"`
 	Numbering    bool   `json:"numbering"`   // prefix list position
 	ImageFormat  string `json:"imageFormat"` // original | jpg (pictures from social posts)
+
+	Subtitles    string `json:"subtitles"`    // none | file | embed
+	SubLangs     string `json:"subLangs"`     // e.g. "id,en"
+	SectionStart string `json:"sectionStart"` // download only part of a video ("" = from the start)
+	SectionEnd   string `json:"sectionEnd"`   // ("" = to the end)
+	SponsorBlock string `json:"sponsorBlock"` // off | mark | remove (YouTube)
+	Playlist     bool   `json:"playlist"`     // write an .m3u8 playlist for albums/playlists
 }
 
 // Normalize fills defaults.
@@ -74,7 +91,7 @@ func (o *Options) Normalize(source string) {
 		o.Mode = "video"
 	}
 	switch o.Quality {
-	case "best", "1080", "720", "480":
+	case "best", "2160", "1440", "1080", "720", "480":
 	default:
 		o.Quality = "1080"
 	}
@@ -101,6 +118,42 @@ func (o *Options) Normalize(source string) {
 	if o.AudioFormat == "flac" || o.AudioFormat == "wav" {
 		o.AudioQuality = "auto"
 	}
+	switch o.Subtitles {
+	case "file", "embed":
+	default:
+		o.Subtitles = "none"
+	}
+	o.SubLangs = cleanLangs(o.SubLangs)
+	switch o.SponsorBlock {
+	case "mark", "remove":
+	default:
+		o.SponsorBlock = "off"
+	}
+	if source != SourceYouTube {
+		o.SponsorBlock = "off"
+	}
+	o.SectionStart, o.SectionEnd = strings.TrimSpace(o.SectionStart), strings.TrimSpace(o.SectionEnd)
+}
+
+// cleanLangs keeps a comma-separated list of language codes ("id,en", "en.*").
+func cleanLangs(s string) string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		ok := p != ""
+		for _, r := range p {
+			if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '.' || r == '*' || r == '_') {
+				ok = false
+			}
+		}
+		if ok {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return "id,en"
+	}
+	return strings.Join(out, ",")
 }
 
 // Ext returns the final file extension for the options.

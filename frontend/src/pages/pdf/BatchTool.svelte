@@ -8,7 +8,7 @@
   import Icon from '../../components/Icon.svelte'
   import ToolOptions from './ToolOptions.svelte'
   import { imageUrl, pageUrl } from '../../lib/api'
-  import { toast } from '../../lib/stores/app.svelte'
+  import { hasTool, toast } from '../../lib/stores/app.svelte'
   import { convFor, ensurePasswords, pdfDrop, pdfEnv, pdfForm, pdfOpts, startBatch } from '../../lib/stores/pdf.svelte'
   import { askPassword } from '../../lib/stores/prompt.svelte'
   import { bytes, tile } from '../../lib/format'
@@ -31,7 +31,8 @@
   function blank(path: string): FileItem {
     return {
       id: `u${Date.now()}-${seq++}`, path, name: path, ext: 'url', size: 0, width: 0, height: 0, duration: 0, format: '', videoCodec: '', fps: 0,
-      audioCodec: '', sampleRate: 0, bitsPerSample: 0, channels: 0, hasVideo: false, hasAudio: false, hasCover: false, pages: 0, encrypted: false, locked: false, error: '',
+      audioCodec: '', sampleRate: 0, bitsPerSample: 0, channels: 0, hasVideo: false, hasAudio: false, hasCover: false, pages: 0, encrypted: false, locked: false,
+      subCodec: '', subFile: '', tags: null, error: '',
     }
   }
   function addUrls() {
@@ -77,6 +78,10 @@
         return L('PDF terkunci', 'Locked PDF')
       case 'unlock':
         return L('PDF terbuka', 'Unlocked PDF')
+      case 'digisign':
+        return L('PDF bertanda tangan digital', 'Digitally signed PDF')
+      case 'pdfacheck':
+        return o.pdfaCheck.flavour === '0' ? L('Cek PDF/A', 'PDF/A check') : `PDF/A-${o.pdfaCheck.flavour}`
     }
     return 'PDF'
   })
@@ -103,6 +108,11 @@
       if (!ms && !env.office.libreoffice) return L('Butuh Microsoft Office atau LibreOffice.', 'Needs Microsoft Office or LibreOffice.')
     }
     if (isWeb && env && !env.browser) return L('Butuh Microsoft Edge atau Chrome.', 'Needs Microsoft Edge or Chrome.')
+    if (tool.id === 'digisign') {
+      if (!o.digisign.certFile) return L('Pilih file sertifikat.', 'Choose a certificate file.')
+      if (!pdfForm.certPassword) return L('Isi password sertifikat.', 'Enter the certificate password.')
+    }
+    if (tool.id === 'pdfacheck' && !hasTool('verapdf')) return L('Pasang veraPDF dulu di Pengaturan.', 'Install veraPDF in Settings first.')
     return ''
   })
 
@@ -123,7 +133,7 @@
     {
       compress: L('Kompres', 'Compress'), repair: L('Perbaiki', 'Repair'), ocr: L('Jalankan OCR', 'Run OCR'), rotate: L('Putar', 'Rotate'),
       protect: L('Kunci', 'Protect'), unlock: L('Buka kunci', 'Unlock'), watermark: L('Tambah watermark', 'Add watermark'), numbers: L('Beri nomor', 'Add numbers'),
-      pdfa: L('Ubah ke PDF/A', 'Convert to PDF/A'),
+      pdfa: L('Ubah ke PDF/A', 'Convert to PDF/A'), digisign: L('Tandatangani', 'Sign'), pdfacheck: L('Validasi', 'Validate'),
     }[tool.id] ?? L('Mulai konversi', 'Start converting'),
   )
 </script>

@@ -44,7 +44,7 @@
     {/if}
   {/key}
 {:else}
-  <PageHeader title={L('Alat PDF', 'PDF Tools')} subtitle={L('29 alat PDF, semuanya diproses di komputer ini — file tidak pernah diunggah.', '29 PDF tools, all processed on this computer — files are never uploaded.')} />
+  <PageHeader title={L('Alat PDF', 'PDF Tools')} subtitle={L(`${pdfTools.length} alat PDF, semuanya diproses di komputer ini — file tidak pernah diunggah.`, `${pdfTools.length} PDF tools, all processed on this computer — files are never uploaded.`)} />
   <div class="hub">
     <div class="search">
       <Icon name="search" size={16} />
@@ -144,7 +144,7 @@
   }
   .tool:hover {
     border-color: var(--border-strong);
-    background: #1c2029;
+    background: var(--row-active);
   }
   .tool:active {
     transform: translateY(1px);

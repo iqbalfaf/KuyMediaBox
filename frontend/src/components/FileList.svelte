@@ -19,6 +19,8 @@
     meta,
     result,
     thumb,
+    actions,
+    reorder = false,
   }: {
     conv: Converter
     noun: string
@@ -29,9 +31,13 @@
     meta: (it: FileItem) => string
     result: Snippet<[FileItem]>
     thumb: Snippet<[FileItem]>
+    /** Extra per-row buttons (e.g. the tag editor). */
+    actions?: Snippet<[FileItem]>
+    /** Show move up/down buttons (order matters, e.g. joining files). */
+    reorder?: boolean
   } = $props()
 
-  const cols = $derived(`minmax(0, 1fr) ${resultWidth}px 128px 64px`)
+  const cols = $derived(`minmax(0, 1fr) ${resultWidth}px 128px ${64 + (actions ? 34 : 0) + (reorder ? 68 : 0)}px`)
 </script>
 
 <section class="card list" aria-label={L(`Daftar ${noun}`, `${noun} list`)}>
@@ -60,13 +66,13 @@
   </div>
 
   <div class="rows">
-    {#each conv.items as it (it.id)}
+    {#each conv.items as it, i (it.id)}
       {@const st = conv.state(it)}
       {@const task = conv.task(it)}
       <div class="row" class:active={st === 'running'} class:dim={st === 'canceled'} style="grid-template-columns: {cols}; height: {rowHeight}px">
         <div class="file">
           {#if it.error}
-            {@const t = { bg: '#3A1C1E', fg: '#FF8A8A' }}
+            {@const t = { bg: 'var(--err-soft)', fg: 'var(--err)' }}
             <div class="tile" style="background: {t.bg}; color: {t.fg}"><Icon name="alert" /></div>
           {:else}
             {@render thumb(it)}
@@ -91,6 +97,11 @@
         </div>
         <div><StatusCell state={st} {task} /></div>
         <div class="actions">
+          {#if reorder}
+            <button class="mini" aria-label={L('Naikkan', 'Move up')} title={L('Naikkan', 'Move up')} disabled={i === 0} onclick={() => conv.move(i, i - 1)}><Icon name="arrowUp" size={15} /></button>
+            <button class="mini" aria-label={L('Turunkan', 'Move down')} title={L('Turunkan', 'Move down')} disabled={i === conv.items.length - 1} onclick={() => conv.move(i, i + 1)}><Icon name="arrowDown" size={15} /></button>
+          {/if}
+          {#if actions}{@render actions(it)}{/if}
           {#if st === 'done' && task?.output}
             <button class="mini" aria-label={L('Tampilkan file hasil', 'Show output file')} title={L('Tampilkan file hasil', 'Show output file')} onclick={() => api.revealFile(task.output)}><Icon name="folderOpen" size={16} /></button>
           {/if}
@@ -194,7 +205,7 @@
     border-bottom: 1px solid var(--border-soft);
   }
   .row.active {
-    background: #1c2029;
+    background: var(--row-active);
   }
   .row.dim .file {
     opacity: 0.55;
@@ -290,9 +301,12 @@
     background: transparent;
     color: var(--text-3);
   }
-  .mini:hover {
+  .mini:hover:not(:disabled) {
     background: var(--surface-2);
     color: var(--text);
+  }
+  .mini:disabled {
+    opacity: 0.3;
   }
   :global(.kmb-tile) {
     width: 40px;

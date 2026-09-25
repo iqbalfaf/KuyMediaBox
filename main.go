@@ -9,7 +9,9 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 
+	"kuymediabox/internal/config"
 	"kuymediabox/internal/pdf"
+	"kuymediabox/internal/platform"
 )
 
 //go:embed all:frontend/dist
@@ -17,6 +19,13 @@ var assets embed.FS
 
 func main() {
 	app := NewApp()
+	// Window colour before the page paints, matching the saved theme.
+	bg := &options.RGBA{R: 14, G: 16, B: 20, A: 255}
+	theme := windows.Dark
+	if t := app.cfg.Get().Theme; t == config.ThemeLight || (t == config.ThemeSystem && platform.SystemLightTheme()) {
+		bg = &options.RGBA{R: 243, G: 244, B: 247, A: 255}
+		theme = windows.Light
+	}
 	err := wails.Run(&options.App{
 		Title:            "KuyMediaBox",
 		Width:            1280,
@@ -24,7 +33,7 @@ func main() {
 		MinWidth:         1100,
 		MinHeight:        700,
 		Frameless:        true,
-		BackgroundColour: &options.RGBA{R: 14, G: 16, B: 20, A: 255},
+		BackgroundColour: bg,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 			// Page and image previews for the PDF tools (/kmb/page, /kmb/img).
@@ -46,7 +55,7 @@ func main() {
 		Windows: &windows.Options{
 			WebviewIsTransparent: false,
 			WindowIsTranslucent:  false,
-			Theme:                windows.Dark,
+			Theme:                theme,
 			DisableWindowIcon:    false,
 		},
 	})

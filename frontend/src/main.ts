@@ -5,6 +5,13 @@ import '@fontsource/plus-jakarta-sans/700.css'
 import '@fontsource/plus-jakarta-sans/800.css'
 import '@fontsource/jetbrains-mono/500.css'
 import './app.css'
+
+// Theme of the last session, before settings arrive (avoids a flash of the wrong theme).
+try {
+  if (localStorage.getItem('kmb.theme') === 'light') document.documentElement.dataset.theme = 'light'
+} catch {
+  /* storage unavailable */
+}
 import { mount } from 'svelte'
 import App from './App.svelte'
 

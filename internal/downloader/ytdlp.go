@@ -25,7 +25,19 @@ func (e Env) commonArgs() []string {
 	if e.FFmpeg != "" {
 		args = append(args, "--ffmpeg-location", e.FFmpeg)
 	}
-	return args
+	return append(args, e.cookieArgs()...)
+}
+
+// cookieArgs lets yt-dlp and gallery-dl use the browser's login (age-restricted, members-only,
+// private posts). Both tools accept the same flags.
+func (e Env) cookieArgs() []string {
+	switch {
+	case e.CookiesFile != "":
+		return []string{"--cookies", e.CookiesFile}
+	case e.CookiesBrowser != "":
+		return []string{"--cookies-from-browser", e.CookiesBrowser}
+	}
+	return nil
 }
 
 type ytInfo struct {
@@ -303,8 +315,30 @@ func (e Env) ytArgs(job ytJob) []string {
 			args = append(args, "--embed-thumbnail", "--convert-thumbnails", "jpg")
 		}
 	}
+	if o.Mode == "video" && o.Subtitles != "none" && !job.NoEmbed {
+		// --embed-subs fetches the subtitles itself and deletes the .srt afterwards;
+		// --write-subs keeps them as files next to the video.
+		if o.Subtitles == "embed" {
+			args = append(args, "--embed-subs")
+		} else {
+			args = append(args, "--write-subs")
+		}
+		args = append(args, "--write-auto-subs", "--sub-langs", o.SubLangs, "--convert-subs", "srt")
+	}
+	if sec := sectionArg(o.SectionStart, o.SectionEnd); sec != "" {
+		args = append(args, "--download-sections", sec)
+	}
+	switch o.SponsorBlock {
+	case "mark":
+		args = append(args, "--sponsorblock-mark", "all")
+	case "remove":
+		args = append(args, "--sponsorblock-remove", "sponsor,selfpromo,interaction")
+	}
 	if job.Archive && e.ArchivePath != "" {
 		args = append(args, "--download-archive", e.ArchivePath)
+	}
+	if e.RateLimitKB > 0 {
+		args = append(args, "--limit-rate", strconv.Itoa(e.RateLimitKB)+"K")
 	}
 	return append(args, "--", job.URL)
 }
@@ -434,10 +468,14 @@ func DownloadYouTube(ctx context.Context, env Env, entry Entry, dir, prefix stri
 		return "", queue.Fail(i18n.L("Tidak bisa membuat folder tujuan", "Can't create the destination folder"), err.Error())
 	}
 	tpl := escapeTemplate(prefix)
-	if datePrefix {
-		tpl += "%(upload_date>%Y-%m-%d)s - "
+	if env.NameTemplate != "" {
+		tpl += YtTemplate(env.NameTemplate, entry.Index)
+	} else {
+		if datePrefix {
+			tpl += "%(upload_date>%Y-%m-%d)s - "
+		}
+		tpl += "%(title).150B"
 	}
-	tpl += "%(title).150B"
 	phases := 1
 	if o.Mode == "video" {
 		phases = 2

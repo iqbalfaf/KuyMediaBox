@@ -27,19 +27,23 @@ export interface LinkRow {
   since: string // yyyy-mm-dd
   range: string
   taskOf: Record<string, string>
+  cut: string // "1:00-2:30": download only this part (DL-13)
 }
 
 const youtubeDefaults: DownloadOptions = {
   mode: 'video', quality: '1080', container: 'mp4', audioFormat: 'mp3', audioQuality: 'auto',
   embed: true, skipExisting: true, numbering: true, imageFormat: 'original',
+  subtitles: 'none', subLangs: 'id,en', sectionStart: '', sectionEnd: '', sponsorBlock: 'off', playlist: false,
 }
 const spotifyDefaults: DownloadOptions = {
   mode: 'audio', quality: '1080', container: 'mp4', audioFormat: 'mp3', audioQuality: 'auto',
   embed: true, skipExisting: true, numbering: true, imageFormat: 'original',
+  subtitles: 'none', subLangs: 'id,en', sectionStart: '', sectionEnd: '', sponsorBlock: 'off', playlist: true,
 }
 const socialDefaults: DownloadOptions = {
   mode: 'video', quality: 'best', container: 'mp4', audioFormat: 'mp3', audioQuality: 'auto',
   embed: true, skipExisting: true, numbering: false, imageFormat: 'original',
+  subtitles: 'none', subLangs: 'id,en', sectionStart: '', sectionEnd: '', sponsorBlock: 'off', playlist: false,
 }
 
 /** TikTok, Instagram and Facebook. */
@@ -152,7 +156,7 @@ export function rowsOf(cat: Category | ''): LinkRow[] {
 }
 
 export const typeLabel: Record<string, string> = {
-  video: 'Video', playlist: 'Playlist', channel: 'Channel', get track() { return L('Lagu', 'Track') }, album: 'Album', unknown: 'Link',
+  video: 'Video', playlist: 'Playlist', channel: 'Channel', get track() { return L('Lagu', 'Track') }, album: 'Album', get artist() { return L('Artis', 'Artist') }, unknown: 'Link',
   post: 'Post', get profile() { return L('Profil', 'Profile') },
 }
 
@@ -193,6 +197,7 @@ export async function addLinks(text: string) {
       since: '',
       range: '',
       taskOf: {},
+      cut: '',
     }
     dl.rows.push(row)
     if (!firstCat) firstCat = cat
@@ -240,7 +245,7 @@ export async function analyze(id: string) {
     }
     r.col = col
     r.status = 'ready'
-    if (col.type === 'playlist' || col.type === 'album') r.range = col.entries.length ? `1-${col.entries.length}` : ''
+    if (col.type === 'playlist' || col.type === 'album' || col.type === 'artist') r.range = col.entries.length ? `1-${col.entries.length}` : ''
     if (r.link.type === 'channel') {
       // Default to the tab that has content.
       const counts = col.tabCounts ?? {}
@@ -359,7 +364,11 @@ export async function startAll() {
       const list = toQueue(row)
       if (list.length === 0) continue
       try {
-        const refs = await api.startDownloads(row.col.key, list.map((e) => e.id), $state.snapshot(rowOpts(row)) as DownloadOptions)
+        const o = $state.snapshot(rowOpts(row)) as DownloadOptions
+        const [cutStart, cutEnd] = row.cut ? row.cut.split('-').map((s) => s.trim()) : ['', '']
+        o.sectionStart = cutStart ?? ''
+        o.sectionEnd = cutEnd ?? ''
+        const refs = await api.startDownloads(row.col.key, list.map((e) => e.id), o)
         for (const r of refs) row.taskOf[r.itemId] = r.taskId
         trackBatch('download', refs.map((r) => r.taskId))
         queued += refs.length

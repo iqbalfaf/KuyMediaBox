@@ -5,6 +5,7 @@
   import { nav, toolAttention, toolState } from '../lib/stores/app.svelte'
   import { clock, summarize } from '../lib/stores/tasks.svelte'
   import { upd } from '../lib/stores/update.svelte'
+  import { after, chooseAfter } from '../lib/stores/history.svelte'
   import type { Kind, Page } from '../lib/types'
 
   const kindName = $derived<Record<Kind, string>>({ image: L('Gambar', 'Images'), video: 'Video', audio: 'Audio', download: 'Download', pdf: 'PDF' })
@@ -61,6 +62,19 @@
     </div>
     <div class="bar"><div style="width: {queue ? queue.progress * 100 : 0}%"></div></div>
     <span class="q-sub">{queue ? queue.sub : L('Belum ada tugas', 'No tasks yet')}</span>
+    <label class="after" title={L('Dijalankan sekali saat semua tugas selesai', 'Runs once when every task has finished')}>
+      <Icon name="power" size={13} />
+      <span class="al">{L('Lalu', 'Then')}</span>
+      <select
+        aria-label={L('Setelah antrian selesai', 'When the queue is done')}
+        value={after.action}
+        onchange={(e) => chooseAfter((e.currentTarget as HTMLSelectElement).value as any)}
+      >
+        <option value="none">{L('tidak ada aksi', 'do nothing')}</option>
+        <option value="sleep">{L('sleep PC', 'sleep the PC')}</option>
+        <option value="shutdown">{L('matikan PC', 'shut down the PC')}</option>
+      </select>
+    </label>
   </div>
 
   {#if upd.info?.available}
@@ -78,6 +92,9 @@
       {/if}
     </button>
   {/if}
+  <button class="item" class:active={nav.page === 'history'} onclick={() => (nav.page = 'history')}>
+    <span class="ic"><Icon name="history" /></span>{L('Riwayat', 'History')}
+  </button>
   <button class="item" class:active={nav.page === 'settings'} onclick={() => (nav.page = 'settings')}>
     <span class="ic"><Icon name="sliders" /></span>{L('Pengaturan', 'Settings')}
   </button>
@@ -141,7 +158,7 @@
     transition: background 0.15s, color 0.15s;
   }
   .item:hover {
-    background: #181c23;
+    background: var(--hover);
     color: var(--text);
   }
   .item .ic {
@@ -150,7 +167,7 @@
   }
   .item.active {
     background: var(--accent-tint);
-    color: #ffd9c8;
+    color: var(--nav-active-text);
   }
   .item.active .ic {
     color: var(--accent);
@@ -187,6 +204,32 @@
     font-size: 12px;
     color: var(--text-2);
   }
+  .after {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+    color: var(--text-3);
+  }
+  .after .al {
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .after select {
+    flex-grow: 1;
+    min-width: 0;
+    height: 26px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--surface-2);
+    color: var(--text-2);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 0 4px;
+  }
+  .after select option {
+    background: var(--popup);
+  }
   .tools-link {
     display: flex;
     align-items: center;
@@ -202,7 +245,7 @@
     text-align: left;
   }
   .tools-link:hover {
-    background: #181c23;
+    background: var(--hover);
   }
   .tools-link .dot {
     width: 8px;

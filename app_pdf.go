@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+
 	"kuymediabox/internal/appdir"
 	"kuymediabox/internal/config"
 	"kuymediabox/internal/i18n"
@@ -142,6 +144,13 @@ type PdfOptions struct {
 	Separate  bool                   `json:"separate"` // extract: one file per page
 	HTML      pdf.HTMLOptions        `json:"html"`
 	Images    pdf.ImagesOptions      `json:"images"`
+	DigiSign  pdf.DigitalSignOptions `json:"digisign"`
+	PdfaCheck PdfaCheckOptions       `json:"pdfaCheck"`
+}
+
+// PdfaCheckOptions are the settings of the PDF/A validation tool.
+type PdfaCheckOptions struct {
+	Flavour string `json:"flavour"` // 0 (what the file claims) | 1b | 2b | 3b | …
 }
 
 // tool suffixes (Indonesian, English) for results that stay PDF.
@@ -152,7 +161,8 @@ var pdfSuffix = map[string][2]string{
 	"crop": {"_dipotong", "_cropped"}, "remove": {"_dikurangi", "_pages-removed"}, "extract": {"_ekstrak", "_extracted"},
 	"organize": {"_disusun", "_organized"}, "edit": {"_diedit", "_edited"}, "sign": {"_ttd", "_signed"},
 	"redact": {"_disensor", "_redacted"}, "merge": {"_gabungan", "_merged"}, "split": {"_pisah", "_split"},
-	"pdf2img": {"_gambar", "_images"},
+	"digisign": {"_ttd-digital", "_digitally-signed"},
+	"pdf2img":  {"_gambar", "_images"},
 }
 
 func (a *App) suffixFor(tool string) string {
@@ -302,6 +312,7 @@ var pdfVerb = map[string][2]string{
 	"compress": {"Mengompres…", "Compressing…"}, "repair": {"Memperbaiki…", "Repairing…"}, "ocr": {"Mengenali teks…", "Recognising text…"},
 	"protect": {"Mengunci…", "Locking…"}, "unlock": {"Membuka kunci…", "Unlocking…"}, "split": {"Memisahkan…", "Splitting…"},
 	"merge": {"Menggabungkan…", "Merging…"}, "html": {"Membuka halaman…", "Loading the page…"}, "redact": {"Menyensor…", "Redacting…"},
+	"digisign": {"Menandatangani…", "Signing…"}, "pdfacheck": {"Memvalidasi dengan veraPDF…", "Validating with veraPDF…"},
 }
 
 func verb(tool string) string {
@@ -311,8 +322,9 @@ func verb(tool string) string {
 	return i18n.L("Memproses…", "Processing…")
 }
 
-// StartPdf queues a per-file PDF tool.
-func (a *App) StartPdf(tool string, items []PdfJob, o PdfOptions) ([]JobRef, error) {
+// StartPdf queues a per-file PDF tool. secret is the certificate password of the digital
+// signature tool (never stored).
+func (a *App) StartPdf(tool string, items []PdfJob, o PdfOptions, secret string) ([]JobRef, error) {
 	if len(items) == 0 {
 		return nil, errors.New(i18n.L("Tambahkan file dulu", "Add files first"))
 	}
@@ -328,6 +340,19 @@ func (a *App) StartPdf(tool string, items []PdfJob, o PdfOptions) ([]JobRef, err
 	case "html":
 		if env.Browser == "" {
 			return nil, errors.New(i18n.L("Microsoft Edge atau Google Chrome tidak ditemukan", "Microsoft Edge or Google Chrome was not found"))
+		}
+	case "digisign":
+		if o.DigiSign.CertFile == "" {
+			return nil, errors.New(i18n.L("Pilih file sertifikat (.pfx/.p12) dulu", "Choose a certificate file (.pfx/.p12) first"))
+		}
+		s, err := pdf.LoadSigner(o.DigiSign.CertFile, secret)
+		if err != nil {
+			return nil, err
+		}
+		a.signer = s
+	case "pdfacheck":
+		if a.tools.Path(tools.VeraPDF) == "" {
+			return nil, errors.New(i18n.L("veraPDF belum terpasang. Pasang di Pengaturan › Tools pendukung.", "veraPDF is not installed. Install it in Settings › Helper tools."))
 		}
 	}
 	tmpDir := appdir.TempDir()
@@ -359,7 +384,7 @@ func (a *App) StartPdf(tool string, items []PdfJob, o PdfOptions) ([]JobRef, err
 		if err != nil {
 			return nil, err
 		}
-		specs = append(specs, queue.Spec{Title: title, Run: func(ctx context.Context, r queue.Reporter) error {
+		specs = append(specs, queue.Spec{Title: title, Input: it.Path, InSize: fileSize(it.Path), Run: func(ctx context.Context, r queue.Reporter) error {
 			r.Message(verb(tool))
 			return run(ctx, r)
 		}})
@@ -424,10 +449,46 @@ func (a *App) pdfRun(tool string, in pdf.Input, source string, out naming.Output
 	case "pdfa":
 		return same(func(ctx context.Context, tmp string, r queue.Reporter) error {
 			res, err := pdf.ToPDFA(ctx, in, tmp, progress(r))
-			if err == nil && len(res.RasterPages) > 0 {
-				r.Message(fmt.Sprintf(i18n.L("%d halaman dijadikan gambar (font tidak tertanam)", "%d pages became images (fonts not embedded)"), len(res.RasterPages)))
+			if err != nil {
+				return err
 			}
-			return err
+			msg := ""
+			if len(res.RasterPages) > 0 {
+				msg = fmt.Sprintf(i18n.L("%d halaman dijadikan gambar (font tidak tertanam)", "%d pages became images (fonts not embedded)"), len(res.RasterPages))
+			}
+			// With veraPDF installed, every result is checked by the official validator.
+			if bat := a.tools.Path(tools.VeraPDF); bat != "" {
+				r.Message(i18n.L("Memvalidasi dengan veraPDF…", "Validating with veraPDF…"))
+				if v, verr := pdf.ValidatePDFA(ctx, bat, tools.JavaPath(), tmp, "2b"); verr == nil {
+					check := i18n.L("veraPDF: lolos", "veraPDF: passed")
+					if !v.Compliant {
+						check = fmt.Sprintf(i18n.L("veraPDF: %d aturan belum terpenuhi", "veraPDF: %d rules not met"), len(v.Failed))
+					}
+					msg = strings.TrimPrefix(msg+" · "+check, " · ")
+				}
+			}
+			if msg != "" {
+				r.Message(msg)
+			}
+			return nil
+		}), nil
+	case "pdfacheck":
+		return func(ctx context.Context, r queue.Reporter) error {
+			r.Progress(-1)
+			v, err := pdf.ValidatePDFA(ctx, a.tools.Path(tools.VeraPDF), tools.JavaPath(), in.Path, o.PdfaCheck.Flavour)
+			if err != nil {
+				return pdfFail(err)
+			}
+			if !v.Compliant {
+				return queue.Fail(fmt.Sprintf(i18n.L("Tidak lolos %s: %d aturan dilanggar", "Not %s compliant: %d rules broken"), v.ShortProfile(), len(v.Failed)), v.Report())
+			}
+			r.Message(fmt.Sprintf(i18n.L("Lolos %s (%d aturan)", "%s compliant (%d rules)"), v.ShortProfile(), v.Passed))
+			return nil
+		}, nil
+	case "digisign":
+		signer := a.signer
+		return same(func(ctx context.Context, tmp string, r queue.Reporter) error {
+			return pdf.SignDigital(in, o.DigiSign, signer, tmp)
 		}), nil
 	case "crop":
 		return same(func(ctx context.Context, tmp string, r queue.Reporter) error { return pdf.Crop(in, o.Crop, tmp) }), nil
@@ -609,4 +670,35 @@ func (a *App) StartPdfEdit(req PdfEditRequest) (JobRef, error) {
 		return run(ctx, r)
 	})
 	return JobRef{ItemID: "edit", TaskID: id}, nil
+}
+
+// CertInfo opens a certificate file to show who it belongs to.
+func (a *App) CertInfo(path, password string) (pdf.CertInfo, error) {
+	s, err := pdf.LoadSigner(path, password)
+	if err != nil {
+		return pdf.CertInfo{}, err
+	}
+	return s.Describe(), nil
+}
+
+// CreateCertificate makes a personal (self-signed) signing certificate and asks where to save it.
+func (a *App) CreateCertificate(name, email, org string, years int, password string) (string, error) {
+	dir := filepath.Join(appdir.DefaultOutputDir(kindPDF), i18n.L("Sertifikat", "Certificates"))
+	_ = os.MkdirAll(dir, 0o755)
+	out, err := wruntime.SaveFileDialog(a.ctx, wruntime.SaveDialogOptions{
+		Title:            i18n.L("Simpan sertifikat", "Save certificate"),
+		DefaultDirectory: dir,
+		DefaultFilename:  naming.SanitizeFileName(name) + ".p12",
+		Filters:          []wruntime.FileFilter{{DisplayName: i18n.L("Sertifikat (*.p12)", "Certificate (*.p12)"), Pattern: "*.p12;*.pfx"}},
+	})
+	if err != nil || out == "" {
+		return "", err
+	}
+	if !strings.HasSuffix(strings.ToLower(out), ".p12") && !strings.HasSuffix(strings.ToLower(out), ".pfx") {
+		out += ".p12"
+	}
+	if err := pdf.CreateCertificate(name, email, org, years, password, out); err != nil {
+		return "", err
+	}
+	return out, nil
 }

@@ -3,6 +3,7 @@
 package platform
 
 import (
+	"errors"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -43,3 +44,18 @@ func ProcessIDs(string) map[uint32]bool { return map[uint32]bool{} }
 
 // KillNew is a no-op outside Windows.
 func KillNew(string, map[uint32]bool) {}
+
+// SystemLightTheme is always false outside Windows.
+func SystemLightTheme() bool { return false }
+
+// Sleep is not supported outside Windows.
+func Sleep() error { return errors.New("not supported") }
+
+// Shutdown is not supported outside Windows.
+func Shutdown() error { return errors.New("not supported") }
+
+// SendToDir has no meaning outside Windows.
+func SendToDir() string { return "" }
+
+// CreateShortcut is not supported outside Windows.
+func CreateShortcut(lnk, target, desc string) error { return errors.New("not supported") }

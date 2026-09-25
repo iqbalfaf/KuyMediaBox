@@ -66,9 +66,14 @@ func (e Env) spotdlSave(ctx context.Context, urls []string, preload bool) ([]spo
 
 	args := []string{"save"}
 	args = append(args, urls...)
-	args = append(args, "--save-file", saveFile, "--log-level", "ERROR")
+	// Lyrics lookups (Genius, AZLyrics, Musixmatch) are slow and often rate-limited, and the
+	// save file doesn't need them.
+	args = append(args, "--save-file", saveFile, "--log-level", "ERROR", "--lyrics", "--threads", "4")
 	if preload {
 		args = append(args, "--preload")
+	}
+	if e.SpotifyAuth {
+		args = append(args, "--user-auth")
 	}
 	if e.FFmpeg != "" {
 		args = append(args, "--ffmpeg", e.FFmpeg)
@@ -116,13 +121,28 @@ func friendlySpotifyError(detail string) error {
 	return queue.Fail(msg, detail)
 }
 
-// AnalyzeSpotify reads a Spotify track, album or playlist through spotDL.
+// AnalyzeSpotify reads a Spotify track, album or playlist: from the embed page when possible
+// (about a second), else through spotDL (artists, private or very long playlists).
 func AnalyzeSpotify(ctx context.Context, env Env, link Link) (*Collection, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	songs, err := env.spotdlSave(ctx, []string{link.URL}, false)
-	if err != nil {
-		return nil, err
+	var songs []spotifySong
+	var embed *embedEntity
+	if link.Type == TypeTrack || link.Type == TypeAlbum || link.Type == TypePlaylist {
+		ectx, ecancel := context.WithTimeout(ctx, 25*time.Second)
+		e, err := spotifyEmbed(ectx, link.Type, link.ID)
+		ecancel()
+		if err == nil && !(link.Type == TypePlaylist && len(e.TrackList) >= embedLimit) {
+			if list := embedSongs(link, e); len(list) > 0 {
+				songs, embed = list, e
+			}
+		}
+	}
+	if songs == nil {
+		var err error
+		if songs, err = env.spotdlSave(ctx, []string{link.URL}, false); err != nil {
+			return nil, err
+		}
 	}
 	if len(songs) == 0 {
 		return nil, errors.New(i18n.L("tidak ada lagu di link ini (playlist kosong, private, atau buatan Spotify)", "no songs in this link (empty, private or Spotify-made playlist)"))
@@ -134,12 +154,28 @@ func AnalyzeSpotify(ctx context.Context, env Env, link Link) (*Collection, error
 		col.Subtitle = firstNonEmpty(songs[0].AlbumArtist, songs[0].artistLine())
 	case TypePlaylist:
 		col.Title = firstNonEmpty(songs[0].ListName, "Playlist Spotify")
+		if embed != nil {
+			col.Subtitle = embed.Subtitle
+			if col.Subtitle == "" && len(embed.Authors) > 0 {
+				col.Subtitle = embed.Authors[0].Name
+			}
+		}
+	case TypeArtist:
+		col.Title = firstNonEmpty(songs[0].AlbumArtist, firstOf(songs[0].Artists), songs[0].Artist, "Artist")
+		col.Subtitle = i18n.L("Semua lagu artis", "All songs of the artist")
 	default:
 		col.Title = songs[0].Name
 		col.Subtitle = songs[0].artistLine()
 	}
 	col.Thumbnail = songs[0].CoverURL
-	sortSongs(songs, link.Type == TypeAlbum)
+	if embed != nil && embed.cover() != "" {
+		col.Thumbnail = embed.cover()
+	}
+	if link.Type == TypeArtist {
+		sortArtist(songs)
+	} else {
+		sortSongs(songs, link.Type == TypeAlbum)
+	}
 	for i := range songs {
 		s := songs[i]
 		idx := i + 1
@@ -178,12 +214,13 @@ func sortSongs(songs []spotifySong, album bool) {
 
 // Matcher resolves Spotify tracks to YouTube URLs once per download batch.
 type Matcher struct {
-	env  Env
-	urls []string
-	once sync.Once
-	done chan struct{}
-	res  map[string]string
-	err  error
+	env   Env
+	urls  []string
+	once  sync.Once
+	done  chan struct{}
+	res   map[string]string
+	songs map[string]*spotifySong // full metadata from spotDL, by Spotify URL
+	err   error
 }
 
 // NewMatcher prepares a matcher for the given Spotify track URLs.
@@ -201,11 +238,13 @@ func (m *Matcher) Resolve(ctx context.Context, spotifyURL string) (string, error
 			defer cancel()
 			songs, err := m.env.spotdlSave(rctx, m.urls, true)
 			m.res = map[string]string{}
+			m.songs = map[string]*spotifySong{}
 			m.err = err
-			for _, s := range songs {
+			for i, s := range songs {
 				if s.DownloadURL != "" {
 					m.res[s.URL] = s.DownloadURL
 				}
+				m.songs[s.URL] = &songs[i]
 			}
 		}()
 	})
@@ -215,6 +254,34 @@ func (m *Matcher) Resolve(ctx context.Context, spotifyURL string) (string, error
 	case <-ctx.Done():
 		return "", ctx.Err()
 	}
+}
+
+// Song returns spotDL's full metadata of a track once Resolve has finished (nil otherwise).
+func (m *Matcher) Song(spotifyURL string) *spotifySong {
+	select {
+	case <-m.done:
+		return m.songs[spotifyURL]
+	default:
+		return nil
+	}
+}
+
+// fullSong merges spotDL's complete metadata over what the link list knew.
+func fullSong(partial *spotifySong, full *spotifySong) spotifySong {
+	if full == nil {
+		return *partial
+	}
+	s := *full
+	if s.Name == "" {
+		s.Name = partial.Name
+	}
+	if len(s.Artists) == 0 && s.Artist == "" {
+		s.Artists, s.Artist = partial.Artists, partial.Artist
+	}
+	if s.CoverURL == "" {
+		s.CoverURL = partial.CoverURL
+	}
+	return s
 }
 
 // DownloadSpotify downloads one Spotify entry: match on YouTube, fetch audio, tag it.
@@ -232,15 +299,19 @@ func DownloadSpotify(ctx context.Context, env Env, entry Entry, dir, fileName st
 	}
 
 	r.Progress(-1)
-	r.Message(i18n.L("Mencocokkan lagu di YouTube…", "Matching the song on YouTube…"))
-	src, err := matcher.Resolve(ctx, entry.song.URL)
-	if ctx.Err() != nil {
-		return "", ctx.Err()
+	src := entry.Source
+	if src == "" {
+		r.Message(i18n.L("Mencocokkan lagu di YouTube…", "Matching the song on YouTube…"))
+		var err error
+		src, err = matcher.Resolve(ctx, entry.song.URL)
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		_ = err
 	}
 	if src == "" {
 		// spotDL could not match: fall back to a YouTube Music style search.
 		src = "ytsearch1:" + entry.song.artistLine() + " - " + entry.song.Name + " audio"
-		_ = err
 	}
 
 	work, err := os.MkdirTemp(env.TempDir, "sp-*")
@@ -255,20 +326,24 @@ func DownloadSpotify(ctx context.Context, env Env, entry Entry, dir, fileName st
 	if err != nil {
 		var ue *queue.UserError
 		if errors.As(err, &ue) && strings.Contains(src, "ytsearch1:") {
-			ue.Message = i18n.L("Lagu tidak ditemukan di YouTube", "Song not found on YouTube")
+			ue.Message = i18n.L("Lagu tidak ditemukan di YouTube — ganti dengan link YouTube sendiri", "Song not found on YouTube — replace it with your own YouTube link")
 		}
 		return "", err
 	}
 
 	r.Message(i18n.L("Menyematkan judul, artis & cover…", "Embedding title, artist & cover…"))
+	song := *entry.song
+	if matcher != nil {
+		song = fullSong(entry.song, matcher.Song(entry.song.URL))
+	}
 	cover := ""
-	if entry.song.CoverURL != "" {
-		if p, cerr := fetchCover(ctx, entry.song.CoverURL, work); cerr == nil {
+	if song.CoverURL != "" {
+		if p, cerr := fetchCover(ctx, song.CoverURL, work); cerr == nil {
 			cover = p
 		}
 	}
 	tmpOut := filepath.Join(work, "tagged."+o.AudioFormat)
-	if err := tagAudio(ctx, env.FFmpeg, audio, cover, tmpOut, *entry.song, o.AudioFormat); err != nil {
+	if err := tagAudio(ctx, env.FFmpeg, audio, cover, tmpOut, song, o.AudioFormat); err != nil {
 		return "", err
 	}
 	if err := naming.Commit(tmpOut, final); err != nil {
@@ -355,8 +430,25 @@ func tagAudio(ctx context.Context, ffmpegPath, in, cover, out string, s spotifyS
 	return ffmpeg.Run(ctx, ffmpegPath, args, 0, nil)
 }
 
-// SpotifyFileName builds "NN - Artist - Title" (number optional).
-func SpotifyFileName(e Entry, numbering bool, width int) string {
+// SpotifyFileName builds "NN - Artist - Title" (number optional), or fills a template.
+func SpotifyFileName(e Entry, numbering bool, width int, tpl string) string {
+	if tpl != "" {
+		year := ""
+		if e.song != nil {
+			if y := fmt.Sprint(e.song.Year); y != "" && y != "<nil>" && y != "0" {
+				year = strings.TrimSuffix(y, ".0")
+			} else if len(e.song.Date) >= 4 {
+				year = e.song.Date[:4]
+			}
+		}
+		name := FillTemplate(tpl, map[string]string{
+			"artist": e.Artist, "title": e.Title, "album": e.Album, "year": year, "index": fmt.Sprintf("%0*d", width, e.Index),
+		})
+		if numbering && e.Index > 0 && !strings.Contains(tpl, "{index}") {
+			name = fmt.Sprintf("%0*d - %s", width, e.Index, name)
+		}
+		return naming.SanitizeFileName(name)
+	}
 	name := e.Title
 	if e.Artist != "" {
 		name = e.Artist + " - " + e.Title

@@ -3,6 +3,8 @@
 package platform
 
 import (
+	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -92,4 +94,54 @@ func KillNew(exe string, before map[uint32]bool) {
 			_ = KillTree(int(pid))
 		}
 	}
+}
+
+// SystemLightTheme reports whether Windows apps use the light theme.
+func SystemLightTheme() bool {
+	k, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`, registry.QUERY_VALUE)
+	if err != nil {
+		return false
+	}
+	defer k.Close()
+	v, _, err := k.GetIntegerValue("AppsUseLightTheme")
+	return err == nil && v == 1
+}
+
+// Sleep puts the computer to sleep.
+func Sleep() error {
+	proc := windows.NewLazySystemDLL("powrprof.dll").NewProc("SetSuspendState")
+	if err := proc.Find(); err != nil {
+		return err
+	}
+	r, _, err := proc.Call(0, 0, 0)
+	if r == 0 {
+		return err
+	}
+	return nil
+}
+
+// Shutdown turns the computer off (programs get the normal chance to save).
+func Shutdown() error {
+	c := exec.Command("shutdown", "/s", "/t", "0")
+	HideWindow(c)
+	return c.Run()
+}
+
+// SendToDir is the user's "Send to" menu folder.
+func SendToDir() string {
+	return filepath.Join(os.Getenv("APPDATA"), `Microsoft\Windows\SendTo`)
+}
+
+// CreateShortcut writes a .lnk file pointing at target.
+func CreateShortcut(lnk, target, desc string) error {
+	script := `$s = (New-Object -ComObject WScript.Shell).CreateShortcut($env:KMB_LNK); ` +
+		`$s.TargetPath = $env:KMB_TARGET; $s.IconLocation = $env:KMB_TARGET + ',0'; ` +
+		`$s.Description = $env:KMB_DESC; $s.WorkingDirectory = [IO.Path]::GetDirectoryName($env:KMB_TARGET); $s.Save()`
+	c := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
+	c.Env = append(os.Environ(), "KMB_LNK="+lnk, "KMB_TARGET="+target, "KMB_DESC="+desc)
+	HideWindow(c)
+	if out, err := c.CombinedOutput(); err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }

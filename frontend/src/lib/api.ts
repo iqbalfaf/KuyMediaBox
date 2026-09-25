@@ -3,8 +3,9 @@ import { L } from './i18n.svelte'
 import * as App from '../../wailsjs/go/main/App'
 import * as RT from '../../wailsjs/runtime/runtime'
 import type {
-  AudioOptions, Capabilities, Collection, CompareResult, DocInfo, DownloadOptions, EditItem, FileItem, ImageOptions, JobRef, Link,
-  OcrLanguage, PageRef, PdfEnv, PdfJob, PdfOptions, PdfRect, Settings, TaskInfo, ToolStatus, UpdateInfo, VideoOptions,
+  AfterQueue, AudioOptions, AudioTags, Capabilities, CertInfo, Collection, CompareResult, DocInfo, DownloadOptions, EditItem, Entry, FileItem,
+  HistoryEntry, ImageOptions, JobRef, Link, OcrLanguage, OpenRequest, PageRef, PdfEnv, PdfJob, PdfOptions, PdfRect, Settings, TaskInfo,
+  ToolStatus, UpdateInfo, VideoOptions,
 } from './types'
 
 const call = App as any
@@ -27,9 +28,29 @@ export const api = {
   pickFiles: (kind: string): Promise<FileItem[]> => call.PickFiles(kind),
   pickFolder: (kind: string): Promise<FileItem[]> => call.PickFolder(kind),
   startImage: (items: { id: string; path: string }[], o: ImageOptions): Promise<JobRef[]> => call.StartImage(items, o),
-  startVideo: (items: { id: string; path: string }[], job: { mode: string; video: VideoOptions; audio: AudioOptions }): Promise<JobRef[]> =>
-    call.StartVideo(items, job),
-  startAudio: (items: { id: string; path: string }[], o: AudioOptions): Promise<JobRef[]> => call.StartAudio(items, o),
+  startVideo: (
+    items: { id: string; path: string }[],
+    job: { mode: string; video: VideoOptions; audio: AudioOptions; frameEvery: number; frameFormat: string },
+  ): Promise<JobRef[]> => call.StartVideo(items, job),
+  startAudio: (items: { id: string; path: string; tags?: AudioTags | null }[], job: { mode: string; options: AudioOptions }): Promise<JobRef[]> =>
+    call.StartAudio(items, job),
+  getHWEncoders: (): Promise<Record<string, string[]>> => call.GetHWEncoders(),
+  pickFile: (title: string, filterName: string, pattern: string): Promise<string> => call.PickFile(title, filterName, pattern),
+  openFileDefault: (path: string): Promise<void> => call.OpenFileDefault(path),
+  pathExists: (paths: string[]): Promise<Record<string, boolean>> => call.PathExists(paths),
+
+  getHistory: (): Promise<HistoryEntry[]> => call.GetHistory(),
+  removeHistory: (ids: string[]): Promise<void> => call.RemoveHistory(ids),
+  clearHistory: (): Promise<void> => call.ClearHistory(),
+
+  getAfterQueue: (): Promise<AfterQueue> => call.GetAfterQueue(),
+  setAfterQueue: (action: string): Promise<AfterQueue> => call.SetAfterQueue(action),
+  cancelAfterQueue: (): Promise<AfterQueue> => call.CancelAfterQueue(),
+
+  getSendTo: (): Promise<boolean> => call.GetSendTo(),
+  setSendTo: (on: boolean): Promise<boolean> => call.SetSendTo(on),
+  takeLaunchFiles: (): Promise<OpenRequest | null> => call.TakeLaunchFiles(),
+  routePaths: (paths: string[]): Promise<OpenRequest> => call.RoutePaths(paths),
   getDefaultDirs: (): Promise<Record<string, string>> => call.GetDefaultDirs(),
   outputFolder: (kind: string): Promise<string> => call.OutputFolder(kind),
   getVersion: (): Promise<string> => call.GetVersion(),
@@ -46,6 +67,7 @@ export const api = {
   forgetCollection: (key: string): Promise<void> => call.ForgetCollection(key),
   collectionDir: (key: string): Promise<string> => call.CollectionDir(key),
   startDownloads: (key: string, ids: string[], o: DownloadOptions): Promise<JobRef[]> => call.StartDownloads(key, ids, o),
+  setEntrySource: (key: string, id: string, url: string): Promise<Entry> => call.SetEntrySource(key, id, url),
 
   pdfWarmup: (): Promise<void> => call.PdfWarmup(),
   pdfDoc: (path: string, password = ''): Promise<DocInfo> => call.PdfDoc(path, password),
@@ -55,7 +77,10 @@ export const api = {
   pdfEnvironment: (): Promise<PdfEnv> => call.PdfEnvironment(),
   pdfScan: (): Promise<FileItem | null> => call.PdfScan(),
   pdfSaveCapture: (dataUrl: string): Promise<FileItem | null> => call.PdfSaveCapture(dataUrl),
-  startPdf: (tool: string, items: PdfJob[], o: PdfOptions): Promise<JobRef[]> => call.StartPdf(tool, items, o),
+  startPdf: (tool: string, items: PdfJob[], o: PdfOptions, secret = ''): Promise<JobRef[]> => call.StartPdf(tool, items, o, secret),
+  certInfo: (path: string, password: string): Promise<CertInfo> => call.CertInfo(path, password),
+  createCertificate: (name: string, email: string, org: string, years: number, password: string): Promise<string> =>
+    call.CreateCertificate(name, email, org, years, password),
   startPdfCombine: (tool: string, items: PdfJob[], o: PdfOptions): Promise<JobRef> => call.StartPdfCombine(tool, items, o),
   startPdfEdit: (req: {
     tool: string

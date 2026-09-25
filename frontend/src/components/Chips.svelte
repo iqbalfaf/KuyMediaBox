@@ -61,12 +61,19 @@
     font-size: 12px;
   }
   .chip.tall {
-    height: 40px;
-    font-size: 12px;
+    height: auto;
+    min-height: 44px;
+    padding: 6px 6px;
+    font-size: 13px;
+    line-height: 1.2;
+    text-align: center;
+  }
+  .chip span {
+    max-width: 100%;
   }
   .chip:hover:not(:disabled):not(.on) {
     border-color: var(--border-strong);
-    background: #252a33;
+    background: var(--chip-hover);
   }
   .chip.on {
     border-color: var(--accent);
@@ -78,9 +85,11 @@
     opacity: 0.35;
   }
   .sub {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
+    line-height: 1.2;
     color: var(--text-3);
+    overflow-wrap: anywhere;
   }
   .chip.on .sub {
     color: var(--accent-text-2);

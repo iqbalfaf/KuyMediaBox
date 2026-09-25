@@ -189,7 +189,8 @@ func galleryPost(ctx context.Context, env Env, link Link) (*Collection, error) {
 	if env.GalleryDL == "" {
 		return nil, errGalleryMissing()
 	}
-	out, err := proc.Output(ctx, env.GalleryDL, "--config-ignore", "-j", link.URL)
+	args := append([]string{"--config-ignore", "-j"}, env.cookieArgs()...)
+	out, err := proc.Output(ctx, env.GalleryDL, append(args, link.URL)...)
 	files, perr := parseGalleryJSON(out)
 	if perr != nil {
 		detail := out
@@ -575,7 +576,7 @@ func downloadImage(ctx context.Context, env Env, e Entry, dir, name string, o Op
 	r.Message(i18n.L("Mengunduh foto…", "Downloading picture…"))
 	r.Progress(0)
 	raw := naming.TempPath(filepath.Join(dir, name+"."+ext))
-	if err := fetchImage(ctx, e.URL, raw, sourceReferer(e.URL), r); err != nil {
+	if err := fetchImage(ctx, e.URL, raw, sourceReferer(e.URL), env.RateLimitKB, r); err != nil {
 		_ = os.Remove(raw)
 		return "", err
 	}
@@ -599,7 +600,7 @@ func downloadImage(ctx context.Context, env Env, e Entry, dir, name string, o Op
 	return target, nil
 }
 
-func fetchImage(ctx context.Context, url, dest, referer string, r queue.Reporter) error {
+func fetchImage(ctx context.Context, url, dest, referer string, limitKB int, r queue.Reporter) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return queue.Fail(i18n.L("Link foto tidak valid", "Invalid picture link"), err.Error())
@@ -629,7 +630,20 @@ func fetchImage(ctx context.Context, url, dest, referer string, r queue.Reporter
 	total := resp.ContentLength
 	var done int64
 	buf := make([]byte, 128*1024)
+	started := time.Now()
 	for {
+		if limitKB > 0 {
+			// Wait until the average speed is back under the limit.
+			want := time.Duration(float64(done) / float64(limitKB*1024) * float64(time.Second))
+			if ahead := want - time.Since(started); ahead > 0 {
+				select {
+				case <-ctx.Done():
+					f.Close()
+					return ctx.Err()
+				case <-time.After(ahead):
+				}
+			}
+		}
 		n, rerr := resp.Body.Read(buf)
 		if n > 0 {
 			if _, werr := f.Write(buf[:n]); werr != nil {

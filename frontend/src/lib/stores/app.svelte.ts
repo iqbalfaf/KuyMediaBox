@@ -89,6 +89,7 @@ export async function initApp() {
     Object.assign(defaultDirs, dirs)
     settings.value = s
     setLang(s.language)
+    applyTheme(s.theme)
   } catch (e) {
     toast(errText(e), 'err')
   }
@@ -104,6 +105,7 @@ export async function saveSettings(patch: Partial<Settings>) {
   try {
     settings.value = await api.saveSettings({ ...settings.value, ...patch })
     setLang(settings.value.language)
+    applyTheme(settings.value.theme)
   } catch (e) {
     toast(errText(e), 'err')
   }
@@ -146,3 +148,21 @@ export function showDetail(title: string, message: string, text: string) {
   detail.text = text
   detail.open = true
 }
+
+// ---- theme (G-12) ------------------------------------------------------------------------
+
+const lightQuery = window.matchMedia?.('(prefers-color-scheme: light)')
+let themeChoice: string = 'dark'
+
+/** Applies dark, light or the Windows app theme ("system"). */
+export function applyTheme(theme: string | undefined) {
+  themeChoice = theme || 'dark'
+  const light = themeChoice === 'light' || (themeChoice === 'system' && !!lightQuery?.matches)
+  document.documentElement.dataset.theme = light ? 'light' : 'dark'
+  try {
+    localStorage.setItem('kmb.theme', light ? 'light' : 'dark')
+  } catch {
+    /* storage unavailable */
+  }
+}
+lightQuery?.addEventListener?.('change', () => themeChoice === 'system' && applyTheme('system'))

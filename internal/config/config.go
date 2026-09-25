@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -41,6 +42,31 @@ const (
 	LangEN = "en"
 )
 
+// UI themes.
+const (
+	ThemeDark   = "dark"
+	ThemeLight  = "light"
+	ThemeSystem = "system"
+)
+
+// DefaultParallel is how many tasks of each kind run at the same time by default.
+var DefaultParallel = map[string]int{"image": 3, "video": 1, "audio": 2, "download": 2, "pdf": 2}
+
+// MaxParallel caps the parallel tasks per kind.
+const MaxParallel = 8
+
+// CookieBrowsers are the browsers yt-dlp and gallery-dl can read cookies from.
+var CookieBrowsers = []string{"chrome", "edge", "firefox", "brave", "opera", "vivaldi", "chromium"}
+
+// WatchRule makes the app convert new files that appear in a folder.
+type WatchRule struct {
+	ID      string          `json:"id"`
+	Dir     string          `json:"dir"`
+	Kind    string          `json:"kind"`    // image | video | audio
+	Options json.RawMessage `json:"options"` // the module's settings when the rule was saved
+	Enabled bool            `json:"enabled"`
+}
+
 // Settings are the user's global preferences.
 type Settings struct {
 	Outputs            map[string]Output `json:"outputs"`
@@ -51,6 +77,16 @@ type Settings struct {
 	SkipDownloaded     bool              `json:"skipDownloaded"`
 	AutoUpdate         bool              `json:"autoUpdate"`
 	Language           string            `json:"language"` // id | en
+	Theme              string            `json:"theme"`    // dark | light | system
+	Parallel           map[string]int    `json:"parallel"` // tasks at once per kind
+	CookiesBrowser     string            `json:"cookiesBrowser"`
+	CookiesFile        string            `json:"cookiesFile"`
+	NameTemplate       string            `json:"nameTemplate"`    // YouTube & other sites, "" = built-in
+	SpotifyTemplate    string            `json:"spotifyTemplate"` // Spotify, "" = built-in
+	SpotifyLogin       bool              `json:"spotifyLogin"`    // spotDL --user-auth (private playlists)
+	ClipboardWatch     bool              `json:"clipboardWatch"`
+	DownloadLimitKB    int               `json:"downloadLimitKB"` // total download speed limit, 0 = none
+	Watch              []WatchRule       `json:"watch"`
 	ToolPaths          map[string]string `json:"toolPaths"`
 }
 
@@ -65,7 +101,13 @@ func Defaults() Settings {
 		SkipDownloaded:     true,
 		AutoUpdate:         true,
 		Language:           LangID,
+		Theme:              ThemeDark,
+		Parallel:           map[string]int{},
+		Watch:              []WatchRule{},
 		ToolPaths:          map[string]string{},
+	}
+	for k, v := range DefaultParallel {
+		s.Parallel[k] = v
 	}
 	for _, k := range OutputKinds {
 		s.Outputs[k] = Output{Mode: OutputDefault}
@@ -114,9 +156,59 @@ func (s *Settings) Normalize() {
 	if s.Language != LangEN {
 		s.Language = LangID
 	}
+	switch s.Theme {
+	case ThemeLight, ThemeSystem:
+	default:
+		s.Theme = ThemeDark
+	}
+	par := map[string]int{}
+	for k, v := range DefaultParallel {
+		n := s.Parallel[k]
+		if n < 1 {
+			n = v
+		}
+		par[k] = min(n, MaxParallel)
+	}
+	s.Parallel = par
+	if !slices.Contains(CookieBrowsers, s.CookiesBrowser) {
+		s.CookiesBrowser = ""
+	}
+	s.CookiesFile = strings.TrimSpace(s.CookiesFile)
+	s.DownloadLimitKB = max(0, min(s.DownloadLimitKB, 1_000_000))
+	s.NameTemplate = cleanTemplate(s.NameTemplate)
+	s.SpotifyTemplate = cleanTemplate(s.SpotifyTemplate)
+	rules := []WatchRule{}
+	for _, r := range s.Watch {
+		r.Dir = strings.TrimSpace(r.Dir)
+		if r.Dir == "" || (r.Kind != "image" && r.Kind != "video" && r.Kind != "audio") || r.ID == "" {
+			continue
+		}
+		if len(r.Options) == 0 || !json.Valid(r.Options) {
+			r.Options = json.RawMessage("{}")
+		}
+		rules = append(rules, r)
+	}
+	s.Watch = rules
 	if s.ToolPaths == nil {
 		s.ToolPaths = map[string]string{}
 	}
+}
+
+// cleanTemplate trims a file name template and drops characters Windows forbids (the path
+// separators too: a template names a file, not a folder).
+func cleanTemplate(t string) string {
+	var b strings.Builder
+	for _, r := range strings.TrimSpace(t) {
+		if strings.ContainsRune(`<>:"/\|?*`, r) || r < 32 {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	out := strings.TrimRight(b.String(), ". ")
+	if len([]rune(out)) > 120 {
+		out = string([]rune(out)[:120])
+	}
+	return out
 }
 
 func isKind(k string) bool {
@@ -211,6 +303,19 @@ func parse(data []byte) Settings {
 	if _, ok := raw["language"]; ok {
 		s.Language = parsed.Language
 	}
+	if _, ok := raw["theme"]; ok {
+		s.Theme = parsed.Theme
+	}
+	for k, v := range parsed.Parallel {
+		s.Parallel[k] = v
+	}
+	s.CookiesBrowser, s.CookiesFile = parsed.CookiesBrowser, parsed.CookiesFile
+	s.NameTemplate, s.SpotifyTemplate = parsed.NameTemplate, parsed.SpotifyTemplate
+	s.SpotifyLogin, s.ClipboardWatch = parsed.SpotifyLogin, parsed.ClipboardWatch
+	s.DownloadLimitKB = parsed.DownloadLimitKB
+	if parsed.Watch != nil {
+		s.Watch = parsed.Watch
+	}
 	if parsed.ToolPaths != nil {
 		s.ToolPaths = parsed.ToolPaths
 	}
@@ -230,6 +335,11 @@ func (st *Store) Get() Settings {
 	for k, v := range st.s.Outputs {
 		c.Outputs[k] = v
 	}
+	c.Parallel = map[string]int{}
+	for k, v := range st.s.Parallel {
+		c.Parallel[k] = v
+	}
+	c.Watch = append([]WatchRule{}, st.s.Watch...)
 	return c
 }
 

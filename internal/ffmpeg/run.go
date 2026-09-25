@@ -20,8 +20,14 @@ type Progress func(p float64, speed string)
 
 // Run executes ffmpeg with args (input/output included) and reports progress based on duration.
 func Run(ctx context.Context, ffmpegPath string, args []string, duration float64, onProgress Progress) error {
+	return RunIn(ctx, ffmpegPath, "", args, duration, onProgress)
+}
+
+// RunIn is Run with a working directory (for relative pass logs and subtitle files).
+func RunIn(ctx context.Context, ffmpegPath, dir string, args []string, duration float64, onProgress Progress) error {
 	full := append([]string{"-hide_banner", "-nostdin", "-y", "-loglevel", "error", "-progress", "pipe:1", "-nostats"}, args...)
 	cmd := proc.Command(ctx, ffmpegPath, full...)
+	cmd.Dir = dir
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err

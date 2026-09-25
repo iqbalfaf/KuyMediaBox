@@ -6,6 +6,8 @@
   import OutputPicker from '../components/OutputPicker.svelte'
   import Icon from '../components/Icon.svelte'
   import AppLogo from '../components/AppLogo.svelte'
+  import AutomationSettings from '../components/AutomationSettings.svelte'
+  import DownloadSettings from '../components/DownloadSettings.svelte'
   import { api, errText, runtime } from '../lib/api'
   import {
     defaultDirs, fixedFolder, outputOf, saveSettings, setOutput, settings, shortPath, toast, toolState,
@@ -13,7 +15,7 @@
   import type { OutputKind, ToolStatus } from '../lib/types'
   import { checkNow, upd } from '../lib/stores/update.svelte'
 
-  const icons: Record<string, string> = { ffmpeg: 'video', ytdlp: 'download', jsruntime: 'code', spotdl: 'music', gallerydl: 'image', libreoffice: 'fileText' }
+  const icons: Record<string, string> = { ffmpeg: 'video', ytdlp: 'download', jsruntime: 'code', spotdl: 'music', gallerydl: 'image', libreoffice: 'fileText', verapdf: 'shieldCheck' }
   const sourceLabel = $derived<Record<string, string>>({
     downloaded: L('dipasang oleh KuyMediaBox', 'installed by KuyMediaBox'),
     bundled: L('dari folder aplikasi', 'from the app folder'),
@@ -215,6 +217,8 @@
         </div>
       {/each}
     </section>
+
+    <AutomationSettings />
   </div>
 
   <div class="col-side">
@@ -281,6 +285,19 @@
           />
         </div>
         <div class="sec">
+          <span class="label">{L('Tampilan', 'Appearance')}</span>
+          <Segmented
+            label={L('Tampilan', 'Appearance')}
+            value={settings.value.theme}
+            onchange={(v) => saveSettings({ theme: v })}
+            options={[
+              { value: 'dark', label: L('Gelap', 'Dark'), icon: 'moon' },
+              { value: 'light', label: L('Terang', 'Light'), icon: 'sun' },
+              { value: 'system', label: 'Windows', icon: 'sliders' },
+            ]}
+          />
+        </div>
+        <div class="sec">
           <label class="label" for="akhiran">{L('Tambahan di nama file', 'File name suffix')}</label>
           <input id="akhiran" class="text-input" bind:value={suffix} onblur={saveSuffix} onkeydown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()} placeholder={L('(kosong)', '(empty)')} maxlength="40" />
           <span class="hint">{L('Contoh', 'Example')}: {example}</span>
@@ -304,6 +321,8 @@
       </div>
     {/if}
   </section>
+
+  <DownloadSettings />
   </div>
 </div>
 
@@ -529,7 +548,7 @@
     border-radius: 0 0 16px 16px;
   }
   .tool.hl {
-    background: #1c1f27;
+    background: var(--tool-hl);
   }
   .tic {
     width: 44px;
@@ -576,7 +595,7 @@
     font-weight: 700;
     background: var(--err-soft);
     border-color: transparent;
-    color: #ff9c9c;
+    color: var(--danger-text);
   }
   .tdesc {
     font-size: 12px;
@@ -600,7 +619,7 @@
   .path {
     font-family: var(--mono);
     font-size: 11px;
-    color: #6f7887;
+    color: var(--path);
     max-width: 360px;
   }
   .tl {

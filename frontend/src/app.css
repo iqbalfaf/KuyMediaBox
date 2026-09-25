@@ -28,9 +28,111 @@
   --info-text: #b5d6ff;
   --warn: #ffc77a;
   --warn-dot: #ffb547;
+  --hover: #181c23;
+  --row-active: #1c2029;
+  --seg-on: #2a303b;
+  --chip-hover: #252a33;
+  --btn-hover: #262c36;
+  --switch-off: #343b48;
+  --popup: #20252e;
+  --canvas: #161a20;
+  --canvas-2: #12151b;
+  --tool-hl: #1c1f27;
+  --path: #6f7887;
+  --dot: #434a57;
+  --swatch-border: #3a414e;
+  --danger-bg: #2a1719;
+  --danger-hover: #351c1f;
+  --danger-text: #ff9c9c;
+  --nav-active-text: #ffd9c8;
+  --primary-off: #262b34;
+  --primary-off-text: #7d8594;
+  --scroll: #2f3541;
+  --scroll-hover: #3c4350;
+  --warn-bg: #2b2112;
+  --warn-border: #5c4520;
+  --warn-text: #d9c3a0;
+  --warn-title: #ffe0b0;
+  --note-bg: #3a2f17;
+  --note-text: #bff3d8;
+  --tt-bg: #10302f;
+  --tt-fg: #6ff2ec;
+  --ig-bg: #3a1a2b;
+  --ig-fg: #ff8fbf;
+  --fb-bg: #172a40;
+  --fb-fg: #8ab8ff;
+  --shadow: rgba(0, 0, 0, 0.45);
   --font: 'Plus Jakarta Sans', system-ui, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, monospace;
   color-scheme: dark;
+}
+
+/* Light theme (Settings › Tampilan). */
+:root[data-theme='light'] {
+  --bg: #f3f4f7;
+  --sidebar: #eceef2;
+  --surface: #ffffff;
+  --surface-2: #f3f5f8;
+  --surface-3: #f8f9fb;
+  --inset: #eceff3;
+  --border: #dde1e8;
+  --border-soft: #e8ebf0;
+  --border-strong: #c3c9d3;
+  --text: #1b1f27;
+  --text-2: #4a5263;
+  --text-3: #6b7384;
+  --text-4: #2c323d;
+  --accent: #ff7a45;
+  --accent-ink: #1b0d05;
+  --accent-soft: #ffeae0;
+  --accent-tint: #fff0e8;
+  --accent-text: #b8400f;
+  --accent-text-2: #d9541f;
+  --ok: #188a55;
+  --ok-soft: #e1f5ea;
+  --err: #cf3131;
+  --err-soft: #fde9e9;
+  --err-border: #f0b9b9;
+  --info: #2764c5;
+  --info-soft: #e5eefb;
+  --info-text: #1d4f9c;
+  --warn: #a8660b;
+  --warn-dot: #f0a020;
+  --hover: #e6e9ee;
+  --row-active: #fff4ee;
+  --seg-on: #ffffff;
+  --chip-hover: #eceff4;
+  --btn-hover: #e9ecf1;
+  --switch-off: #c9cfd8;
+  --popup: #ffffff;
+  --canvas: #e7eaef;
+  --canvas-2: #dfe3e9;
+  --tool-hl: #fff8f2;
+  --path: #7a8394;
+  --dot: #b8bfca;
+  --swatch-border: #c3c9d3;
+  --danger-bg: #fdecec;
+  --danger-hover: #fadcdc;
+  --danger-text: #c62828;
+  --nav-active-text: #9a3412;
+  --primary-off: #e3e6eb;
+  --primary-off-text: #8a92a1;
+  --scroll: #c9ced6;
+  --scroll-hover: #b3b9c3;
+  --warn-bg: #fff6e5;
+  --warn-border: #f1d7a6;
+  --warn-text: #7a5a1f;
+  --warn-title: #6b4400;
+  --note-bg: #fff3d6;
+  --note-text: #1f7a4f;
+  --tt-bg: #dcf7f5;
+  --tt-fg: #0b7c76;
+  --ig-bg: #fde7f1;
+  --ig-fg: #b8266a;
+  --fb-bg: #e3edfd;
+  --fb-fg: #1f5fbf;
+  --shadow: rgba(30, 40, 60, 0.18);
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -60,8 +162,8 @@ a { color: var(--accent-text-2); }
 a:hover { color: var(--accent-text); }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #2f3541; border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
-::-webkit-scrollbar-thumb:hover { background: #3c4350; background-clip: padding-box; border: 2px solid transparent; }
+::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-hover); background-clip: padding-box; border: 2px solid transparent; }
 ::-webkit-scrollbar-track { background: transparent; }
 
 /* Shared building blocks */
@@ -100,11 +202,11 @@ a:hover { color: var(--accent-text); }
   white-space: nowrap;
   transition: background 0.15s, border-color 0.15s;
 }
-.btn:hover:not(:disabled) { background: #262c36; border-color: var(--border-strong); }
+.btn:hover:not(:disabled) { background: var(--btn-hover); border-color: var(--border-strong); }
 .btn:disabled { opacity: 0.5; }
 .btn.icon { width: 36px; padding: 0; color: var(--text-2); }
-.btn.danger { border-color: var(--err-border); background: #2a1719; color: #ff9c9c; }
-.btn.danger:hover:not(:disabled) { background: #351c1f; }
+.btn.danger { border-color: var(--err-border); background: var(--danger-bg); color: var(--danger-text); }
+.btn.danger:hover:not(:disabled) { background: var(--danger-hover); }
 
 .btn-primary {
   height: 52px;
@@ -123,7 +225,7 @@ a:hover { color: var(--accent-text); }
 }
 .btn-primary:hover:not(:disabled) { filter: brightness(1.07); }
 .btn-primary:active:not(:disabled) { transform: translateY(1px); }
-.btn-primary:disabled { background: #262b34; color: #7d8594; }
+.btn-primary:disabled { background: var(--primary-off); color: var(--primary-off-text); }
 
 .btn-accent {
   height: 36px;

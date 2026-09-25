@@ -228,7 +228,7 @@
     align-items: center;
     gap: 16px;
     padding: 16px;
-    background: #12151b;
+    background: var(--canvas-2);
   }
   .pg {
     position: relative;
@@ -273,7 +273,7 @@
     margin: 14px;
     border: 2px dashed var(--border-strong);
     border-radius: 12px;
-    background: #161a20;
+    background: var(--canvas);
     color: var(--text-3);
     display: flex;
     flex-direction: column;
@@ -365,7 +365,7 @@
   }
   .chg.removed .k,
   .chg.removed .tx {
-    color: #ff9c9c;
+    color: var(--danger-text);
   }
   .chg.removed .tx {
     text-decoration: line-through;
@@ -393,6 +393,6 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    background: #1a1e26;
+    background: var(--surface-3);
   }
 </style>

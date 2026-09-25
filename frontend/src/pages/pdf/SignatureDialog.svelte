@@ -276,7 +276,7 @@
     color: var(--text-3);
     font-size: 13px;
     cursor: pointer;
-    background: #161a20;
+    background: var(--canvas);
     text-align: center;
     padding: 12px;
   }

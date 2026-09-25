@@ -858,7 +858,7 @@
     overflow: auto;
     display: flex;
     padding: 24px;
-    background: #12151b;
+    background: var(--canvas-2);
   }
   .page {
     position: relative;
@@ -1051,7 +1051,7 @@
     align-items: flex-start;
     padding: 12px;
     border-radius: 10px;
-    background: #3a2f17;
+    background: var(--note-bg);
     color: var(--warn);
     font-size: 12px;
     line-height: 1.5;

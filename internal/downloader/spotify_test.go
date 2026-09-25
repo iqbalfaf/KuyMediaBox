@@ -27,10 +27,10 @@ func TestSortSongs(t *testing.T) {
 
 func TestSpotifyFileName(t *testing.T) {
 	e := Entry{Title: "Lagu: Satu?", Artist: "Band A, Band B", Index: 3}
-	if got := SpotifyFileName(e, true, 2); got != "03 - Band A, Band B - Lagu_ Satu_" {
+	if got := SpotifyFileName(e, true, 2, ""); got != "03 - Band A, Band B - Lagu_ Satu_" {
 		t.Fatalf("got %q", got)
 	}
-	if got := SpotifyFileName(e, false, 2); got != "Band A, Band B - Lagu_ Satu_" {
+	if got := SpotifyFileName(e, false, 2, ""); got != "Band A, Band B - Lagu_ Satu_" {
 		t.Fatalf("got %q", got)
 	}
 }

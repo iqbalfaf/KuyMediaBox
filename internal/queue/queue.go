@@ -65,6 +65,8 @@ type Info struct {
 	Progress float64 `json:"progress"` // 0..1, or -1 when unknown
 	Message  string  `json:"message"`
 	Detail   string  `json:"detail"`
+	Input    string  `json:"input"`  // source file (or link) of the task
+	InSize   int64   `json:"inSize"` // size of the source file(s)
 	Output   string  `json:"output"`
 	OutSize  int64   `json:"outSize"`
 	Started  int64   `json:"started"`  // unix ms
@@ -108,8 +110,12 @@ type Manager struct {
 	emit   func(Info)
 	onIdle func(kind string, done, failed, skipped, canceled int)
 	batch  map[string]*batchStats
+	limits map[string]int
 	root   context.Context
 	stop   context.CancelFunc
+
+	// OnFinish, when set, receives every task that reached a final status (for the history).
+	OnFinish func(Info)
 }
 
 // kindState is the FIFO line of waiting tasks plus the number running, per kind.
@@ -121,7 +127,7 @@ type kindState struct {
 
 type batchStats struct{ active, done, failed, skipped, canceled int }
 
-// Limits holds max parallel tasks per kind.
+// Limits holds the default max parallel tasks per kind.
 var Limits = map[string]int{KindImage: 3, KindVideo: 1, KindAudio: 2, KindDownload: 2, KindPDF: 2}
 
 // New creates a manager. emit receives every change; onIdle fires when a kind has no more
@@ -134,6 +140,7 @@ func New(emit func(Info), onIdle func(kind string, done, failed, skipped, cancel
 		emit:   emit,
 		onIdle: onIdle,
 		batch:  map[string]*batchStats{},
+		limits: map[string]int{},
 		root:   ctx,
 		stop:   stop,
 	}
@@ -148,10 +155,49 @@ func (m *Manager) state(kind string) *kindState {
 	return ks
 }
 
+// SetLimit changes how many tasks of a kind run at the same time; waiting tasks start
+// right away when the limit grows.
+func (m *Manager) SetLimit(kind string, n int) {
+	if n < 1 {
+		n = 1
+	}
+	m.mu.Lock()
+	m.limits[kind] = n
+	m.mu.Unlock()
+	m.schedule(kind)
+}
+
+// Limit returns the current parallel limit of a kind.
+func (m *Manager) Limit(kind string) int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.limitLocked(kind)
+}
+
+func (m *Manager) limitLocked(kind string) int {
+	if n, ok := m.limits[kind]; ok && n > 0 {
+		return n
+	}
+	if n := Limits[kind]; n > 0 {
+		return n
+	}
+	return 1
+}
+
+// Busy reports whether any task of any kind has not finished yet. Safe to call from onIdle:
+// a kind's batch is dropped before onIdle runs.
+func (m *Manager) Busy() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.batch) > 0
+}
+
 // Spec describes one task for AddMany.
 type Spec struct {
-	Title string
-	Run   RunFunc
+	Title  string
+	Input  string // source path or link, shown in the history
+	InSize int64
+	Run    RunFunc
 }
 
 // Add queues a task and returns its ID. Tasks of one kind start in the order they were added.
@@ -173,7 +219,7 @@ func (m *Manager) AddMany(kind string, specs []Spec) []string {
 	for i, s := range specs {
 		id := fmt.Sprintf("t%d", m.seq.Add(1))
 		ctx, cancel := context.WithCancel(m.root)
-		t := &task{info: Info{ID: id, Kind: kind, Title: s.Title, Status: StatusQueued}, run: s.Run, cancel: cancel}
+		t := &task{info: Info{ID: id, Kind: kind, Title: s.Title, Input: s.Input, InSize: s.InSize, Status: StatusQueued}, run: s.Run, cancel: cancel}
 		m.tasks[id] = t
 		m.order = append(m.order, id)
 		ks.pending = append(ks.pending, t)
@@ -193,14 +239,11 @@ func (m *Manager) AddMany(kind string, specs []Spec) []string {
 
 // schedule starts waiting tasks while the kind has free slots; stopped ones are finished.
 func (m *Manager) schedule(kind string) {
-	limit := Limits[kind]
-	if limit <= 0 {
-		limit = 1
-	}
 	var start []*task
 	var startCtx []context.Context
 	var dropped []*task
 	m.mu.Lock()
+	limit := m.limitLocked(kind)
 	ks := m.state(kind)
 	for len(ks.pending) > 0 && ks.running < limit {
 		t := ks.pending[0]
@@ -305,6 +348,12 @@ func (m *Manager) finish(t *task, err error) {
 	t.mu.Unlock()
 	t.cancel()
 	m.publish(t, true)
+	if m.OnFinish != nil {
+		t.mu.Lock()
+		info := t.info
+		t.mu.Unlock()
+		m.OnFinish(info)
+	}
 
 	m.mu.Lock()
 	bs := m.batch[kind]

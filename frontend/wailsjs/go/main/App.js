@@ -10,6 +10,10 @@ export function AnalyzeLink(arg1) {
   return window['go']['main']['App']['AnalyzeLink'](arg1);
 }
 
+export function CancelAfterQueue() {
+  return window['go']['main']['App']['CancelAfterQueue']();
+}
+
 export function CancelKind(arg1) {
   return window['go']['main']['App']['CancelKind'](arg1);
 }
@@ -18,12 +22,28 @@ export function CancelTask(arg1) {
   return window['go']['main']['App']['CancelTask'](arg1);
 }
 
+export function CertInfo(arg1, arg2) {
+  return window['go']['main']['App']['CertInfo'](arg1, arg2);
+}
+
 export function CheckUpdate() {
   return window['go']['main']['App']['CheckUpdate']();
 }
 
+export function ClearHistory() {
+  return window['go']['main']['App']['ClearHistory']();
+}
+
 export function CollectionDir(arg1) {
   return window['go']['main']['App']['CollectionDir'](arg1);
+}
+
+export function CreateCertificate(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['CreateCertificate'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function DataFolder() {
+  return window['go']['main']['App']['DataFolder']();
 }
 
 export function DetectLinks(arg1) {
@@ -38,12 +58,28 @@ export function ForgetTasks(arg1) {
   return window['go']['main']['App']['ForgetTasks'](arg1);
 }
 
+export function GetAfterQueue() {
+  return window['go']['main']['App']['GetAfterQueue']();
+}
+
 export function GetCapabilities() {
   return window['go']['main']['App']['GetCapabilities']();
 }
 
 export function GetDefaultDirs() {
   return window['go']['main']['App']['GetDefaultDirs']();
+}
+
+export function GetHWEncoders() {
+  return window['go']['main']['App']['GetHWEncoders']();
+}
+
+export function GetHistory() {
+  return window['go']['main']['App']['GetHistory']();
+}
+
+export function GetSendTo() {
+  return window['go']['main']['App']['GetSendTo']();
 }
 
 export function GetSettings() {
@@ -70,12 +106,20 @@ export function ListTasks() {
   return window['go']['main']['App']['ListTasks']();
 }
 
+export function OpenFileDefault(arg1) {
+  return window['go']['main']['App']['OpenFileDefault'](arg1);
+}
+
 export function OpenFolder(arg1) {
   return window['go']['main']['App']['OpenFolder'](arg1);
 }
 
 export function OutputFolder(arg1) {
   return window['go']['main']['App']['OutputFolder'](arg1);
+}
+
+export function PathExists(arg1) {
+  return window['go']['main']['App']['PathExists'](arg1);
 }
 
 export function PdfCompare(arg1, arg2) {
@@ -114,6 +158,10 @@ export function PickDirectory(arg1, arg2) {
   return window['go']['main']['App']['PickDirectory'](arg1, arg2);
 }
 
+export function PickFile(arg1, arg2, arg3) {
+  return window['go']['main']['App']['PickFile'](arg1, arg2, arg3);
+}
+
 export function PickFiles(arg1) {
   return window['go']['main']['App']['PickFiles'](arg1);
 }
@@ -130,6 +178,10 @@ export function RecheckTools() {
   return window['go']['main']['App']['RecheckTools']();
 }
 
+export function RemoveHistory(arg1) {
+  return window['go']['main']['App']['RemoveHistory'](arg1);
+}
+
 export function ResetToolPath(arg1) {
   return window['go']['main']['App']['ResetToolPath'](arg1);
 }
@@ -138,8 +190,24 @@ export function RevealFile(arg1) {
   return window['go']['main']['App']['RevealFile'](arg1);
 }
 
+export function RoutePaths(arg1) {
+  return window['go']['main']['App']['RoutePaths'](arg1);
+}
+
 export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
+}
+
+export function SetAfterQueue(arg1) {
+  return window['go']['main']['App']['SetAfterQueue'](arg1);
+}
+
+export function SetEntrySource(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetEntrySource'](arg1, arg2, arg3);
+}
+
+export function SetSendTo(arg1) {
+  return window['go']['main']['App']['SetSendTo'](arg1);
 }
 
 export function StartAudio(arg1, arg2) {
@@ -154,8 +222,8 @@ export function StartImage(arg1, arg2) {
   return window['go']['main']['App']['StartImage'](arg1, arg2);
 }
 
-export function StartPdf(arg1, arg2, arg3) {
-  return window['go']['main']['App']['StartPdf'](arg1, arg2, arg3);
+export function StartPdf(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['StartPdf'](arg1, arg2, arg3, arg4);
 }
 
 export function StartPdfCombine(arg1, arg2, arg3) {
@@ -168,4 +236,8 @@ export function StartPdfEdit(arg1) {
 
 export function StartVideo(arg1, arg2) {
   return window['go']['main']['App']['StartVideo'](arg1, arg2);
+}
+
+export function TakeLaunchFiles() {
+  return window['go']['main']['App']['TakeLaunchFiles']();
 }

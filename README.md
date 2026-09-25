@@ -4,7 +4,7 @@
 
 # KuyMediaBox
 
-**Satu aplikasi desktop untuk konversi gambar, video, audio, 29 alat PDF, dan download dari YouTube, TikTok, Instagram, Facebook & Spotify.**
+**Satu aplikasi desktop untuk konversi gambar, video, audio, 31 alat PDF, dan download dari YouTube, TikTok, Instagram, Facebook & Spotify.**
 Ringan, offline, tanpa iklan, dan tanpa batas ukuran file. Tersedia dalam **Bahasa Indonesia** dan **English**.
 
 [![Release](https://img.shields.io/github/v/release/iqbalfaf/KuyMediaBox?label=download&color=ff7a45)](https://github.com/iqbalfaf/KuyMediaBox/releases/latest)
@@ -61,8 +61,12 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Ukuran** | Ukuran asli · sisi terpanjang (px) · persentase · lebar × tinggi maksimal. Rasio selalu terjaga, gambar kecil **tidak pernah diperbesar**. |
 | **Transparansi** | Untuk format tanpa transparansi (JPG/BMP/PDF), area transparan diisi putih, hitam, atau warna pilihan |
 | **Putar otomatis** | Mengikuti orientasi kamera (EXIF), jadi foto tidak miring |
-| **ICO** | Otomatis dibatasi 256×256 px (ukuran ikon Windows) |
-| **Info hasil** | Ukuran file hasil dan persentase penghematan (mis. `−82%`) per file |
+| **Ukuran file maksimal** | Mis. **≤ 500 KB**: kualitas lalu ukuran gambar diturunkan otomatis sampai muat |
+| **Putar, balik & crop** | Putar 90°/180°/270°, cermin horizontal/vertikal, crop rasio 1:1, 4:5, 16:9, 9:16, 4:3, 3:2, 2:3 (di tengah) |
+| **Watermark** | Teks (huruf non-Latin didukung) atau logo; ukuran, transparansi, kemiringan, 9 posisi atau berulang |
+| **Metadata EXIF** | Dihapus secara bawaan (lokasi GPS, kamera ikut hilang); bisa dipertahankan untuk hasil JPG/PNG |
+| **ICO** | Satu file berisi beberapa ukuran sekaligus (16, 24, 32, 48, 64, 128, 256) |
+| **Info hasil** | Thumbnail tiap file, ukuran hasil & persentase penghematan (mis. `−82%`), dan **Bandingkan** sebelum/sesudah dengan slider |
 
 ### 🎬 Konversi Video
 
@@ -71,9 +75,17 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Input** | MP4, MKV, MOV, AVI, WEBM, FLV, WMV, 3GP, TS, M4V, MPG, MPEG, MTS, M2TS, OGV, VOB |
 | **Output** | MP4, MKV, WEBM, MOV, AVI, **GIF** |
 | **Codec** | H.264 (paling kompatibel), H.265 (lebih kecil), VP9, AV1, dan **Salin tanpa encode ulang** (super cepat, tanpa turun kualitas). Hanya codec yang cocok dengan format & tersedia di FFmpeg yang bisa dipilih. |
-| **Kualitas** | Pilihan mudah: Hemat / Seimbang / Tinggi, atau **Atur manual** (CRF + kecepatan encode) |
-| **Resolusi** | Asli, 1080p, 720p, 480p, atau custom. Video vertikal ikut disesuaikan dan tidak pernah diperbesar. |
-| **GIF** | 12 fps dengan palet warna optimal, cocok untuk klip pendek |
+| **Kualitas** | Pilihan mudah: Hemat / Seimbang / Tinggi, **Atur manual** (CRF + kecepatan encode), atau **Bitrate** tetap dalam kbps |
+| **Ukuran target** | Mis. **16 MB untuk WhatsApp**: bitrate dihitung dari durasi, encode 2 tahap agar ukurannya pas |
+| **Akselerasi GPU** | NVIDIA NVENC, Intel Quick Sync, AMD AMF — hanya yang benar-benar berfungsi di PC Anda yang bisa dipilih |
+| **Resolusi & fps** | Asli, 4K, 1440p, 1080p, 720p, 480p, atau custom (tidak pernah diperbesar) · fps asli / 60 / 30 / 24 / custom |
+| **Potong** | Waktu mulai–selesai (mis. `1:30` – `2:45`) |
+| **Putar & balik** | 90°/180°/270°, cermin horizontal/vertikal |
+| **Suara** | Otomatis, salin asli, AAC/MP3/Opus dengan bitrate pilihan, atau tanpa suara |
+| **Subtitle** | File `.srt/.ass/.vtt` di samping video (atau subtitle di dalam file) **disematkan** atau **dibakar** ke video |
+| **GIF** | Palet warna optimal; fps & ukuran bisa diatur |
+| **Gabung video** | Beberapa video jadi satu (urutan diatur ↑↓), ukuran & fps disamakan otomatis |
+| **Ambil frame** | Simpan gambar JPG/PNG tiap N detik ke satu folder |
 | **Ambil audio saja** | Ekstrak audio dari video ke MP3, M4A, FLAC, WAV, OGG, atau OPUS |
 | **Info media** | Resolusi, codec, fps, durasi, dan ukuran dibaca otomatis (ffprobe) |
 | **Progress** | Persen per file, kecepatan encode (mis. `2.1x`), dan estimasi sisa waktu |
@@ -84,16 +96,22 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 |---|---|
 | **Input** | MP3, WAV, FLAC, AAC, M4A, OGG, OPUS, WMA, AIFF, AMR, APE, WV, MKA, dan **audio dari file video** |
 | **Output** | MP3, M4A (AAC), FLAC, WAV, OGG, OPUS |
-| **Bitrate** | 128 / 192 / 256 / 320 kbps (Opus: 96–256 kbps). FLAC & WAV lossless. |
+| **Bitrate** | Tetap (CBR) 64 / 128 / 192 / 256 / 320 kbps (Opus: 64–256 kbps), atau **VBR** berdasarkan kualitas untuk MP3, OGG & Opus. FLAC & WAV lossless. |
 | **Channel & sample rate** | Ikuti asli / stereo / mono · ikuti asli / 44,1 kHz / 48 kHz |
 | **Info lagu** | Judul, artis, album, dan **cover** tetap terbawa (MP3, M4A, FLAC). Audio 24-bit tetap 24-bit di FLAC/WAV. |
+| **Editor tag** | Ubah judul, artis, album, tahun, genre, nomor lagu, dan cover per file (atau album/artis untuk semua file). Format **Asli (salin)** mengubah tag tanpa encode ulang. |
+| **Potong & fade** | Waktu mulai–selesai, fade in/out |
+| **Ratakan volume** | EBU R128 (`loudnorm`) dengan target −14 / −16 / −18 / −23 LUFS |
+| **Hapus hening** | Bagian sunyi di awal & akhir dibuang otomatis |
+| **Kecepatan & nada** | Kecepatan 0,5×–2× tanpa mengubah nada, nada −12…+12 semitone tanpa mengubah kecepatan |
+| **Gabung audio** | Beberapa file jadi satu, sesuai urutan daftar |
 
 ### ⬇ Download YouTube, TikTok, Instagram, Facebook & Spotify
 
 | | |
 |---|---|
 | **Link YouTube** | Video, Shorts, live, **playlist**, dan **channel** (`@nama`, `/channel/…`, `/c/…`, `/user/…`) |
-| **Link Spotify** | **Lagu, album, dan playlist** |
+| **Link Spotify** | **Lagu, album, playlist, dan artis** (playlist private bisa dibaca setelah login Spotify di Pengaturan) |
 | **Link TikTok** | **Video**, **post foto (slide)** beserta musiknya, link pendek `vt.tiktok.com`/`vm.tiktok.com`, dan **profil** (`@nama`) |
 | **Link Instagram** | **Reel**, **post foto**, **post video**, dan **carousel** (banyak foto/video dalam satu post) |
 | **Link Facebook** | **Video**, **reel**, link `fb.watch` / `/share/v/`, dan **foto** |
@@ -104,16 +122,24 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Pengaturan per kategori** | Format, kualitas, dan opsi lain berlaku untuk semua link dalam kategori itu (misalnya semua YouTube jadi MP3, TikTok tetap video). |
 | **Pilih item** | Centang satu per satu, **Pilih semua**, atau **rentang** seperti `1-20` / `3,5,7-9` |
 | **Channel** | Pilih jenis konten (**Video / Shorts / Live**) dan cakupan (**Semua / N terbaru / Sejak tanggal**). Nama file diawali tanggal upload. |
-| **YouTube: video** | Kualitas Terbaik / 1080p / 720p / 480p, format MP4 atau MKV |
+| **YouTube: video** | Kualitas Terbaik / 4K / 1440p / 1080p / 720p / 480p, format MP4 atau MKV |
+| **Subtitle** | Unduh sebagai file `.srt` atau sematkan ke video, bahasa pilihan (mis. `id,en`) |
+| **Unduh sebagian** | Klik ikon gunting untuk mengunduh bagian tertentu saja (mis. `1:30-2:45`) |
+| **SponsorBlock** | Tandai bagian sponsor sebagai bab, atau buang dari video |
+| **Cookies browser** | Login lewat cookies Firefox/Edge/Chrome/… atau file `cookies.txt` untuk video dibatasi umur, khusus member, atau post yang butuh login |
+| **Template nama file** | Mis. `{uploader} - {title} [{id}]` (YouTube & situs lain) dan `{artist} - {title}` (Spotify) |
+| **Pantau clipboard** | Link yang disalin otomatis masuk ke halaman Download (bisa dinyalakan di Pengaturan) |
+| **Batas kecepatan** | Mis. 1 MB/s total untuk semua unduhan, supaya internet tetap lancar (Pengaturan › Download) |
+| **Kirim ke konversi** | Hasil unduhan bisa langsung dibuka di halaman Video/Audio/Gambar |
 | **YouTube: audio** | MP3, M4A, OPUS, FLAC |
 | **TikTok, Instagram & Facebook** | Tiap item diberi label **Video / Foto / Musik**. Video bisa diunduh sebagai video (MP4/MKV) atau audio (MP3/M4A/OPUS/FLAC). **Format foto**: *Asli* atau diubah ke **JPG**. Post berisi banyak item disimpan dalam subfolder sendiri. Hanya konten **publik** (tanpa login). |
-| **Spotify** | Diunduh sebagai audio (MP3/M4A/OPUS). Kualitas Otomatis/192/320 kbps. Lagu dicocokkan dari YouTube, lalu diberi judul, artis, album, nomor track, dan cover dari Spotify. |
+| **Spotify** | Diunduh sebagai audio (MP3/M4A/OPUS/WAV). Lagu dicocokkan dari YouTube, lalu diberi judul, artis, album, nomor track, dan cover dari Spotify. Lagu yang salah/gagal dicocokkan bisa **diganti dengan link YouTube sendiri** (ikon rantai). Album & playlist bisa dibuatkan **file playlist `.m3u8`**. |
 | **Info & thumbnail** | Judul dan gambar sampul disematkan ke file hasil |
 | **Lewati yang sudah ada** | Video yang pernah diunduh ditandai "Sudah ada" dan dilewati, jadi unduh ulang channel/playlist hanya mengambil yang baru |
 | **Nomor urut** | `01 - judul`, `02 - judul`, … sesuai urutan playlist/album |
 | **Progress** | Persen, kecepatan, dan sisa waktu per item; bisa dibatalkan per item atau semua |
 
-### 📄 Alat PDF (29 alat, semuanya offline)
+### 📄 Alat PDF (31 alat, semuanya offline)
 
 Semua file PDF diproses **di komputer Anda**, tidak ada yang diunggah ke internet. Buka **Alat PDF** di sidebar, lalu pilih alatnya (bisa dicari).
 
@@ -122,11 +148,12 @@ Semua file PDF diproses **di komputer Anda**, tidak ada yang diunggah ke interne
 | **Atur halaman** | **Gabungkan PDF** (urutan bisa digeser) · **Pisahkan PDF** (per rentang, tiap N halaman, atau per halaman — klik gunting di antara halaman) · **Hapus halaman** · **Ekstrak halaman** (satu file atau per halaman) · **Susun halaman** (geser, putar, gandakan, hapus, sisipkan halaman kosong, gabung halaman dari beberapa PDF) · **Scan ke PDF** (scanner via dialog Windows atau kamera) |
 | **Optimasi** | **Kompres PDF** (Ekstrem / Disarankan / Ringan, opsional hitam-putih) · **Perbaiki PDF** (bangun ulang struktur, selamatkan halaman dari file rusak) · **OCR PDF** (teks hasil scan jadi bisa dicari & disalin, memakai OCR bawaan Windows) |
 | **Ubah ke PDF** | **Gambar ke PDF** (JPG, PNG, HEIC, WEBP, … dengan ukuran kertas A4/F4/Letter/…, arah, margin) · **Word, PowerPoint, Excel ke PDF** (lewat Microsoft Office bila terpasang, atau LibreOffice) · **HTML ke PDF** (alamat web atau file HTML, lebar layar HP/tablet/laptop/desktop, bisa satu halaman panjang) |
-| **Ubah dari PDF** | **PDF ke gambar** (JPG/PNG 72–300 DPI, atau ambil gambar asli di dalam PDF) · **PDF ke Word** (Microsoft Word bila ada; tanpa Word teks & paragraf tetap diambil) · **PDF ke PowerPoint** (satu halaman = satu slide) · **PDF ke Excel** (tabel disusun ke baris & kolom) · **PDF ke PDF/A** (PDF/A-2b untuk arsip) |
+| **Ubah dari PDF** | **PDF ke gambar** (JPG/PNG 72–300 DPI, atau ambil gambar asli di dalam PDF) · **PDF ke Word** (Microsoft Word bila ada; tanpa Word teks & paragraf tetap diambil) · **PDF ke PowerPoint** (satu halaman = satu slide) · **PDF ke Excel** (tabel disusun ke baris & kolom) · **PDF ke PDF/A** (PDF/A-2b untuk arsip, divalidasi otomatis bila veraPDF terpasang) · **Validasi PDF/A** (pemeriksaan resmi dengan veraPDF) |
 | **Edit & tandai** | **Putar PDF** · **Nomor halaman** (6 posisi, format "Halaman 1 dari N", mulai dari nomor tertentu, lewati sampul, mode buku) · **Watermark** teks atau logo (transparansi, kemiringan, 9 posisi atau berulang, di atas/di bawah isi) · **Edit PDF** (teks, kotak, lingkaran, garis, coretan bebas, gambar, tutup putih; bisa digeser, diubah ukuran, urungkan) · **Potong PDF** (pilih area atau margin mm) |
-| **Keamanan** | **Kunci PDF** (AES-256, izin cetak/salin/ubah) · **Buka kunci PDF** · **Tanda tangan PDF** (gambar dengan mouse/pena, ketik nama dengan huruf tulisan tangan, atau unggah gambar; plus tanggal) · **Sensor PDF** (tarik kotak atau cari teks, mis. nomor rekening; teks di bawahnya benar-benar dihapus dari file) · **Bandingkan PDF** (dua versi berdampingan, kata yang dihapus merah dan yang ditambah hijau) |
+| **Keamanan** | **Kunci PDF** (AES-256, izin cetak/salin/ubah) · **Buka kunci PDF** · **Tanda tangan PDF** (gambar dengan mouse/pena, ketik nama dengan huruf tulisan tangan, atau unggah gambar; plus tanggal) · **Sensor PDF** (tarik kotak atau cari teks, mis. nomor rekening; teks di bawahnya benar-benar dihapus dari file) · **Bandingkan PDF** (dua versi berdampingan, kata yang dihapus merah dan yang ditambah hijau) · **Tanda tangan digital** (sertifikat `.pfx/.p12` PKCS#7, atau buat sertifikat pribadi; bisa diverifikasi di pembaca PDF) |
 
 - PDF yang dikunci password bisa dipakai di semua alat: password ditanyakan saat mulai dan **tidak disimpan**.
+- Teks watermark, nomor halaman, dan Edit PDF mendukung **huruf non-Latin** (Cyrillic, Yunani, Jepang, Mandarin, Korea, Devanagari, …) dengan font Windows yang disematkan.
 - Hasil tersimpan di `Documents › KuyMediaBox` (bisa diubah ke folder dinamis atau folder pilihan). Nama file diberi akhiran sesuai alatnya, mis. `laporan_kecil.pdf`, `laporan_ttd.pdf`, `laporan_disensor.pdf`.
 - Konversi Word/Excel/PowerPoint memakai **Microsoft Office** yang sudah terpasang. Tanpa Office, unduh **LibreOffice** (opsional, ±375 MB) di **Pengaturan › Tools pendukung**.
 
@@ -157,8 +184,15 @@ Semua file PDF diproses **di komputer Anda**, tidak ada yang diunggah ke interne
 - **Dua bahasa: Indonesia & English.** Ganti di **Pengaturan › Umum › Bahasa / Language**. Seluruh tampilan, pesan error, dan notifikasi Windows langsung berganti tanpa perlu membuka ulang aplikasi.
 - **Pesan error yang jelas** (sesuai bahasa yang dipilih), plus tombol **Lihat detail** untuk log lengkap (bisa disalin).
 - **Notifikasi Windows** saat antrian selesai (bisa dimatikan).
-- **Tools Manager**: deteksi, unduh, update, atau pilih manual FFmpeg, yt-dlp, JS runtime (memakai Node.js/Deno yang sudah terpasang bila ada), spotDL, gallery-dl, dan LibreOffice (opsional). Update yt-dlp/spotDL/gallery-dl/LibreOffice dicek otomatis. Unduhan tools yang terputus **dilanjutkan otomatis** dari titik terakhir.
+- **Tools Manager**: deteksi, unduh, update, atau pilih manual FFmpeg, yt-dlp, JS runtime (memakai Node.js/Deno yang sudah terpasang bila ada), spotDL, gallery-dl, LibreOffice (opsional), dan veraPDF (opsional, Java ikut dipasang bila belum ada). Update yt-dlp/spotDL/gallery-dl/LibreOffice dicek otomatis. Unduhan tools yang terputus **dilanjutkan otomatis** dari titik terakhir.
 - **Pengaturan terakhir diingat** per halaman (format, kualitas, resolusi, dll.).
+- **Preset** per halaman: simpan/muat/hapus kumpulan pengaturan (mis. "WA Video 16MB", "MP3 320"), plus preset bawaan.
+- **Riwayat tugas**: tanggal, file asal & hasil, ukuran sebelum/sesudah, status; bisa dicari & difilter.
+- **Jumlah proses paralel** per menu bisa diatur (1–8).
+- **Tema gelap, terang, atau ikut Windows.**
+- **Setelah antrian selesai**: tidak ada / sleep / matikan PC (dengan hitung mundur 60 detik yang bisa dibatalkan).
+- **Kirim ke › KuyMediaBox** di menu klik kanan Explorer (aktifkan di Pengaturan); file langsung masuk ke halaman yang cocok.
+- **Folder pantauan**: file baru yang masuk ke folder tertentu otomatis dikonversi.
 - **Satu jendela saja**: membuka aplikasi lagi akan memunculkan jendela yang sudah terbuka.
 - **Update otomatis dari GitHub Releases**: saat dibuka, aplikasi mengecek versi terbaru. Kalau ada, muncul dialog berisi catatan rilis dan tombol **Update sekarang**. Aplikasi lalu mengunduh versi baru, memverifikasi checksum SHA-256, memasangnya, dan membuka ulang dirinya sendiri, tanpa perlu download manual.
   - Versi **portable**: file `.exe` diganti langsung di tempatnya.
@@ -347,6 +381,9 @@ Setiap push biasa ke branch `main` juga menjalankan build dan test yang sama (ta
 | Hasil (default) | `Pictures`, `Videos`, `Music`, `Downloads`, `Documents` › `KuyMediaBox` |
 | LibreOffice (opsional) | `%LOCALAPPDATA%\KuyMediaBox\bin\libreoffice\` |
 | Cache mesin PDF | `%LOCALAPPDATA%\KuyMediaBox\cache\` |
+| Riwayat tugas | `%LOCALAPPDATA%\KuyMediaBox\history.jsonl` |
+| veraPDF & Java (opsional) | `%LOCALAPPDATA%\KuyMediaBoxinerapdf\` dan `bin\jre\` |
+| Sertifikat pribadi (tanda tangan digital) | `Documents › KuyMediaBox › Sertifikat` (lokasi dipilih saat membuat) |
 
 Untuk reset total, tutup aplikasi lalu hapus folder `%APPDATA%\KuyMediaBox` dan `%LOCALAPPDATA%\KuyMediaBox`.
 

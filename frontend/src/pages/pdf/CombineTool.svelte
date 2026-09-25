@@ -401,7 +401,7 @@
   .thumb {
     height: 160px;
     border-radius: 8px;
-    background: #2a2f38;
+    background: var(--surface-2);
     display: flex;
     align-items: center;
     justify-content: center;
