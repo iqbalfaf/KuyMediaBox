@@ -12,10 +12,18 @@
   import SettingsPage from './pages/SettingsPage.svelte'
   import PdfPage from './pages/PdfPage.svelte'
   import PasswordDialog from './components/PasswordDialog.svelte'
+  import TextDialog from './components/TextDialog.svelte'
+  import TagDialog from './components/TagDialog.svelte'
+  import CompareDialog from './components/CompareDialog.svelte'
+  import AfterQueueBanner from './components/AfterQueueBanner.svelte'
+  import HistoryPage from './pages/HistoryPage.svelte'
+  import { initAfter, initHistory } from './lib/stores/history.svelte'
+  import { openRequest } from './lib/stores/open.svelte'
+  import type { OpenRequest } from './lib/types'
   import { convFor, pdfDrop, pdfNav } from './lib/stores/pdf.svelte'
   import { toolById } from './lib/pdfTools'
-  import { runtime } from './lib/api'
-  import { initApp, nav, toast } from './lib/stores/app.svelte'
+  import { api, runtime } from './lib/api'
+  import { initApp, nav, settings, toast } from './lib/stores/app.svelte'
   import { initTasks } from './lib/stores/tasks.svelte'
   import { audioConv, imageConv, videoConv } from './lib/stores/converter.svelte'
   import { addLinks } from './lib/stores/download.svelte'
@@ -41,6 +49,16 @@
     initApp()
     initTasks()
     initUpdate()
+    initHistory()
+    initAfter()
+
+    // Files from Explorer ("Send to") — at start and while running.
+    api.takeLaunchFiles().then(openRequest).catch(() => {})
+    runtime.on('files:open', (req: OpenRequest) => openRequest(req))
+    runtime.on('watch:queued', (w: { dir: string; count: number }) =>
+      toast(L(`Folder pantauan: ${w.count} file baru diproses`, `Watched folder: ${w.count} new file${w.count === 1 ? '' : 's'} queued`), 'info'),
+    )
+    runtime.on('watch:error', (w: { dir: string; error: string }) => toast(`${L('Folder pantauan', 'Watched folder')}: ${w.error}`, 'err'))
 
     runtime.onFileDrop((_x, _y, paths) => {
       switch (nav.page) {
@@ -81,6 +99,36 @@
     })
   })
 
+  // Clipboard monitor (DL-16): copied links go to the Download page. Text already on the
+  // clipboard when monitoring starts is ignored.
+  let clipTimer: ReturnType<typeof setInterval> | null = null
+  let lastClip: string | null = null
+  $effect(() => {
+    const on = !!settings.value?.clipboardWatch
+    if (on && !clipTimer) {
+      lastClip = null
+      clipTimer = setInterval(async () => {
+        let text = ''
+        try {
+          text = ((await runtime.clipboardText()) ?? '').trim()
+        } catch {
+          return
+        }
+        if (lastClip === null) {
+          lastClip = text
+          return
+        }
+        if (text === lastClip || !text) return
+        lastClip = text
+        if (text.length > 20000 || !/(https?:\/\/|www\.)\S+/i.test(text)) return
+        await addLinks(text)
+      }, 1500)
+    } else if (!on && clipTimer) {
+      clearInterval(clipTimer)
+      clipTimer = null
+    }
+  })
+
   // Ctrl+V anywhere on the Download page adds links from the clipboard.
   function onPaste(e: ClipboardEvent) {
     if (nav.page !== 'download') return
@@ -109,6 +157,8 @@
       <DownloadPage />
     {:else if nav.page === 'pdf'}
       <PdfPage />
+    {:else if nav.page === 'history'}
+      <HistoryPage />
     {:else}
       <SettingsPage />
     {/if}
@@ -122,6 +172,10 @@
 <DetailModal />
 <UpdateDialog />
 <PasswordDialog />
+<TextDialog />
+<TagDialog />
+<CompareDialog />
+<AfterQueueBanner />
 
 <style>
   .shell {

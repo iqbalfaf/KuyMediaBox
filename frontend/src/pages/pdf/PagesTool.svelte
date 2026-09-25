@@ -511,7 +511,7 @@
     max-width: 100%;
     max-height: 100%;
     background: #fff;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 2px 10px var(--shadow);
     transition: transform 0.2s;
   }
   .blank {

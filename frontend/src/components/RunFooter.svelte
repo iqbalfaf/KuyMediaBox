@@ -89,7 +89,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    background: #1a1e26;
+    background: var(--surface-3);
     flex-shrink: 0;
   }
   .line {

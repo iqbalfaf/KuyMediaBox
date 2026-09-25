@@ -35,10 +35,10 @@ func TestStatusesAndIdle(t *testing.T) {
 	m := New(c.emit, func(kind string, d, f, s, x int) { c.idle <- [5]int{d, f, s, x, 0} })
 
 	ids := m.AddMany(KindImage, []Spec{
-		{"ok", func(ctx context.Context, r Reporter) error { r.Progress(0.5); return nil }},
-		{"bad", func(ctx context.Context, r Reporter) error { return Fail("gagal", "detail") }},
-		{"skip", func(ctx context.Context, r Reporter) error { return Skip("sudah ada") }},
-		{"panic", func(ctx context.Context, r Reporter) error { panic("boom") }},
+		{Title: "ok", Run: func(ctx context.Context, r Reporter) error { r.Progress(0.5); return nil }},
+		{Title: "bad", Run: func(ctx context.Context, r Reporter) error { return Fail("gagal", "detail") }},
+		{Title: "skip", Run: func(ctx context.Context, r Reporter) error { return Skip("sudah ada") }},
+		{Title: "panic", Run: func(ctx context.Context, r Reporter) error { panic("boom") }},
 	})
 	ok, bad, skip, panicky := ids[0], ids[1], ids[2], ids[3]
 
@@ -216,5 +216,51 @@ func TestSeqOrdersUpdates(t *testing.T) {
 		if snap, _ := m.Get(id); snap.Seq != best.Seq {
 			t.Fatalf("round %d: snapshot seq %d, last emitted %d", round, snap.Seq, best.Seq)
 		}
+	}
+}
+
+func TestSetLimitAndFinishHook(t *testing.T) {
+	m := New(nil, nil)
+	finished := make(chan Info, 8)
+	m.OnFinish = func(i Info) { finished <- i }
+	m.SetLimit(KindVideo, 3)
+	if m.Limit(KindVideo) != 3 {
+		t.Fatalf("limit %d", m.Limit(KindVideo))
+	}
+	var mu sync.Mutex
+	running, peak := 0, 0
+	var wg sync.WaitGroup
+	for i := 0; i < 6; i++ {
+		wg.Add(1)
+		m.AddMany(KindVideo, []Spec{{Title: "x", Input: "in.mp4", InSize: 10, Run: func(ctx context.Context, r Reporter) error {
+			defer wg.Done()
+			mu.Lock()
+			running++
+			peak = max(peak, running)
+			mu.Unlock()
+			time.Sleep(40 * time.Millisecond)
+			mu.Lock()
+			running--
+			mu.Unlock()
+			return nil
+		}}})
+	}
+	wg.Wait()
+	if peak < 2 || peak > 3 {
+		t.Fatalf("peak %d, want 2..3", peak)
+	}
+	for i := 0; i < 6; i++ {
+		select {
+		case info := <-finished:
+			if info.Input != "in.mp4" || info.InSize != 10 || info.Status != StatusDone {
+				t.Fatalf("finish info %+v", info)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("finish hook not called")
+		}
+	}
+	time.Sleep(20 * time.Millisecond)
+	if m.Busy() {
+		t.Fatal("still busy")
 	}
 }

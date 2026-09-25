@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"kuymediabox/internal/appdir"
 	"kuymediabox/internal/downloader"
@@ -18,15 +19,22 @@ import (
 )
 
 func (a *App) env() downloader.Env {
+	s := a.cfg.Get()
 	return downloader.Env{
-		YtDlp:       a.tools.Path(tools.YtDlp),
-		FFmpeg:      a.tools.Path(tools.FFmpeg),
-		SpotDL:      a.tools.Path(tools.SpotDL),
-		GalleryDL:   a.tools.Path(tools.GalleryDL),
-		JSKind:      a.tools.JSRuntimeKind(),
-		JSPath:      a.tools.Path(tools.JSRuntime),
-		ArchivePath: filepath.Join(appdir.DataDir(), "download-archive.txt"),
-		TempDir:     appdir.TempDir(),
+		CookiesBrowser: s.CookiesBrowser,
+		CookiesFile:    s.CookiesFile,
+		SpotifyAuth:    s.SpotifyLogin,
+		NameTemplate:   s.NameTemplate,
+		SpotifyTpl:     s.SpotifyTemplate,
+		RateLimitKB:    rateShare(s.DownloadLimitKB, s.Parallel["download"]),
+		YtDlp:          a.tools.Path(tools.YtDlp),
+		FFmpeg:         a.tools.Path(tools.FFmpeg),
+		SpotDL:         a.tools.Path(tools.SpotDL),
+		GalleryDL:      a.tools.Path(tools.GalleryDL),
+		JSKind:         a.tools.JSRuntimeKind(),
+		JSPath:         a.tools.Path(tools.JSRuntime),
+		ArchivePath:    filepath.Join(appdir.DataDir(), "download-archive.txt"),
+		TempDir:        appdir.TempDir(),
 	}
 }
 
@@ -74,6 +82,32 @@ func (a *App) AnalyzeLink(raw string) (*downloader.Collection, error) {
 	return col, nil
 }
 
+// SetEntrySource replaces the automatic YouTube match of a Spotify song with a chosen link
+// ("" goes back to the automatic match).
+func (a *App) SetEntrySource(key, id, url string) (downloader.Entry, error) {
+	url = strings.TrimSpace(url)
+	if url != "" {
+		l := downloader.Detect(url)
+		if l.Type == downloader.TypeUnknown || l.Source == downloader.SourceSpotify || downloader.IsSocial(l.Source) {
+			return downloader.Entry{}, errors.New(i18n.L("Tempel link video YouTube (atau YouTube Music)", "Paste a YouTube (or YouTube Music) video link"))
+		}
+		url = l.URL
+	}
+	a.colMu.Lock()
+	defer a.colMu.Unlock()
+	col := a.collections[key]
+	if col == nil {
+		return downloader.Entry{}, errors.New(i18n.L("Data link sudah kedaluwarsa, periksa link lagi", "Link data expired, check the link again"))
+	}
+	for i := range col.Entries {
+		if col.Entries[i].ID == id {
+			col.Entries[i].Source = url
+			return col.Entries[i], nil
+		}
+	}
+	return downloader.Entry{}, errors.New(i18n.L("Lagu tidak ditemukan", "Song not found"))
+}
+
 // ForgetCollection releases a link removed from the page.
 func (a *App) ForgetCollection(key string) {
 	a.colMu.Lock()
@@ -102,7 +136,7 @@ func collectionDir(base string, col *downloader.Collection, subfolders bool) str
 		return base
 	}
 	switch col.Type {
-	case downloader.TypePlaylist, downloader.TypeChannel, downloader.TypeAlbum:
+	case downloader.TypePlaylist, downloader.TypeChannel, downloader.TypeAlbum, downloader.TypeArtist:
 		name := strings.ReplaceAll(naming.SanitizeFileName(col.Title), "%", "")
 		return filepath.Join(base, name)
 	case downloader.TypeProfile:
@@ -124,6 +158,13 @@ func (a *App) StartDownloads(key string, ids []string, o downloader.Options) ([]
 		return nil, errors.New(i18n.L("Data link sudah kedaluwarsa, periksa link lagi", "Link data expired, check the link again"))
 	}
 	o.Normalize(col.Source)
+	if s, e := o.SectionStart, o.SectionEnd; s != "" || e != "" {
+		st, ok1 := downloader.ParseClock(s)
+		en, ok2 := downloader.ParseClock(e)
+		if !ok1 || !ok2 || (en > 0 && en <= st) {
+			return nil, errors.New(i18n.L("Waktu potong tidak valid. Contoh: 1:30 sampai 2:45", "Invalid cut time. Example: 1:30 to 2:45"))
+		}
+	}
 	env := a.env()
 	want := map[string]bool{}
 	for _, id := range ids {
@@ -174,6 +215,15 @@ func (a *App) StartDownloads(key string, ids []string, o downloader.Options) ([]
 		matcher = downloader.NewMatcher(env, urls)
 	}
 
+	// Albums, playlists and artists can get an .m3u8 playlist, refreshed as songs finish.
+	var list *m3uWriter
+	switch col.Type {
+	case downloader.TypePlaylist, downloader.TypeAlbum, downloader.TypeArtist:
+		if o.Playlist {
+			list = &m3uWriter{path: filepath.Join(dir, downloader.PlaylistName(col)), items: map[string]downloader.PlaylistItem{}}
+		}
+	}
+
 	specs := make([]queue.Spec, len(chosen))
 	out := make([]JobRef, len(chosen))
 	for i, e := range chosen {
@@ -191,7 +241,7 @@ func (a *App) StartDownloads(key string, ids []string, o downloader.Options) ([]
 				return err
 			}
 		} else if col.Source == downloader.SourceSpotify {
-			name := downloader.SpotifyFileName(e, o.Numbering && col.Type != downloader.TypeTrack, width)
+			name := downloader.SpotifyFileName(e, o.Numbering && col.Type != downloader.TypeTrack, width, env.SpotifyTpl)
 			run = func(ctx context.Context, r queue.Reporter) error {
 				_, err := downloader.DownloadSpotify(ctx, env, e, dir, name, o, matcher, r)
 				return err
@@ -207,7 +257,10 @@ func (a *App) StartDownloads(key string, ids []string, o downloader.Options) ([]
 				return err
 			}
 		}
-		specs[i] = queue.Spec{Title: title, Run: run}
+		if list != nil {
+			run = list.wrap(e, title, run)
+		}
+		specs[i] = queue.Spec{Title: title, Input: e.URL, Run: run}
 		out[i].ItemID = e.ID
 	}
 	taskIDs := a.queue.AddMany(queue.KindDownload, specs)
@@ -215,4 +268,51 @@ func (a *App) StartDownloads(key string, ids []string, o downloader.Options) ([]
 		out[i].TaskID = taskIDs[i]
 	}
 	return out, nil
+}
+
+// m3uWriter keeps a playlist file in step with finished downloads.
+type m3uWriter struct {
+	mu    sync.Mutex
+	path  string
+	items map[string]downloader.PlaylistItem
+}
+
+// wrap records the task's result file and rewrites the playlist.
+func (m *m3uWriter) wrap(e downloader.Entry, title string, run queue.RunFunc) queue.RunFunc {
+	return func(ctx context.Context, r queue.Reporter) error {
+		rec := &outRecorder{Reporter: r}
+		err := run(ctx, rec)
+		if rec.path != "" && (err == nil || errors.Is(err, queue.ErrSkipped)) {
+			if _, statErr := os.Stat(rec.path); statErr == nil {
+				m.mu.Lock()
+				m.items[e.ID] = downloader.PlaylistItem{Index: e.Index, Path: rec.path, Title: title, Duration: e.Duration}
+				list := make([]downloader.PlaylistItem, 0, len(m.items))
+				for _, it := range m.items {
+					list = append(list, it)
+				}
+				_ = downloader.WriteM3U(m.path, list)
+				m.mu.Unlock()
+			}
+		}
+		return err
+	}
+}
+
+// outRecorder remembers the output path a task reports.
+type outRecorder struct {
+	queue.Reporter
+	path string
+}
+
+func (o *outRecorder) SetOutput(path string, size int64) {
+	o.path = path
+	o.Reporter.SetOutput(path, size)
+}
+
+// rateShare splits the total download speed limit over the downloads running at once.
+func rateShare(totalKB, parallel int) int {
+	if totalKB <= 0 {
+		return 0
+	}
+	return max(32, totalKB/max(1, parallel))
 }

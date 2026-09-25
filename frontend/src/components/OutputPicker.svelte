@@ -142,9 +142,9 @@
     z-index: 20;
     padding: 6px;
     border-radius: 12px;
-    background: #20252e;
+    background: var(--popup);
     border: 1px solid var(--border-strong);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 12px 32px var(--shadow);
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -169,7 +169,7 @@
     min-width: 0;
   }
   .menu button:hover {
-    background: #2a303b;
+    background: var(--hover);
   }
   .menu button.on .mt {
     color: var(--accent-text);

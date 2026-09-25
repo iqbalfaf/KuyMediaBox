@@ -54,7 +54,7 @@
     padding: 0;
     border: 0;
     border-radius: 999px;
-    background: #343b48;
+    background: var(--switch-off);
     position: relative;
     transition: background 0.15s;
   }

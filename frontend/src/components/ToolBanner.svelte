@@ -47,8 +47,8 @@
     gap: 12px;
     padding: 12px 14px;
     border-radius: 12px;
-    background: #2b2112;
-    border: 1px solid #5c4520;
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
     color: var(--warn);
     flex-shrink: 0;
   }
@@ -61,10 +61,10 @@
     min-width: 0;
   }
   .txt b {
-    color: #ffe0b0;
+    color: var(--warn-title);
   }
   .txt span {
-    color: #d9c3a0;
+    color: var(--warn-text);
     font-size: 12px;
   }
   .prog {

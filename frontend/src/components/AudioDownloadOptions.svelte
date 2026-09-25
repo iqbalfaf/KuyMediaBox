@@ -52,7 +52,7 @@
 
 <div class="sec">
   <span class="label">{label}</span>
-  <Chips bind:value={opts.audioFormat} columns={spotify ? 4 : 3} tall options={formats} onchange={pickFormat} />
+  <Chips bind:value={opts.audioFormat} columns={spotify ? 2 : 3} tall options={formats} onchange={pickFormat} />
 </div>
 
 {#if lossless}
@@ -68,22 +68,21 @@
     <span class="label">{L('Bitrate', 'Bitrate')}</span>
     <Chips
       bind:value={opts.audioQuality}
-      columns={list.length + 1}
+      columns={list.length + 1 > 4 ? 3 : list.length + 1 === 4 ? 2 : list.length + 1}
       tall
       {onchange}
       options={[
         { value: 'auto' as Rate, label: L('Otomatis', 'Auto'), sub: L('ikut sumber', 'as source') },
-        ...list.map((r) => ({ value: r.value, label: `${r.value}`, sub: tagText(r.tag) || 'kbps' })),
+        ...list.map((r) => ({ value: r.value, label: `${r.value} kbps`, sub: tagText(r.tag) || ' ' })),
       ]}
     />
     <p class="hint">
       {#if opts.audioQuality === 'auto'}
-        {L('Otomatis memakai kualitas terbaik sesuai sumber (VBR).', 'Auto uses the best quality the source allows (VBR).')}
+        {L('Kualitas terbaik sesuai sumber (VBR).', 'Best quality the source allows (VBR).')}
       {:else}
-        {opts.audioQuality} kbps ≈ {mbPerMin} MB {L('per menit', 'per minute')}.
+        ± {mbPerMin} MB {L('per menit', 'per minute')}.
       {/if}
-      {L(`Rekomendasi: ${recommended[opts.audioFormat]} kbps.`, `Recommended: ${recommended[opts.audioFormat]} kbps.`)}
-      {L('Audio YouTube aslinya sekitar 128–160 kbps, jadi bitrate lebih tinggi hanya menambah ukuran, bukan kualitas.', 'YouTube audio is about 128–160 kbps to begin with, so a higher bitrate only adds size, not quality.')}
+      {L(`Disarankan ${recommended[opts.audioFormat]} kbps — audio YouTube aslinya ±128–160 kbps, jadi bitrate lebih tinggi hanya menambah ukuran.`, `${recommended[opts.audioFormat]} kbps recommended — YouTube audio is ±128–160 kbps, so higher bitrates only add size.`)}
     </p>
   </div>
 {/if}
