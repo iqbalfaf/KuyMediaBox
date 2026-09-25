@@ -1,5 +1,5 @@
 export type Kind = 'image' | 'video' | 'audio' | 'download' | 'pdf'
-export type Page = 'image' | 'video' | 'audio' | 'download' | 'pdf' | 'settings'
+export type Page = 'image' | 'video' | 'audio' | 'download' | 'pdf' | 'history' | 'settings'
 
 export type TaskStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled' | 'skipped'
 
@@ -11,6 +11,8 @@ export interface TaskInfo {
   progress: number
   message: string
   detail: string
+  input: string
+  inSize: number
   output: string
   outSize: number
   started: number
@@ -40,6 +42,9 @@ export interface FileItem {
   pages: number
   encrypted: boolean
   locked: boolean
+  subCodec: string
+  subFile: string
+  tags: Record<string, string> | null
   error: string
 }
 
@@ -63,6 +68,28 @@ export interface ImageOptions {
   height: number
   background: string
   autoRotate: boolean
+  keepMetadata: boolean
+  targetKB: number
+  icoSizes: number[]
+  rotate: number
+  flipH: boolean
+  flipV: boolean
+  crop: string
+  watermark: ImageWatermark
+}
+
+export interface ImageWatermark {
+  enabled: boolean
+  type: 'text' | 'image'
+  text: string
+  bold: boolean
+  color: string
+  image: string
+  size: number
+  opacity: number
+  angle: number
+  position: string
+  margin: number
 }
 
 export interface VideoOptions {
@@ -72,16 +99,52 @@ export interface VideoOptions {
   manual: boolean
   crf: number
   preset: 'fast' | 'medium' | 'slow'
-  resolution: 'original' | '1080' | '720' | '480' | 'custom'
+  resolution: 'original' | '2160' | '1440' | '1080' | '720' | '480' | 'custom'
   custom: number
+  targetMB: number
+  bitrateK: number
+  hw: '' | 'nvenc' | 'qsv' | 'amf'
+  trimStart: string
+  trimEnd: string
+  fps: string
+  fpsCustom: number
+  audioMode: 'auto' | 'copy' | 'aac' | 'mp3' | 'opus' | 'mute'
+  audioBitrate: number
+  rotate: number
+  flipH: boolean
+  flipV: boolean
+  subtitles: 'none' | 'embed' | 'burn'
 }
 
 export interface AudioOptions {
   format: string
   bitrate: number
+  vbr: boolean
+  vbrLevel: 'best' | 'high' | 'medium' | 'small'
   channels: 'source' | 'stereo' | 'mono'
   sampleRate: 'source' | '44100' | '48000'
   keepMetadata: boolean
+  trimStart: string
+  trimEnd: string
+  fadeIn: number
+  fadeOut: number
+  normalize: boolean
+  loudness: number
+  removeSilence: boolean
+  speed: number
+  pitch: number
+}
+
+export interface AudioTags {
+  title: string
+  artist: string
+  album: string
+  albumArtist: string
+  year: string
+  genre: string
+  track: string
+  cover: string
+  removeCover: boolean
 }
 
 export interface Settings {
@@ -93,7 +156,60 @@ export interface Settings {
   skipDownloaded: boolean
   autoUpdate: boolean
   language: Lang
+  theme: 'dark' | 'light' | 'system'
+  parallel: Record<string, number>
+  cookiesBrowser: string
+  cookiesFile: string
+  nameTemplate: string
+  spotifyTemplate: string
+  spotifyLogin: boolean
+  clipboardWatch: boolean
+  downloadLimitKB: number
+  watch: WatchRule[]
   toolPaths: Record<string, string>
+}
+
+export interface WatchRule {
+  id: string
+  dir: string
+  kind: 'image' | 'video' | 'audio'
+  options: any
+  enabled: boolean
+}
+
+export interface HistoryEntry {
+  id: string
+  time: number
+  started: number
+  kind: Kind
+  title: string
+  input: string
+  output: string
+  inSize: number
+  outSize: number
+  status: TaskStatus
+  message: string
+  detail: string
+}
+
+export interface AfterQueue {
+  action: 'none' | 'sleep' | 'shutdown'
+  pending: boolean
+  seconds: number
+}
+
+export interface OpenRequest {
+  page: '' | 'image' | 'video' | 'audio' | 'pdf'
+  paths: string[]
+}
+
+export interface CertInfo {
+  name: string
+  email: string
+  issuer: string
+  selfSigned: boolean
+  notBefore: string
+  notAfter: string
 }
 
 export interface UpdateInfo {
@@ -135,7 +251,7 @@ export type Source = 'youtube' | 'spotify' | 'tiktok' | 'instagram' | 'facebook'
 
 export interface Link {
   source: Source | ''
-  type: 'video' | 'playlist' | 'channel' | 'track' | 'album' | 'post' | 'profile' | 'unknown'
+  type: 'video' | 'playlist' | 'channel' | 'track' | 'album' | 'artist' | 'post' | 'profile' | 'unknown'
   url: string
   id: string
   photo: boolean
@@ -156,6 +272,7 @@ export interface Entry {
   kind: '' | 'video' | 'audio' | 'image'
   archived: boolean
   unavailable: boolean
+  source: string
 }
 
 export interface Collection {
@@ -172,7 +289,7 @@ export interface Collection {
 
 export interface DownloadOptions {
   mode: 'video' | 'audio'
-  quality: 'best' | '1080' | '720' | '480'
+  quality: 'best' | '2160' | '1440' | '1080' | '720' | '480'
   container: 'mp4' | 'mkv'
   audioFormat: 'mp3' | 'm4a' | 'opus' | 'flac' | 'wav'
   audioQuality: 'auto' | '96' | '128' | '160' | '192' | '256' | '320'
@@ -180,6 +297,12 @@ export interface DownloadOptions {
   skipExisting: boolean
   numbering: boolean
   imageFormat: 'original' | 'jpg'
+  subtitles: 'none' | 'file' | 'embed'
+  subLangs: string
+  sectionStart: string
+  sectionEnd: string
+  sponsorBlock: 'off' | 'mark' | 'remove'
+  playlist: boolean
 }
 
 export interface JobRef {
@@ -268,6 +391,8 @@ export interface PdfOptions {
   separate: boolean
   html: { pageSize: string; orientation: string; margin: string; width: number; onePage: boolean; background: boolean }
   images: { pageSize: string; orientation: string; margin: string; quality: number; combine: boolean }
+  digisign: { certFile: string; name: string; reason: string; location: string; contact: string; visible: boolean; position: string; page: string }
+  pdfaCheck: { flavour: string }
 }
 
 /** One page of an organised document. src -1 = blank page. */

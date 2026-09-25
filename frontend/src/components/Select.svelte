@@ -57,7 +57,7 @@
     border-color: var(--accent);
   }
   option {
-    background: #1f242d;
+    background: var(--surface-2);
     color: var(--text);
   }
   .chev {

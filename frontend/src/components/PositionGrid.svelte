@@ -41,7 +41,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #434a57;
+    background: var(--dot);
   }
   button:hover span {
     background: var(--text-3);

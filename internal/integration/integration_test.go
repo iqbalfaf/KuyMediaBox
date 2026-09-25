@@ -316,7 +316,7 @@ func TestSpotify(t *testing.T) {
 	o.Normalize(downloader.SourceSpotify)
 	matcher := downloader.NewMatcher(e, []string{col.Entries[0].URL})
 	dir := t.TempDir()
-	name := downloader.SpotifyFileName(col.Entries[0], true, 2)
+	name := downloader.SpotifyFileName(col.Entries[0], true, 2, "")
 	r := &rep{t: t}
 	out, err := downloader.DownloadSpotify(ctx, e, col.Entries[0], dir, name, o, matcher, r)
 	if err != nil {

@@ -1,6 +1,9 @@
 package downloader
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestDetect(t *testing.T) {
 	cases := []struct {
@@ -16,7 +19,7 @@ func TestDetect(t *testing.T) {
 		{"https://open.spotify.com/intl-id/track/4uLU6hMCjMI75M1A2tKUQC?si=x", SourceSpotify, TypeTrack, "https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC"},
 		{"https://open.spotify.com/album/1DFixLWuPkv3KT3TnV35m3", SourceSpotify, TypeAlbum, "https://open.spotify.com/album/1DFixLWuPkv3KT3TnV35m3"},
 		{"https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M", SourceSpotify, TypePlaylist, "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"},
-		{"https://open.spotify.com/artist/abc", SourceSpotify, TypeUnknown, "https://open.spotify.com/artist/abc"},
+		{"https://open.spotify.com/artist/abc", SourceSpotify, TypeArtist, "https://open.spotify.com/artist/abc"},
 		{"https://vimeo.com/123", SourceOther, TypeVideo, "https://vimeo.com/123"},
 		{"https://www.tiktok.com/@hihustleband/video/7677609057787612436?is_from_webapp=1", SourceTikTok, TypePost, "https://www.tiktok.com/@hihustleband/video/7677609057787612436"},
 		{"tiktok.com/@hullcity/photo/7557376330036153622", SourceTikTok, TypePost, "https://www.tiktok.com/@hullcity/photo/7557376330036153622"},
@@ -70,5 +73,57 @@ func TestDetectPhotoHint(t *testing.T) {
 		if got := Detect(in); got.Photo != want || got.Type != TypePost {
 			t.Errorf("%s → %+v, want photo=%v", in, got, want)
 		}
+	}
+}
+
+func TestTemplatesAndSections(t *testing.T) {
+	if got := YtTemplate("{uploader} - {title} [{id}] 100%", 7); got != "%(uploader,channel|)s - %(title).150B [%(id)s] 100%%" {
+		t.Fatalf("yt template %q", got)
+	}
+	if got := YtTemplate("{index}. {title} {unknown}", 3); got != "03. %(title).150B {unknown}" {
+		t.Fatalf("index template %q", got)
+	}
+	e := Entry{Title: "Lagu", Artist: "Band", Album: "Album", Index: 4}
+	if got := SpotifyFileName(e, true, 2, "{artist} - {title} ({album})"); got != "04 - Band - Lagu (Album)" {
+		t.Fatalf("spotify template %q", got)
+	}
+	if got := SpotifyFileName(e, true, 2, "{index} {title} - {year}"); got != "04 Lagu" {
+		t.Fatalf("empty token template %q", got)
+	}
+	for in, want := range map[[2]string]string{{"1:00", "2:30"}: "*60-150", {"90", ""}: "*90-inf", {"", ""}: "", {"2:00", "1:00"}: ""} {
+		if got := sectionArg(in[0], in[1]); got != want {
+			t.Errorf("section %v = %q, want %q", in, got, want)
+		}
+	}
+	o := Options{SubLangs: "id, en; rm -rf", Subtitles: "embed", SponsorBlock: "remove"}
+	o.Normalize(SourceTikTok)
+	if o.SubLangs != "id" || o.SponsorBlock != "off" {
+		t.Fatalf("normalize %+v", o)
+	}
+}
+
+func TestYtArgsExtras(t *testing.T) {
+	e := Env{YtDlp: "yt-dlp", CookiesBrowser: "firefox"}
+	o := Options{Mode: "video", Quality: "1080", Container: "mp4", Subtitles: "embed", SubLangs: "id,en", SectionStart: "1:00", SectionEnd: "2:00", SponsorBlock: "remove"}
+	args := strings.Join(e.ytArgs(ytJob{URL: "u", Dir: "d", Template: "t", Opts: o, PathFile: "p"}), " ")
+	for _, want := range []string{"--cookies-from-browser firefox", "--embed-subs", "--sub-langs id,en", "--download-sections *60-120", "--sponsorblock-remove sponsor,selfpromo,interaction"} {
+		if !strings.Contains(args, want) {
+			t.Errorf("missing %q in %s", want, args)
+		}
+	}
+	if strings.Contains(args, "--write-subs") {
+		t.Error("embed mode must not keep .srt files")
+	}
+	e.CookiesFile = `C:\c.txt`
+	if a := strings.Join(e.cookieArgs(), " "); a != `--cookies C:\c.txt` {
+		t.Errorf("cookie file args %q", a)
+	}
+}
+
+func TestRateLimitArg(t *testing.T) {
+	e := Env{YtDlp: "yt-dlp", RateLimitKB: 512}
+	args := strings.Join(e.ytArgs(ytJob{URL: "u", Dir: "d", Template: "t", Opts: Options{Mode: "audio", AudioFormat: "mp3"}, PathFile: "p"}), " ")
+	if !strings.Contains(args, "--limit-rate 512K") {
+		t.Fatalf("missing limit: %s", args)
 	}
 }

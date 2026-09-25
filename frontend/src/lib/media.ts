@@ -46,6 +46,10 @@ export function maxCrf(codec: string): number {
 
 export function targetShort(o: VideoOptions): number {
   switch (o.resolution) {
+    case '2160':
+      return 2160
+    case '1440':
+      return 1440
     case '1080':
       return 1080
     case '720':
@@ -63,6 +67,7 @@ export function outputSize(w: number, h: number, o: VideoOptions): [number, numb
   let target = targetShort(o)
   if (o.format === 'gif' && target === 0) target = 480
   if (o.codec === 'copy' && o.format !== 'gif') return [w, h]
+  if (o.rotate === 90 || o.rotate === 270) [w, h] = [h, w]
   if (!w || !h || !target || Math.min(w, h) <= target) return [w, h]
   // ffmpeg's "-2" rounds the scaled side to the nearest even number.
   if (w >= h) return [Math.round((w * target) / h / 2) * 2, target]

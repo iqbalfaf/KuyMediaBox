@@ -12,6 +12,8 @@ import (
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/types"
 	"golang.org/x/text/encoding/charmap"
+
+	"kuymediabox/internal/fonts"
 )
 
 // Item is something drawn on top of a page. Coordinates are points in display space: origin
@@ -144,8 +146,12 @@ func pdfString(b []byte) string {
 	return sb.String()
 }
 
-// TextWidth is the width of text in points for Helvetica (bold) at size.
+// TextWidth is the width of text in points at size: Helvetica (bold) for WinAnsi text,
+// otherwise the Windows font that will be embedded for it.
 func TextWidth(text string, size float64, bold bool) float64 {
+	if !winAnsiOK(text) {
+		return fonts.For(text, bold).TextWidth(text, size)
+	}
 	name := "Helvetica"
 	if bold {
 		name = "Helvetica-Bold"
@@ -161,13 +167,14 @@ func TextWidth(text string, size float64, bold bool) float64 {
 
 // overlayBuilder collects content operators and the resources they need.
 type overlayBuilder struct {
-	ctx   *model.Context
-	buf   bytes.Buffer
-	dh    float64 // display height
-	gs    map[string]string
-	fonts map[string]bool
-	xobj  map[string]*types.IndirectRef
-	seq   int
+	ctx    *model.Context
+	buf    bytes.Buffer
+	dh     float64 // display height
+	gs     map[string]string
+	fonts  map[string]bool
+	ufonts map[string]*uniFont // embedded fonts for non-WinAnsi text, by font file
+	xobj   map[string]*types.IndirectRef
+	seq    int
 }
 
 func (b *overlayBuilder) opacity(a float64) string {
@@ -288,7 +295,12 @@ func (b *overlayBuilder) text(it Item) error {
 	if it.Bold {
 		name = fontBold
 	}
-	b.fonts[name] = true
+	uf := b.uniFor(it)
+	if uf != nil {
+		name = uf.res
+	} else {
+		b.fonts[name] = true
+	}
 	color := it.Color
 	if color == "" {
 		color = "#000000"
@@ -308,7 +320,12 @@ func (b *overlayBuilder) text(it Item) error {
 		b.buf.WriteString("3 Tr\n")
 	}
 	for i, line := range lines {
-		w := TextWidth(line, size, it.Bold)
+		var w float64
+		if uf != nil {
+			w = uf.sub.Width(line, size)
+		} else {
+			w = TextWidth(line, size, it.Bold)
+		}
 		x := 0.0
 		switch it.Align {
 		case "center":
@@ -322,7 +339,11 @@ func (b *overlayBuilder) text(it Item) error {
 		}
 		fmt.Fprintf(&b.buf, "%s Tz\n", num(scale))
 		fmt.Fprintf(&b.buf, "1 0 0 1 %s %s Tm\n", num(x), num(-float64(i)*size*1.2))
-		fmt.Fprintf(&b.buf, "%s Tj\n", pdfString(winAnsi(line)))
+		if uf != nil {
+			fmt.Fprintf(&b.buf, "%s Tj\n", uf.hexGlyphs(line))
+		} else {
+			fmt.Fprintf(&b.buf, "%s Tj\n", pdfString(winAnsi(line)))
+		}
 	}
 	b.buf.WriteString("ET\n")
 	return nil
@@ -414,7 +435,10 @@ func drawOnPage(ctx *model.Context, pageNr int, items []Item, under bool) error 
 		return err
 	}
 	_, dh := g.DisplaySize()
-	b := &overlayBuilder{ctx: ctx, dh: dh, gs: map[string]string{}, fonts: map[string]bool{}, xobj: map[string]*types.IndirectRef{}}
+	b := &overlayBuilder{ctx: ctx, dh: dh, gs: map[string]string{}, fonts: map[string]bool{}, ufonts: map[string]*uniFont{}, xobj: map[string]*types.IndirectRef{}}
+	if err := b.collectUnicode(items); err != nil {
+		return err
+	}
 	b.buf.WriteString("q\n" + displayMatrix(g) + "\n")
 	for _, it := range items {
 		if err := b.add(it); err != nil {
@@ -427,10 +451,17 @@ func drawOnPage(ctx *model.Context, pageNr int, items []Item, under bool) error 
 	if err != nil {
 		return err
 	}
-	if len(b.fonts) > 0 {
+	if len(b.fonts) > 0 || len(b.ufonts) > 0 {
 		fd, err := subDict(ctx, res, "Font")
 		if err != nil {
 			return err
+		}
+		for _, uf := range b.ufonts {
+			ref, err := uf.fontDict(ctx)
+			if err != nil {
+				return err
+			}
+			fd.Update(uf.res, *ref)
 		}
 		for name := range b.fonts {
 			base := "Helvetica"

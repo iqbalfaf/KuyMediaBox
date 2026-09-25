@@ -27,6 +27,7 @@ const (
 	SpotDL      = "spotdl"
 	GalleryDL   = "gallerydl"
 	LibreOffice = "libreoffice"
+	VeraPDF     = "verapdf"
 )
 
 // Status is shown on the Settings page.
@@ -62,13 +63,14 @@ var metas = map[string]meta{
 	SpotDL:      {"spotDL", [2]string{"Membaca playlist, album & lagu Spotify", "Reads Spotify playlists, albums & tracks"}, [2]string{"Download Spotify", "Spotify downloads"}, []string{"spotdl.exe"}},
 	GalleryDL:   {"gallery-dl", [2]string{"Membaca foto dari post TikTok & Facebook", "Reads pictures from TikTok & Facebook posts"}, [2]string{"foto TikTok & Facebook", "TikTok & Facebook pictures"}, []string{"gallery-dl.exe"}},
 	LibreOffice: {"LibreOffice", [2]string{"Opsional: konversi Word, Excel & PowerPoint ↔ PDF bila Microsoft Office tidak terpasang (±375 MB)", "Optional: Word, Excel & PowerPoint ↔ PDF when Microsoft Office isn't installed (±375 MB)"}, [2]string{"konversi dokumen Office di menu PDF", "Office document conversion in the PDF tools"}, []string{"soffice.com"}},
+	VeraPDF:     {"veraPDF", [2]string{"Opsional: validasi resmi PDF/A (Java dipasang otomatis bila belum ada, ±130 MB)", "Optional: official PDF/A validation (Java is installed too when missing, ±130 MB)"}, [2]string{"Validasi PDF/A di menu PDF", "PDF/A validation in the PDF tools"}, []string{"verapdf.bat"}},
 }
 
 // Order is the display order.
-var Order = []string{FFmpeg, YtDlp, JSRuntime, SpotDL, GalleryDL, LibreOffice}
+var Order = []string{FFmpeg, YtDlp, JSRuntime, SpotDL, GalleryDL, LibreOffice, VeraPDF}
 
 // optional tools are not reported as missing.
-var optional = map[string]bool{LibreOffice: true}
+var optional = map[string]bool{LibreOffice: true, VeraPDF: true}
 
 // Manager keeps the current status of every tool.
 type Manager struct {
@@ -176,6 +178,13 @@ func fileExists(p string) bool {
 func (m *Manager) locate(id string) (path, source string) {
 	if custom := m.cfg.Get().ToolPaths[id]; custom != "" && fileExists(custom) {
 		return custom, "custom"
+	}
+	if id == VeraPDF {
+		for _, p := range veraCandidates() {
+			if fileExists(p.path) {
+				return p.path, p.source
+			}
+		}
 	}
 	if id == LibreOffice {
 		// Our own extracted copy first, then a normal installation.
@@ -303,6 +312,8 @@ func readVersion(ctx context.Context, id, path string) (string, error) {
 			return v, nil
 		}
 		return firstLine(out), nil
+	case VeraPDF:
+		return veraVersion(path)
 	case SpotDL, GalleryDL:
 		out, err := proc.Output(ctx, path, "--version")
 		if err != nil {

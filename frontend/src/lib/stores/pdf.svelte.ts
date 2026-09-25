@@ -37,6 +37,8 @@ export const defaultOptions: PdfOptions = {
   separate: false,
   html: { pageSize: 'a4', orientation: 'portrait', margin: 'normal', width: 1280, onePage: false, background: true },
   images: { pageSize: 'a4', orientation: 'auto', margin: 'small', quality: 90, combine: true },
+  digisign: { certFile: '', name: '', reason: '', location: '', contact: '', visible: true, position: 'br', page: 'last' },
+  pdfaCheck: { flavour: '0' },
 }
 
 function mergeDefaults(saved: PdfOptions): PdfOptions {
@@ -95,7 +97,8 @@ export function jobs(conv: Converter, items: FileItem[]): PdfJob[] {
 /** Runs a per-file tool for the given items. */
 export function startBatch(toolId: string, conv: Converter, items: FileItem[]) {
   persistOptions()
-  return conv.start(items, () => api.startPdf(toolId, jobs(conv, items), $state.snapshot(pdfOpts) as PdfOptions))
+  const secret = toolId === 'digisign' ? pdfForm.certPassword : ''
+  return conv.start(items, () => api.startPdf(toolId, jobs(conv, items), $state.snapshot(pdfOpts) as PdfOptions, secret))
 }
 
 /** A single task that is not tied to a list row (combine and page editors). */
@@ -145,7 +148,7 @@ export function lockedHint(): string {
 export const pdfDrop: { fn: ((paths: string[]) => void) | null } = { fn: null }
 
 /** Form state that is never saved (password confirmation). */
-export const pdfForm = $state({ confirmPw: '' })
+export const pdfForm = $state({ confirmPw: '', certPassword: '' })
 
 /** Makes sure every locked PDF in items has a (correct) password; returns the items to run. */
 export async function ensurePasswords(conv: Converter, items: FileItem[]): Promise<FileItem[]> {

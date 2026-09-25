@@ -6,8 +6,9 @@
   import Switch from '../../components/Switch.svelte'
   import PositionGrid from '../../components/PositionGrid.svelte'
   import Icon from '../../components/Icon.svelte'
+  import DigiSignOptions from './DigiSignOptions.svelte'
   import { api, errText } from '../../lib/api'
-  import { nav, toast } from '../../lib/stores/app.svelte'
+  import { hasTool, nav, toast } from '../../lib/stores/app.svelte'
   import { initPdf, loadOcrLanguages, pdfEnv, pdfForm, pdfOpts } from '../../lib/stores/pdf.svelte'
   import type { PdfTool } from '../../lib/pdfTools'
 
@@ -28,6 +29,7 @@
   })
 
   const confirm = pdfForm
+  const toolFound = (id: string) => hasTool(id)
   let showPw = $state(false)
   const pwMismatch = $derived(o.protect.password !== '' && confirm.confirmPw !== '' && confirm.confirmPw !== o.protect.password)
 
@@ -299,6 +301,29 @@
   <p class="hint">{L('PDF hasil scan perlu di-OCR dulu.', 'Scanned PDFs need OCR first.')}</p>
 {:else if tool.id === 'pdfa'}
   <div class="note"><Icon name="info" size={16} /><span>{L('Hasil PDF/A-2b: metadata arsip, profil warna sRGB, tanpa enkripsi/JavaScript/lampiran. Halaman dengan huruf yang tidak tertanam diubah jadi gambar agar tampil sama di mana pun.', 'Produces PDF/A-2b: archive metadata, sRGB colour profile, no encryption/JavaScript/attachments. Pages with fonts that are not embedded become images so they look the same everywhere.')}</span></div>
+{:else if tool.id === 'pdfacheck'}
+  <div class="note"><Icon name="shieldCheck" size={16} /><span>{L('veraPDF memeriksa setiap aturan ISO 19005 (PDF/A). Hasilnya "lolos" atau daftar aturan yang dilanggar (klik "Lihat detail").', 'veraPDF checks every ISO 19005 (PDF/A) rule. The result is "compliant" or the list of broken rules (click "View details").')}</span></div>
+  <div class="sec">
+    <span class="label">{L('Periksa sebagai', 'Check as')}</span>
+    <Select
+      label={L('Periksa sebagai', 'Check as')}
+      bind:value={o.pdfaCheck.flavour}
+      options={[
+        { value: '0', label: L('Sesuai klaim file (otomatis)', 'What the file claims (automatic)') },
+        { value: '1b', label: 'PDF/A-1b' },
+        { value: '2b', label: 'PDF/A-2b' },
+        { value: '2u', label: 'PDF/A-2u' },
+        { value: '3b', label: 'PDF/A-3b' },
+        { value: '1a', label: 'PDF/A-1a' },
+        { value: '2a', label: 'PDF/A-2a' },
+      ]}
+    />
+  </div>
+  {#if !toolFound('verapdf')}
+    <div class="note warn"><Icon name="alert" size={16} /><span>{L('veraPDF belum terpasang. Pasang di Pengaturan › Tools pendukung (Java ikut dipasang bila belum ada).', 'veraPDF is not installed. Install it in Settings › Helper tools (Java comes with it when missing).')} <button class="inl" onclick={() => (nav.page = 'settings')}>{L('Buka Pengaturan', 'Open Settings')}</button></span></div>
+  {/if}
+{:else if tool.id === 'digisign'}
+  <DigiSignOptions />
 {:else if tool.id === 'word2pdf' || tool.id === 'excel2pdf' || tool.id === 'ppt2pdf'}
   {@render engineBox()}
   <p class="hint">{L('File asli tidak diubah. Dokumen yang dikunci password harus dibuka proteksinya dulu.', 'The original file is not changed. Password-protected documents must be unprotected first.')}</p>
@@ -454,10 +479,19 @@
   }
   .note.ok {
     background: var(--ok-soft);
-    color: #bff3d8;
+    color: var(--note-text);
   }
   .note.warn {
-    background: #3a2f17;
+    background: var(--note-bg);
     color: var(--warn);
+  }
+  .inl {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-weight: 700;
+    color: var(--accent-text-2);
+    text-decoration: underline;
   }
 </style>

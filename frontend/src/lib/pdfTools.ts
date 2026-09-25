@@ -67,6 +67,7 @@ export const pdfTools: PdfTool[] = [
   t('pdf2ppt', 'from', 'presentation', 'batch', 'pdf', PDF, () => L('PDF ke PowerPoint', 'PDF to PowerPoint'), () => L('Setiap halaman jadi satu slide.', 'Every page becomes a slide.')),
   t('pdf2excel', 'from', 'table', 'batch', 'pdf', PDF, () => L('PDF ke Excel', 'PDF to Excel'), () => L('Tabel di PDF jadi lembar kerja Excel.', 'Tables in PDFs become Excel sheets.')),
   t('pdfa', 'from', 'archive', 'batch', 'pdf', PDF, () => L('PDF ke PDF/A', 'PDF to PDF/A'), () => L('Format arsip jangka panjang (PDF/A-2b).', 'Long-term archive format (PDF/A-2b).')),
+  t('pdfacheck', 'from', 'shieldCheck', 'batch', 'pdf', PDF, () => L('Validasi PDF/A', 'Validate PDF/A'), () => L('Periksa kepatuhan PDF/A dengan veraPDF, validator resmi.', 'Check PDF/A compliance with veraPDF, the reference validator.')),
 
   t('rotate', 'edit', 'rotateCw', 'batch', 'pdf', PDF, () => L('Putar PDF', 'Rotate PDF'), () => L('Putar semua atau sebagian halaman 90°, 180°, 270°.', 'Rotate all or some pages by 90°, 180° or 270°.')),
   t('numbers', 'edit', 'hash', 'batch', 'pdf', PDF, () => L('Nomor halaman', 'Page numbers'), () => L('Tambah nomor halaman dengan posisi dan format pilihan.', 'Add page numbers in the position and format you want.')),
@@ -76,6 +77,7 @@ export const pdfTools: PdfTool[] = [
 
   t('unlock', 'security', 'unlock', 'batch', 'pdf', PDF, () => L('Buka kunci PDF', 'Unlock PDF'), () => L('Hapus password dan batasan cetak/salin.', 'Remove the password and print/copy restrictions.')),
   t('protect', 'security', 'lock', 'batch', 'pdf', PDF, () => L('Kunci PDF', 'Protect PDF'), () => L('Beri password dengan enkripsi AES 256-bit.', 'Add a password with AES 256-bit encryption.')),
+  t('digisign', 'security', 'award', 'batch', 'pdf', PDF, () => L('Tanda tangan digital', 'Digital signature'), () => L('Tandatangani dengan sertifikat (.pfx/.p12) agar keasliannya bisa diperiksa.', 'Sign with a certificate (.pfx/.p12) so authenticity can be verified.')),
   t('sign', 'security', 'signature', 'editor', 'pdf', PDF, () => L('Tanda tangan PDF', 'Sign PDF'), () => L('Bubuhkan tanda tangan gambar, tulisan tangan, nama, dan tanggal.', 'Place a drawn, typed or image signature and the date.')),
   t('redact', 'security', 'eyeOff', 'editor', 'pdf', PDF, () => L('Sensor PDF', 'Redact PDF'), () => L('Hitamkan informasi sensitif secara permanen.', 'Black out sensitive information for good.')),
   t('compare', 'security', 'columns', 'compare', 'pdf', PDF, () => L('Bandingkan PDF', 'Compare PDF'), () => L('Lihat teks yang ditambah dan dihapus antara dua versi.', 'See the text added and removed between two versions.')),

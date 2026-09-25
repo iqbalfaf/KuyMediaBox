@@ -9,6 +9,9 @@
   import ToolBanner from '../components/ToolBanner.svelte'
   import Icon from '../components/Icon.svelte'
   import OutputPicker from '../components/OutputPicker.svelte'
+  import PresetBar from '../components/PresetBar.svelte'
+  import { askText } from '../lib/stores/prompt.svelte'
+  import { sendToConverter } from '../lib/stores/open.svelte'
   import { api, errText, runtime } from '../lib/api'
   import { hasTool, settings, showDetail, toast } from '../lib/stores/app.svelte'
   import {
@@ -37,7 +40,63 @@
     return k
   })
   const hasPlaylist = $derived(readyRows.some((r) => r.col!.type === 'playlist'))
-  const hasList = $derived(readyRows.some((r) => r.col!.type === 'album' || r.col!.type === 'playlist'))
+  const hasList = $derived(readyRows.some((r) => r.col!.type === 'album' || r.col!.type === 'playlist' || r.col!.type === 'artist'))
+  const catOutputs = $derived.by(() => {
+    const out: string[] = []
+    for (const r of catRows) for (const tid of Object.values(r.taskOf)) if (tasks[tid]?.status === 'done' && tasks[tid].output) out.push(tasks[tid].output)
+    return out
+  })
+
+  const dlBuiltins = $derived(
+    cat === 'spotify'
+      ? [
+          { id: 'b-sp-mp3', name: 'MP3 320', value: { audioFormat: 'mp3', audioQuality: '320', playlist: true } },
+          { id: 'b-sp-m4a', name: 'M4A 256', value: { audioFormat: 'm4a', audioQuality: '256', playlist: true } },
+        ]
+      : [
+          { id: 'b-1080', name: L('Video 1080p MP4', 'Video 1080p MP4'), value: { mode: 'video', quality: '1080', container: 'mp4' } },
+          { id: 'b-720', name: L('Video 720p hemat', 'Video 720p (small)'), value: { mode: 'video', quality: '720', container: 'mp4' } },
+          { id: 'b-mp3', name: L('Audio MP3 terbaik', 'Best MP3 audio'), value: { mode: 'audio', audioFormat: 'mp3', audioQuality: 'auto' } },
+          { id: 'b-sub', name: L('Video + subtitle ID/EN', 'Video + ID/EN subtitles'), value: { mode: 'video', subtitles: 'embed', subLangs: 'id,en' } },
+        ],
+  )
+
+  async function setCut(r: LinkRow) {
+    const v = await askText(
+      L('Unduh sebagian', 'Download a part'),
+      L('Rentang waktu (mulai-selesai). Kosongkan selesai untuk sampai akhir.', 'Time range (start-end). Leave the end empty for "to the end".'),
+      r.cut || '0:00-1:00',
+      '1:30-2:45',
+      L('Pakai', 'Use'),
+    )
+    if (v === null) return
+    const [a, b = ''] = v.split('-').map((x) => x.trim())
+    const ok = (t: string) => t === '' || /^\d+(:[0-5]?\d){0,2}([.,]\d+)?$/.test(t)
+    if (!ok(a) || !ok(b)) {
+      toast(L('Format tidak valid. Contoh: 1:30-2:45', 'Invalid format. Example: 1:30-2:45'), 'err')
+      return
+    }
+    r.cut = `${a}-${b}`
+  }
+
+  async function setSource(r: LinkRow, e: Entry) {
+    if (!r.col) return
+    const v = await askText(
+      L('Pilih lagu YouTube sendiri', 'Pick the YouTube song yourself'),
+      L(`Link YouTube untuk "${e.artist} - ${e.title}". Kosongkan untuk pencocokan otomatis.`, `YouTube link for "${e.artist} - ${e.title}". Leave empty for automatic matching.`),
+      e.source,
+      'https://www.youtube.com/watch?v=…',
+      L('Pakai link ini', 'Use this link'),
+    )
+    if (v === null) return
+    try {
+      const updated = await api.setEntrySource(r.col.key, e.id, v === '-' ? '' : v)
+      e.source = updated.source
+      toast(updated.source ? L('Lagu ini akan diunduh dari link pilihan Anda', 'This song will be downloaded from your link') : L('Kembali ke pencocokan otomatis', 'Back to automatic matching'), 'ok')
+    } catch (err) {
+      toast(errText(err), 'err')
+    }
+  }
 
   const hasSpotify = $derived(dl.rows.some((r) => r.link.source === 'spotify'))
   // gallery-dl only matters for TikTok/Facebook photo posts.
@@ -88,7 +147,7 @@
   /** A link that holds exactly one item is shown as a single row, without a group header. */
   function isSingle(r: LinkRow): boolean {
     const t = r.col?.type
-    return !!r.col && r.col.entries.length === 1 && t !== 'playlist' && t !== 'channel' && t !== 'album' && t !== 'profile'
+    return !!r.col && r.col.entries.length === 1 && t !== 'playlist' && t !== 'channel' && t !== 'album' && t !== 'artist' && t !== 'profile'
   }
 
   function entryKindLabel(e: Entry | undefined): string {
@@ -209,7 +268,7 @@
       {#if t && (t.status === 'running' || t.status === 'queued') && t.message}
         <span class="esub ellipsis">{t.message}</span>
       {:else if single}
-        <span class="esub ellipsis" title={r.link.url}>{e.artist ? `${e.artist}${e.album ? ` · ${e.album}` : ''}` : linkSummary(r)}</span>
+        <span class="esub ellipsis" title={r.link.url}>{e.artist ? `${e.artist}${e.album ? ` · ${e.album}` : ''}` : linkSummary(r)}{r.cut ? ` · ✂ ${r.cut.replace('-', '–')}` : ''}</span>
       {:else if e.artist}
         <span class="esub ellipsis">{e.artist}{e.album ? ` · ${e.album}` : ''}</span>
       {:else if e.unavailable}
@@ -229,14 +288,21 @@
           <span class="pill muted">{L('Menunggu', 'Waiting')}</span>
         {:else if t.status === 'done'}
           <button class="pill ok as-btn" title={L('Tampilkan file', 'Show file')} onclick={() => api.revealFile(t.output)}><Icon name="check" size={12} stroke={3} />{L('Selesai', 'Done')}</button>
+          {#if t.output}<button class="mini" title={L('Kirim ke konversi', 'Send to a converter')} aria-label={L('Kirim ke konversi', 'Send to a converter')} onclick={() => sendToConverter([t.output])}><Icon name="send" size={14} /></button>{/if}
         {:else if t.status === 'failed'}
           <button class="pill err as-btn" title={t.message} onclick={() => showDetail(e.title, t.message, t.detail)}>{L('Gagal · detail', 'Failed · details')}</button>
+          {#if col.source === 'spotify'}<button class="mini" title={L('Ganti dengan link YouTube', 'Replace with a YouTube link')} aria-label={L('Ganti dengan link YouTube', 'Replace with a YouTube link')} onclick={() => setSource(r, e)}><Icon name="link" size={14} /></button>{/if}
         {:else if t.status === 'skipped'}
           <span class="pill muted" title={t.message}>{t.message || L('Dilewati', 'Skipped')}</span>
         {:else}
           <span class="pill muted">{L('Dibatalkan', 'Canceled')}</span>
         {/if}
       {:else}
+        {#if col.source === 'spotify'}
+          <button class="mini" class:on={!!e.source} title={e.source ? L(`Link pilihan: ${e.source}`, `Chosen link: ${e.source}`) : L('Pilih link YouTube sendiri', 'Pick a YouTube link yourself')} aria-label={L('Pilih link YouTube', 'Pick a YouTube link')} onclick={() => setSource(r, e)}><Icon name="link" size={14} /></button>
+        {:else if single && e.kind !== 'image'}
+          <button class="mini" class:on={!!r.cut} title={r.cut ? L(`Hanya ${r.cut}`, `Only ${r.cut}`) : L('Unduh sebagian (potong waktu)', 'Download a part (cut)')} aria-label={L('Potong waktu', 'Cut')} onclick={() => setCut(r)}><Icon name="scissors" size={14} /></button>
+        {/if}
         {#if e.date && col.type === 'channel'}<span class="edate">{e.archived && rowOpts(r).skipExisting ? L('Sudah ada', 'Already have') : ymd(e.date)}</span>{:else if e.archived && rowOpts(r).skipExisting}<span class="edate">{L('Sudah ada', 'Already have')}</span>{/if}
         <span class="edur">{duration(e.duration)}</span>
       {/if}
@@ -278,7 +344,7 @@
             <div><span class="badge tt"><Icon name="play" size={10} stroke={3} />TikTok</span> {L('video · foto slide + musik · profil', 'videos · photo slides + sound · profiles')}</div>
             <div><span class="badge ig"><Icon name="image" size={10} stroke={3} />Instagram</span> {L('reel · post foto & video · carousel', 'reels · photo & video posts · carousels')}</div>
             <div><span class="badge fb"><Icon name="play" size={10} stroke={3} />Facebook</span> {L('video · reel · foto', 'videos · reels · photos')}</div>
-            <div><span class="badge sp"><Icon name="music" size={10} stroke={3} />Spotify</span> {L('lagu · album · playlist', 'tracks · albums · playlists')}</div>
+            <div><span class="badge sp"><Icon name="music" size={10} stroke={3} />Spotify</span> {L('lagu · album · playlist · artis', 'tracks · albums · playlists · artists')}</div>
           </div>
         </div>
       {:else}
@@ -309,9 +375,16 @@
             />
             <label for="semua">{L('Pilih semua', 'Select all')}</label>
             <span class="selinfo">
-              {L(`${catSelected} dari ${catEntries.length} dipilih`, `${catSelected} of ${catEntries.length} selected`)} · {catRows.length} link
+              {#if catEntries.length === 0 && catRows.some((r) => r.status === 'loading')}
+                {L('Membaca isi link…', 'Reading the links…')}
+              {:else}
+                {L(`${catSelected} dari ${catEntries.length} dipilih`, `${catSelected} of ${catEntries.length} selected`)} · {catRows.length} link
+              {/if}
             </span>
             {#if catArchived > 0}<span class="arch">{catArchived} {L('sudah pernah diunduh · dilewati', 'downloaded before · skipped')}</span>{/if}
+            {#if catOutputs.length}
+              <button class="link send" onclick={() => sendToConverter(catOutputs)} title={L('Buka hasil unduhan di halaman konversi yang cocok', 'Open the downloads on the matching converter page')}><Icon name="send" size={12} /> {L(`Kirim ${catOutputs.length} hasil ke konversi`, `Send ${catOutputs.length} to a converter`)}</button>
+            {/if}
             <button class="link clear" onclick={() => clearCategory(cat)}>{L(`Hapus semua link ${sourceName[cat]}`, `Remove all ${sourceName[cat]} links`)}</button>
           </div>
         {/if}
@@ -364,11 +437,14 @@
                       <span class="ch-title ellipsis" title={col.title}>{col.title || L('Tanpa judul', 'Untitled')}</span>
                       <span class="ch-sub ellipsis">{linkSummary(r)}</span>
                     </div>
-                    {#if col.type === 'playlist' || col.type === 'album'}
+                    {#if col.type === 'playlist' || col.type === 'album' || col.type === 'artist'}
                       <form class="range" onsubmit={(e) => { e.preventDefault(); onRange(r) }}>
                         <label for="rentang-{r.id}">{L('Rentang', 'Range')}</label>
                         <input id="rentang-{r.id}" class="text-input" bind:value={r.range} onblur={() => onRange(r)} />
                       </form>
+                    {/if}
+                    {#if col.source !== 'spotify'}
+                      <button class="mini" class:on={!!r.cut} title={r.cut ? L(`Semua video: hanya ${r.cut}`, `Every video: only ${r.cut}`) : L('Unduh sebagian (potong waktu)', 'Download a part (cut)')} aria-label={L('Potong waktu', 'Cut')} onclick={() => setCut(r)}><Icon name="scissors" size={14} /></button>
                     {/if}
                     <button class="mini" aria-label={L('Hapus link', 'Remove link')} title={L('Hapus link', 'Remove link')} onclick={() => removeRow(r.id)}><Icon name="trash" size={14} /></button>
                   </div>
@@ -414,6 +490,7 @@
       </div>
       <div class="scroll">
         <p class="hint">{L(`Berlaku untuk semua link ${sourceName[cat]} di daftar.`, `Applies to every ${sourceName[cat]} link in the list.`)}</p>
+        <PresetBar module={`download.${cat}`} target={opts} builtins={dlBuiltins} onapply={optsChanged} />
         {#if cat === 'spotify'}
           <div class="info">
             <Icon name="info" size={16} />
@@ -422,6 +499,7 @@
           <AudioDownloadOptions {opts} spotify label={L('Format audio', 'Audio format')} onchange={optsChanged} />
           {#if hasList}
             <Switch bind:checked={opts.numbering} onchange={optsChanged} label={L('Nomor urut di nama file', 'Track numbers in file names')} hint={L('Urutan sama seperti di Spotify', 'Same order as on Spotify')} />
+            <Switch bind:checked={opts.playlist} onchange={optsChanged} label={L('Buat file playlist (.m3u8)', 'Create a playlist file (.m3u8)')} hint={L('Untuk album & playlist, bisa dibuka di VLC, foobar, dll.', 'For albums & playlists, opens in VLC, foobar, etc.')} />
           {/if}
         {:else}
           {#if social && kinds.image}
@@ -440,7 +518,7 @@
             {#if opts.mode === 'video'}
               <div class="sec">
                 <span class="label">{L('Kualitas video', 'Video quality')}</span>
-                <Chips bind:value={opts.quality} columns={4} small onchange={optsChanged} options={[{ value: 'best', label: L('Terbaik', 'Best') }, { value: '1080', label: '1080p' }, { value: '720', label: '720p' }, { value: '480', label: '480p' }]} />
+                <Chips bind:value={opts.quality} columns={3} small onchange={optsChanged} options={[{ value: 'best', label: L('Terbaik', 'Best') }, { value: '2160', label: '4K' }, { value: '1440', label: '1440p' }, { value: '1080', label: '1080p' }, { value: '720', label: '720p' }, { value: '480', label: '480p' }]} />
               </div>
               <div class="sec">
                 <span class="label">{L('Format file', 'File format')}</span>
@@ -456,9 +534,46 @@
           {#if !social || kinds.video || kinds.audio}
             <Switch bind:checked={opts.embed} onchange={optsChanged} label={L('Sematkan info & thumbnail', 'Embed info & thumbnail')} hint={L('Judul, channel, dan gambar sampul', 'Title, channel and cover image')} />
           {/if}
+          {#if (!social || kinds.video) && opts.mode === 'video'}
+            <div class="sec">
+              <span class="label">Subtitle</span>
+              <Segmented
+                label="Subtitle"
+                bind:value={opts.subtitles}
+                onchange={optsChanged}
+                options={[
+                  { value: 'none', label: L('Tanpa', 'None') },
+                  { value: 'file', label: L('File .srt', '.srt file') },
+                  { value: 'embed', label: L('Sematkan', 'Embed') },
+                ]}
+              />
+              {#if opts.subtitles !== 'none'}
+                <input class="text-input" aria-label={L('Bahasa subtitle', 'Subtitle languages')} bind:value={opts.subLangs} onblur={optsChanged} placeholder="id,en" />
+                <p class="hint">{L('Kode bahasa dipisah koma (id, en, ja…). Subtitle otomatis dipakai bila tidak ada yang asli.', 'Comma-separated language codes (id, en, ja…). Auto-generated subtitles are used when there are no real ones.')}</p>
+              {/if}
+            </div>
+          {/if}
+          {#if cat === 'youtube'}
+            <div class="sec">
+              <span class="label">SponsorBlock</span>
+              <Segmented
+                label="SponsorBlock"
+                bind:value={opts.sponsorBlock}
+                onchange={optsChanged}
+                options={[
+                  { value: 'off', label: L('Mati', 'Off') },
+                  { value: 'mark', label: L('Tandai bab', 'Mark chapters') },
+                  { value: 'remove', label: L('Buang', 'Remove') },
+                ]}
+              />
+              {#if opts.sponsorBlock !== 'off'}<p class="hint">{opts.sponsorBlock === 'remove' ? L('Bagian sponsor, promosi & ajakan subscribe dipotong dari video (data dari komunitas SponsorBlock).', 'Sponsor, self-promo & "subscribe" parts are cut out (data from the SponsorBlock community).') : L('Bagian sponsor ditandai sebagai bab, videonya utuh.', 'Sponsor parts are marked as chapters; the video stays whole.')}</p>{/if}
+            </div>
+          {/if}
           {#if hasPlaylist}
             <Switch bind:checked={opts.numbering} onchange={optsChanged} label={L('Nomor urut di nama file', 'Numbers in file names')} hint={L('Untuk playlist: 01 - judul, 02 - judul, …', 'For playlists: 01 - title, 02 - title, …')} />
+            <Switch bind:checked={opts.playlist} onchange={optsChanged} label={L('Buat file playlist (.m3u8)', 'Create a playlist file (.m3u8)')} hint={L('Daftar putar sesuai urutan playlist', 'A play list in playlist order')} />
           {/if}
+          <p class="hint">{L('Unduh sebagian: klik ikon gunting di tiap link.', 'Download a part: click the scissors icon on a link.')}</p>
         {/if}
         <Switch bind:checked={opts.skipExisting} onchange={skipChanged} label={L('Lewati yang sudah ada', 'Skip existing')} hint={L('Unduh ulang hanya ambil yang baru', 'Downloading again only fetches new items')} />
 
@@ -572,23 +687,23 @@
   }
   .badge.yt {
     background: var(--err-soft);
-    color: #ff9c9c;
+    color: var(--danger-text);
   }
   .badge.sp {
     background: var(--ok-soft);
     color: var(--ok);
   }
   .badge.tt {
-    background: #10302f;
-    color: #6ff2ec;
+    background: var(--tt-bg);
+    color: var(--tt-fg);
   }
   .badge.ig {
-    background: #3a1a2b;
-    color: #ff8fbf;
+    background: var(--ig-bg);
+    color: var(--ig-fg);
   }
   .badge.fb {
-    background: #172a40;
-    color: #8ab8ff;
+    background: var(--fb-bg);
+    color: var(--fb-fg);
   }
   .mini {
     width: 32px;
@@ -603,7 +718,7 @@
     color: var(--text-3);
   }
   .mini:hover {
-    background: #2a303b;
+    background: var(--hover);
     color: var(--text);
   }
   .content {
@@ -818,7 +933,7 @@
     align-items: center;
     gap: 12px;
     padding: 10px 8px 10px 16px;
-    background: #181c23;
+    background: var(--hover);
     border-bottom: 1px solid var(--border-soft);
   }
   .ghead .avatar {
@@ -913,6 +1028,18 @@
   .selbar .clear {
     margin-left: auto;
   }
+  .selbar .send {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .selbar .send + .clear {
+    margin-left: 12px;
+  }
+  .mini.on {
+    color: var(--accent);
+  }
   .ph-v {
     display: flex;
     align-items: center;
@@ -955,7 +1082,7 @@
     border-bottom: 1px solid var(--border-soft);
   }
   .entry.active {
-    background: #1c2029;
+    background: var(--row-active);
   }
   .entry.dim .et,
   .entry.dim .th {

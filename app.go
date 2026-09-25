@@ -16,8 +16,11 @@ import (
 	"kuymediabox/internal/config"
 	"kuymediabox/internal/downloader"
 	"kuymediabox/internal/ffmpeg"
+	"kuymediabox/internal/history"
 	"kuymediabox/internal/i18n"
+	"kuymediabox/internal/mediaconv"
 	"kuymediabox/internal/naming"
+	"kuymediabox/internal/pdf"
 	"kuymediabox/internal/platform"
 	"kuymediabox/internal/queue"
 	"kuymediabox/internal/tools"
@@ -34,6 +37,8 @@ type App struct {
 	encMu      sync.Mutex
 	encPath    string
 	encoderSet map[string]bool
+	hwPath     string
+	hwSet      map[string]bool // hardware encoders that work on this PC
 
 	colMu       sync.Mutex
 	collections map[string]*downloader.Collection
@@ -41,14 +46,26 @@ type App struct {
 
 	notifyOK bool
 	upd      updateState
+
+	signer     *pdf.Signer // certificate of the last digital-signature batch
+	hist       *history.Store
+	producedMu sync.Mutex
+	produced   map[string]bool // outputs written by the app (lower-case paths)
+	after      afterState
+	launch     launchArgs
+	watch      *watcher
 }
 
 // NewApp creates the application state.
 func NewApp() *App {
-	a := &App{cfg: config.Load(), namer: naming.NewNamer(), collections: map[string]*downloader.Collection{}}
+	a := &App{cfg: config.Load(), namer: naming.NewNamer(), collections: map[string]*downloader.Collection{}, produced: map[string]bool{}}
 	i18n.Set(a.cfg.Get().Language)
 	a.tools = tools.New(a.cfg, func(list []tools.Status) { a.emit("tools:changed", list) })
 	a.queue = queue.New(func(info queue.Info) { a.emit("task:update", info) }, a.onBatchDone)
+	a.queue.OnFinish = a.recordFinished
+	a.hist = history.Default(appdir.DataDir())
+	a.applyParallel(a.cfg.Get())
+	a.launch.paths = existingPaths(os.Args[1:])
 	return a
 }
 
@@ -69,9 +86,11 @@ func (a *App) startup(ctx context.Context) {
 		a.tools.CheckUpdates(context.Background())
 	}()
 	go a.autoCheckUpdate()
+	a.startWatcher()
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	a.stopWatcher()
 	a.queue.Shutdown()
 	// Give killed processes a moment so temp files are released before cleanup.
 	time.Sleep(300 * time.Millisecond)
@@ -103,6 +122,9 @@ func kindTitle(kind string) string {
 
 func (a *App) onBatchDone(kind string, done, failed, skipped, canceled int) {
 	a.emit("batch:done", map[string]any{"kind": kind, "done": done, "failed": failed, "skipped": skipped, "canceled": canceled})
+	if done+failed+skipped > 0 {
+		a.maybeAfterQueue()
+	}
 	if !a.notifyOK || !a.cfg.Get().Notify || done+failed == 0 {
 		return
 	}
@@ -134,6 +156,8 @@ func (a *App) SaveSettings(s config.Settings) (config.Settings, error) {
 	s.ToolPaths = cur.ToolPaths // tool paths are managed separately
 	saved, err := a.cfg.Set(s)
 	if err == nil {
+		a.applyParallel(saved)
+		a.updateWatch(saved.Watch)
 		i18n.Set(saved.Language)
 		if saved.Language != cur.Language {
 			a.emit("tools:changed", a.tools.List()) // descriptions are translated
@@ -175,10 +199,11 @@ func (a *App) OutputFolder(kind string) string {
 }
 
 // onSecondInstance brings the running window to the front when the app is started again.
-func (a *App) onSecondInstance(_ options.SecondInstanceData) {
+func (a *App) onSecondInstance(data options.SecondInstanceData) {
 	if a.ctx == nil {
 		return
 	}
+	a.openFromExplorer(data.Args)
 	wruntime.WindowUnminimise(a.ctx)
 	wruntime.WindowShow(a.ctx)
 	wruntime.WindowSetAlwaysOnTop(a.ctx, true)
@@ -258,6 +283,53 @@ type Capabilities struct {
 	Encoders map[string]bool `json:"encoders"`
 }
 
+// GetHWEncoders tests the GPU encoders once (a few seconds) and returns, per vendor
+// (nvenc, qsv, amf), the codecs that work: {"nvenc": ["h264","h265"]}.
+func (a *App) GetHWEncoders() map[string][]string {
+	set := a.hwEncoders()
+	out := map[string][]string{}
+	for _, hw := range []string{"nvenc", "qsv", "amf"} {
+		for _, codec := range []string{"h264", "h265", "vp9", "av1"} {
+			if e := mediaconv.HWEncoder(hw, codec); e != "" && set[e] {
+				out[hw] = append(out[hw], codec)
+			}
+		}
+	}
+	return out
+}
+
+func (a *App) hwEncoders() map[string]bool {
+	path := a.tools.Path(tools.FFmpeg)
+	listed := a.encoders()
+	a.encMu.Lock()
+	if a.hwSet != nil && a.hwPath == path {
+		set := a.hwSet
+		a.encMu.Unlock()
+		return set
+	}
+	a.encMu.Unlock()
+	set := map[string]bool{}
+	if path != "" {
+		set = ffmpeg.HWEncoders(context.Background(), path, listed)
+	}
+	a.encMu.Lock()
+	a.hwPath, a.hwSet = path, set
+	a.encMu.Unlock()
+	return set
+}
+
+// allEncoders is the software encoder list plus the GPU encoders that really work.
+func (a *App) allEncoders() map[string]bool {
+	out := map[string]bool{}
+	for k, v := range a.encoders() {
+		out[k] = v
+	}
+	for k := range a.hwEncoders() {
+		out[k] = true
+	}
+	return out
+}
+
 // GetCapabilities lists usable video encoders (h264, h265, vp9, av1).
 func (a *App) GetCapabilities() Capabilities {
 	set := a.encoders()
@@ -295,6 +367,7 @@ func (a *App) encoders() map[string]bool {
 func (a *App) resetEncoders() {
 	a.encMu.Lock()
 	a.encoderSet = nil
+	a.hwSet = nil
 	a.encMu.Unlock()
 }
 

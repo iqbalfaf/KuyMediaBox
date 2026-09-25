@@ -61,7 +61,7 @@
     color: var(--text);
   }
   button.on {
-    background: #2a303b;
+    background: var(--seg-on);
     color: var(--text);
     font-weight: 700;
   }

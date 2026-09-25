@@ -32,6 +32,9 @@ type Info struct {
 	BitsPerSample int     `json:"bitsPerSample"`
 	CoverIndex    int     `json:"coverIndex"` // stream index of attached picture, -1 if none
 	CoverCodec    string  `json:"coverCodec"`
+	SubCodec      string  `json:"subCodec"` // first subtitle stream ("" when none)
+	// Tags are the container's metadata (lower-case keys: title, artist, album, date, genre, track, …).
+	Tags map[string]string `json:"tags"`
 }
 
 type probeStream struct {
@@ -58,9 +61,10 @@ type probeStream struct {
 type probeOut struct {
 	Streams []probeStream `json:"streams"`
 	Format  struct {
-		FormatName string `json:"format_name"`
-		Duration   string `json:"duration"`
-		BitRate    string `json:"bit_rate"`
+		FormatName string            `json:"format_name"`
+		Duration   string            `json:"duration"`
+		BitRate    string            `json:"bit_rate"`
+		Tags       map[string]string `json:"tags"`
 	} `json:"format"`
 }
 
@@ -84,8 +88,16 @@ func parseProbe(data []byte) (Info, error) {
 	info.Format = p.Format.FormatName
 	info.Duration = parseFloat(p.Format.Duration)
 	info.Bitrate, _ = strconv.ParseInt(p.Format.BitRate, 10, 64)
+	info.Tags = map[string]string{}
+	for k, v := range p.Format.Tags {
+		info.Tags[strings.ToLower(k)] = v
+	}
 	for _, s := range p.Streams {
 		switch s.CodecType {
+		case "subtitle":
+			if info.SubCodec == "" {
+				info.SubCodec = s.CodecName
+			}
 		case "video":
 			if s.Disposition["attached_pic"] == 1 {
 				if info.CoverIndex < 0 {
@@ -113,6 +125,12 @@ func parseProbe(data []byte) (Info, error) {
 		case "audio":
 			if info.HasAudio {
 				continue
+			}
+			// Ogg/Opus/FLAC keep their tags on the stream.
+			for k, v := range s.Tags {
+				if _, ok := info.Tags[strings.ToLower(k)]; !ok {
+					info.Tags[strings.ToLower(k)] = v
+				}
 			}
 			info.HasAudio = true
 			info.AudioCodec = s.CodecName
