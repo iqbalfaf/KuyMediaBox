@@ -4,7 +4,7 @@
 
 # KuyMediaBox
 
-**Satu aplikasi desktop untuk konversi gambar, video, audio, 31 alat PDF, dan download dari YouTube, TikTok, Instagram, Facebook & Spotify.**
+**Satu aplikasi desktop untuk konversi gambar, video, audio, 31 alat PDF, dan download dari YouTube, TikTok, Instagram, Facebook, X, Pinterest & Spotify.**
 Ringan, offline, tanpa iklan, dan tanpa batas ukuran file. Tersedia dalam **Bahasa Indonesia** dan **English**.
 
 [![Release](https://img.shields.io/github/v/release/iqbalfaf/KuyMediaBox?label=download&color=ff7a45)](https://github.com/iqbalfaf/KuyMediaBox/releases/latest)
@@ -106,7 +106,7 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Kecepatan & nada** | Kecepatan 0,5×–2× tanpa mengubah nada, nada −12…+12 semitone tanpa mengubah kecepatan |
 | **Gabung audio** | Beberapa file jadi satu, sesuai urutan daftar |
 
-### ⬇ Download YouTube, TikTok, Instagram, Facebook & Spotify
+### ⬇ Download YouTube, TikTok, Instagram, Facebook, X, Pinterest & Spotify
 
 | | |
 |---|---|
@@ -115,9 +115,11 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Link TikTok** | **Video**, **post foto (slide)** beserta musiknya, link pendek `vt.tiktok.com`/`vm.tiktok.com`, dan **profil** (`@nama`) |
 | **Link Instagram** | **Reel**, **post foto**, **post video**, dan **carousel** (banyak foto/video dalam satu post) |
 | **Link Facebook** | **Video**, **reel**, link `fb.watch` / `/share/v/`, dan **foto** |
+| **Link X (Twitter)** | **Post** berisi foto, video, atau GIF (termasuk post dengan beberapa foto/video) dari `x.com`, `twitter.com`, dan `fxtwitter`/`vxtwitter`. **Profil** (tab Media, 500 item terbaru) butuh login lewat cookies browser. |
+| **Link Pinterest** | **Pin** foto & video (termasuk link pendek `pin.it`), **board**, **profil** (semua pin atau `_created`), dan **hasil pencarian** (200 pin pertama). Domain negara seperti `id.pinterest.com` juga dikenali. |
 | **Situs lain** | Link video lain yang didukung yt-dlp juga bisa dicoba |
 | **Banyak link sekaligus** | Tempel beberapa link (satu per baris), tombol **Tempel**, atau Ctrl+V di halaman Download. Jenis link terdeteksi otomatis. |
-| **Kategori per platform** | Link otomatis masuk ke tab **YouTube, TikTok, Instagram, Facebook, atau Spotify**. Menempel link Instagram lagi menambahkannya ke daftar Instagram yang sama (tidak membuat tab baru). Tiap tab menampilkan jumlah item terpilih. |
+| **Kategori per platform** | Link otomatis masuk ke tab **YouTube, TikTok, Instagram, Facebook, X, Pinterest, atau Spotify**. Menempel link Instagram lagi menambahkannya ke daftar Instagram yang sama (tidak membuat tab baru). Tiap tab menampilkan jumlah item terpilih. |
 | **Pratinjau isi** | Judul, thumbnail, durasi, dan daftar video/lagu sebelum mengunduh. Di dalam kategori, playlist/channel/album/carousel tampil sebagai grup (bisa dicentang sekaligus), link berisi satu item tampil sebagai satu baris. |
 | **Pengaturan per kategori** | Format, kualitas, dan opsi lain berlaku untuk semua link dalam kategori itu (misalnya semua YouTube jadi MP3, TikTok tetap video). |
 | **Pilih item** | Centang satu per satu, **Pilih semua**, atau **rentang** seperti `1-20` / `3,5,7-9` |
@@ -132,7 +134,7 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Batas kecepatan** | Mis. 1 MB/s total untuk semua unduhan, supaya internet tetap lancar (Pengaturan › Download) |
 | **Kirim ke konversi** | Hasil unduhan bisa langsung dibuka di halaman Video/Audio/Gambar |
 | **YouTube: audio** | MP3, M4A, OPUS, FLAC |
-| **TikTok, Instagram & Facebook** | Tiap item diberi label **Video / Foto / Musik**. Video bisa diunduh sebagai video (MP4/MKV) atau audio (MP3/M4A/OPUS/FLAC). **Format foto**: *Asli* atau diubah ke **JPG**. Post berisi banyak item disimpan dalam subfolder sendiri. Hanya konten **publik** (tanpa login). |
+| **TikTok, Instagram, Facebook, X & Pinterest** | Tiap item diberi label **Video / Foto / Musik**. Video bisa diunduh sebagai video (MP4/MKV) atau audio (MP3/M4A/OPUS/FLAC). **Format foto**: *Asli* atau diubah ke **JPG**. Post berisi banyak item disimpan dalam subfolder sendiri. Konten **publik** diunduh tanpa login; profil X dan board/pin Pinterest privat bisa dibaca lewat **Login lewat cookies browser**. |
 | **Spotify** | Diunduh sebagai audio (MP3/M4A/OPUS/WAV). Lagu dicocokkan dari YouTube, lalu diberi judul, artis, album, nomor track, dan cover dari Spotify. Lagu yang salah/gagal dicocokkan bisa **diganti dengan link YouTube sendiri** (ikon rantai). Album & playlist bisa dibuatkan **file playlist `.m3u8`**. |
 | **Info & thumbnail** | Judul dan gambar sampul disematkan ke file hasil |
 | **Lewati yang sudah ada** | Video yang pernah diunduh ditandai "Sudah ada" dan dilewati, jadi unduh ulang channel/playlist hanya mengambil yang baru |
@@ -202,7 +204,7 @@ Semua file PDF diproses **di komputer Anda**, tidak ada yang diunggah ke interne
 <table>
 <tr>
 <td><img src="docs/screenshots/video.png" alt="Konversi video" /></td>
-<td><img src="docs/screenshots/download.png" alt="Download YouTube, TikTok, Instagram, Facebook & Spotify" /></td>
+<td><img src="docs/screenshots/download.png" alt="Download YouTube, TikTok, Instagram, Facebook, X, Pinterest & Spotify" /></td>
 </tr>
 </table>
 
@@ -215,10 +217,10 @@ Semua file PDF diproses **di komputer Anda**, tidak ada yang diunggah ke interne
 1. Jalankan **KuyMediaBox** (installer atau versi portable).
 2. Buka **Pengaturan** (kiri bawah) › **Tools pendukung**, lalu klik **Unduh** pada tool yang berstatus *Belum ada*:
    - **FFmpeg**: wajib untuk Video, Audio, dan Download
-   - **yt-dlp**: untuk download video & audio dari YouTube, TikTok, Instagram, Facebook, dan Spotify
+   - **yt-dlp**: untuk download video & audio dari YouTube, TikTok, Instagram, Facebook, X, Pinterest, dan Spotify
    - **JS runtime**: dipakai yt-dlp untuk YouTube; kalau Node.js sudah terpasang di PC, tidak perlu mengunduh apa pun
    - **spotDL**: khusus Spotify
-   - **gallery-dl**: untuk foto dari post TikTok & Facebook (foto Instagram tidak butuh gallery-dl)
+   - **gallery-dl**: untuk foto dari post TikTok & Facebook, serta link X dan Pinterest (foto Instagram tidak butuh gallery-dl)
 3. (Opsional) Atur **Folder hasil** untuk tiap menu di halaman yang sama.
 4. (Opsional) Prefer English? Pilih **English** di **Pengaturan › Umum › Bahasa / Language**.
 
@@ -265,19 +267,20 @@ Tidak perlu mengunduh ulang secara manual. Kalau ada versi baru di GitHub Releas
 
 Cek manual kapan saja lewat **Pengaturan › Tentang & update › Cek update**.
 
-### Download YouTube, TikTok, Instagram, Facebook & Spotify
+### Download YouTube, TikTok, Instagram, Facebook, X, Pinterest & Spotify
 
 1. Buka menu **Download**.
 2. Tempel link (bisa banyak, satu per baris), lalu klik **Periksa link**. Tombol **Tempel** mengambil langsung dari clipboard.
-3. Link otomatis masuk ke **tab kategorinya** (YouTube, TikTok, Instagram, Facebook, Spotify) dan tab itu langsung terbuka. Pilih item yang mau diunduh:
+3. Link otomatis masuk ke **tab kategorinya** (YouTube, TikTok, Instagram, Facebook, X, Pinterest, Spotify) dan tab itu langsung terbuka. Pilih item yang mau diunduh:
    - **Pilih semua** untuk seluruh isi kategori, atau centang per grup/per item
-   - **Playlist/album**: centang item atau isi **Rentang** (`1-20`)
+   - **Playlist/album/board Pinterest/profil X**: centang item atau isi **Rentang** (`1-20`)
    - **Channel**: pilih Video/Shorts/Live dan Semua / N terbaru / Sejak tanggal
-   - **Post TikTok/Instagram/Facebook**: semua foto, video, dan musik di post tampil sebagai item terpisah
+   - **Post TikTok/Instagram/Facebook/X & pin Pinterest**: semua foto, video, dan musik di post tampil sebagai item terpisah
+   - **Profil X**: login dulu lewat **Pengaturan › Download › Login lewat cookies browser**; post biasa tidak butuh login
 4. Di panel kanan pilih **Video** atau **Audio**, kualitas, dan format (untuk foto: **Asli** atau **JPG**). Pengaturan ini berlaku untuk **semua link di kategori** yang sedang dibuka.
 5. Klik **Unduh semua**. Item terpilih dari semua kategori diproses dalam satu antrian. **Hapus semua link …** mengosongkan satu kategori.
 
-> Playlist, channel, album, dan post berisi banyak item (carousel) otomatis dibuatkan subfolder sesuai namanya (bisa dimatikan di Pengaturan).
+> Playlist, channel, album, board/profil/pencarian Pinterest, profil X, dan post berisi banyak item (carousel) otomatis dibuatkan subfolder sesuai namanya (bisa dimatikan di Pengaturan).
 
 ---
 
@@ -397,8 +400,10 @@ Untuk reset total, tutup aplikasi lalu hapus folder `%APPDATA%\KuyMediaBox` dan 
 | Download YouTube gagal / "minta verifikasi bukan bot" | Update **yt-dlp** di Pengaturan, tunggu beberapa saat, lalu coba lagi |
 | Post Instagram/Facebook "privat, dibatasi, atau butuh login" | Aplikasi hanya mengunduh konten **publik**. Story, profil Instagram, dan post privat butuh login sehingga belum didukung. Kalau post publik tiba-tiba ditolak, tunggu beberapa saat lalu coba lagi. |
 | "Post ini berisi foto. Pasang gallery-dl…" | Klik **Unduh sekarang** pada banner atau **Pengaturan › Tools pendukung › gallery-dl** |
-| TikTok/Instagram/Facebook berhenti bisa dibaca | Situs ini sering berubah; klik **Update** pada yt-dlp dan gallery-dl di Pengaturan |
+| TikTok/Instagram/Facebook/X/Pinterest berhenti bisa dibaca | Situs ini sering berubah; klik **Update** pada yt-dlp dan gallery-dl di Pengaturan |
 | "Link foto sudah kedaluwarsa" | Link gambar dari TikTok/Instagram hanya berlaku beberapa jam. Hapus link, tempel ulang, lalu unduh lagi. |
+| Board/pin Pinterest privat tidak terbaca | Login Pinterest di browser, lalu pilih browser itu di **Pengaturan › Download › Login lewat cookies browser** (Firefox paling andal) |
+| "Butuh login X" | Profil X (dan post sensitif) hanya bisa dibaca setelah login. Login X di browser, lalu pilih browser itu di **Pengaturan › Download › Login lewat cookies browser** (Firefox paling andal). Post biasa tidak butuh login. |
 | "yt-dlp butuh JS runtime" | Pasang Node.js, atau klik **Unduh** pada JS runtime di Pengaturan |
 | Playlist Spotify tidak terbaca | Playlist buatan Spotify (mis. Discover Weekly) dan playlist private tidak bisa dibaca. Salin lagunya ke playlist publik milik sendiri. |
 | "Video … tidak bisa disalin ke … tanpa encode ulang" | Codec sumber tidak cocok dengan format tujuan; pilih codec lain (misalnya H.264) |
@@ -428,7 +433,7 @@ KuyMediaBox/
 │   ├── mediaconv/          # argumen FFmpeg untuk video & audio
 │   ├── imageconv/          # konversi gambar pure Go (+ ICO & PDF)
 │   ├── pdf/                # alat PDF: PDFium (WebAssembly) + pdfcpu, OCR Windows, Office, Edge/Chrome headless
-│   ├── downloader/         # deteksi link, yt-dlp (YouTube & sosmed), spotDL (Spotify), gallery-dl (foto)
+│   ├── downloader/         # deteksi link, yt-dlp (YouTube & sosmed), spotDL (Spotify), gallery-dl (foto, X, Pinterest)
 │   ├── tools/              # Tools Manager: cari, unduh, update
 │   ├── updater/            # update aplikasi dari GitHub Releases
 │   ├── i18n/               # teks Indonesia/English untuk pesan dari backend

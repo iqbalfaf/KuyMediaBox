@@ -247,11 +247,11 @@ export interface Capabilities {
   encoders: Record<string, boolean>
 }
 
-export type Source = 'youtube' | 'spotify' | 'tiktok' | 'instagram' | 'facebook' | 'other'
+export type Source = 'youtube' | 'spotify' | 'tiktok' | 'instagram' | 'facebook' | 'x' | 'pinterest' | 'other'
 
 export interface Link {
   source: Source | ''
-  type: 'video' | 'playlist' | 'channel' | 'track' | 'album' | 'artist' | 'post' | 'profile' | 'unknown'
+  type: 'video' | 'playlist' | 'channel' | 'track' | 'album' | 'artist' | 'post' | 'profile' | 'board' | 'search' | 'unknown'
   url: string
   id: string
   photo: boolean

@@ -8,10 +8,10 @@ import { isActive, tasks, trackBatch } from './tasks.svelte'
 export type Scope = 'all' | 'latest' | 'since'
 
 /** A download category: one per platform. */
-export type Category = 'youtube' | 'tiktok' | 'instagram' | 'facebook' | 'spotify' | 'other'
+export type Category = 'youtube' | 'tiktok' | 'instagram' | 'facebook' | 'x' | 'pinterest' | 'spotify' | 'other'
 
 /** Display order of the category tabs. */
-export const categoryOrder: Category[] = ['youtube', 'tiktok', 'instagram', 'facebook', 'spotify', 'other']
+export const categoryOrder: Category[] = ['youtube', 'tiktok', 'instagram', 'facebook', 'x', 'pinterest', 'spotify', 'other']
 
 export interface LinkRow {
   id: string
@@ -46,23 +46,23 @@ const socialDefaults: DownloadOptions = {
   subtitles: 'none', subLangs: 'id,en', sectionStart: '', sectionEnd: '', sponsorBlock: 'off', playlist: false,
 }
 
-/** TikTok, Instagram and Facebook. */
+/** TikTok, Instagram, Facebook, X and Pinterest. */
 export function isSocial(source: string): boolean {
-  return source === 'tiktok' || source === 'instagram' || source === 'facebook'
+  return source === 'tiktok' || source === 'instagram' || source === 'facebook' || source === 'x' || source === 'pinterest'
 }
 
 export const sourceName: Record<string, string> = {
-  youtube: 'YouTube', spotify: 'Spotify', tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook', other: 'Web',
+  youtube: 'YouTube', spotify: 'Spotify', tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook', x: 'X', pinterest: 'Pinterest', other: 'Web',
 }
 
 /** Short badge class per source. */
 export const sourceClass: Record<string, string> = {
-  youtube: 'yt', spotify: 'sp', tiktok: 'tt', instagram: 'ig', facebook: 'fb', other: 'ot',
+  youtube: 'yt', spotify: 'sp', tiktok: 'tt', instagram: 'ig', facebook: 'fb', x: 'x', pinterest: 'pi', other: 'ot',
 }
 
 /** Icon shown in a category badge. */
 export const sourceIcon: Record<string, string> = {
-  youtube: 'play', spotify: 'music', tiktok: 'play', instagram: 'image', facebook: 'play', other: 'link',
+  youtube: 'play', spotify: 'music', tiktok: 'play', instagram: 'image', facebook: 'play', x: 'at', pinterest: 'pin', other: 'link',
 }
 
 /** "3 foto · 1 video · musik" for a social post. */
@@ -157,7 +157,7 @@ export function rowsOf(cat: Category | ''): LinkRow[] {
 
 export const typeLabel: Record<string, string> = {
   video: 'Video', playlist: 'Playlist', channel: 'Channel', get track() { return L('Lagu', 'Track') }, album: 'Album', get artist() { return L('Artis', 'Artist') }, unknown: 'Link',
-  post: 'Post', get profile() { return L('Profil', 'Profile') },
+  post: 'Post', get profile() { return L('Profil', 'Profile') }, board: 'Board', get search() { return L('Pencarian', 'Search') },
 }
 
 export const tabLabel: Record<string, string> = { get videos() { return L('Video', 'Videos') }, shorts: 'Shorts', streams: 'Live' }
@@ -172,7 +172,7 @@ export async function addLinks(text: string) {
     return
   }
   if (links.length === 0) {
-    toast(L('Tidak ada link yang dikenali. Tempel link YouTube, TikTok, Instagram, Facebook, atau Spotify.', 'No recognizable links. Paste a YouTube, TikTok, Instagram, Facebook or Spotify link.'), 'err')
+    toast(L('Tidak ada link yang dikenali. Tempel link YouTube, TikTok, Instagram, Facebook, X, Pinterest, atau Spotify.', 'No recognizable links. Paste a YouTube, TikTok, Instagram, Facebook, X, Pinterest or Spotify link.'), 'err')
     return
   }
   const known = new Set(dl.rows.map((r) => r.link.url))
@@ -222,6 +222,10 @@ function unknownLinkText(source: string): string {
       return L('Gunakan link post atau reel Instagram (story & profil butuh login)', 'Use an Instagram post or reel link (stories & profiles need a login)')
     case 'facebook':
       return L('Gunakan link video, reel, atau foto Facebook', 'Use a Facebook video, reel or photo link')
+    case 'x':
+      return L('Gunakan link post X (…/status/…) atau profil', 'Use an X post (…/status/…) or profile link')
+    case 'pinterest':
+      return L('Gunakan link pin, board, profil, atau pencarian Pinterest', 'Use a Pinterest pin, board, profile or search link')
   }
   return L('Link tidak dikenali', 'Link not recognized')
 }
@@ -245,7 +249,7 @@ export async function analyze(id: string) {
     }
     r.col = col
     r.status = 'ready'
-    if (col.type === 'playlist' || col.type === 'album' || col.type === 'artist') r.range = col.entries.length ? `1-${col.entries.length}` : ''
+    if (['playlist', 'album', 'artist', 'board', 'search', 'profile'].includes(col.type)) r.range = col.entries.length ? `1-${col.entries.length}` : ''
     if (r.link.type === 'channel') {
       // Default to the tab that has content.
       const counts = col.tabCounts ?? {}

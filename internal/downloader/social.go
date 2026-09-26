@@ -1,6 +1,7 @@
 package downloader
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -56,6 +57,10 @@ func AnalyzeSocial(ctx context.Context, env Env, link Link) (*Collection, error)
 	var col *Collection
 	var err error
 	switch {
+	case link.Source == SourcePinterest:
+		col, err = pinterestCollection(ctx, env, link)
+	case link.Source == SourceX:
+		col, err = xCollection(ctx, env, link)
 	case link.Type == TypeProfile:
 		col, err = tiktokProfile(ctx, env, link)
 	case link.Source == SourceTikTok && link.Photo:
@@ -96,6 +101,11 @@ func ytPost(ctx context.Context, env Env, link Link) (*Collection, error) {
 	if err != nil {
 		return nil, socialError(err)
 	}
+	return ytPostFrom(link, info)
+}
+
+// ytPostFrom turns yt-dlp's view of a post into entries.
+func ytPostFrom(link Link, info *ytInfo) (*Collection, error) {
 	items := []ytInfo{*info}
 	if len(info.Entries) > 0 {
 		items = info.Entries
@@ -275,7 +285,13 @@ func parseGalleryJSON(out string) ([]galleryFile, error) {
 		case 3:
 			var u string
 			var meta map[string]any
-			if json.Unmarshal(m[1], &u) != nil || len(m) < 3 || json.Unmarshal(m[2], &meta) != nil {
+			if json.Unmarshal(m[1], &u) != nil || len(m) < 3 {
+				continue
+			}
+			// Keep numbers exact: X and TikTok IDs have 19 digits, more than a float64 holds.
+			dec := json.NewDecoder(bytes.NewReader(m[2]))
+			dec.UseNumber()
+			if dec.Decode(&meta) != nil {
 				continue
 			}
 			files = append(files, galleryFile{URL: u, Meta: meta})
@@ -340,6 +356,10 @@ func unsupportedSocial(source string) error {
 		return queue.Fail(i18n.L("Link Instagram ini belum didukung. Gunakan link post atau reel (story & profil butuh login).", "This Instagram link isn't supported yet. Use a post or reel link (stories & profiles need a login)."), "")
 	case SourceFacebook:
 		return queue.Fail(i18n.L("Link Facebook ini belum didukung. Gunakan link video, reel, atau foto.", "This Facebook link isn't supported yet. Use a video, reel or photo link."), "")
+	case SourcePinterest:
+		return queue.Fail(i18n.L("Link Pinterest ini belum didukung. Gunakan link pin, board, profil, atau pencarian.", "This Pinterest link isn't supported yet. Use a pin, board, profile or search link."), "")
+	case SourceX:
+		return queue.Fail(i18n.L("Link X ini belum didukung. Gunakan link post (…/status/…) atau profil.", "This X link isn't supported yet. Use a post (…/status/…) or profile link."), "")
 	}
 	return queue.Fail(i18n.L("Link TikTok ini belum didukung. Gunakan link video, foto, atau profil.", "This TikTok link isn't supported yet. Use a video, photo or profile link."), "")
 }
@@ -351,6 +371,26 @@ func socialError(err error) error {
 		return friendlySocialError(ue.Detail)
 	}
 	return err
+}
+
+// needLogin tells the user to sign in to site through the browser cookies setting.
+func needLogin(site string, env Env, detail string) error {
+	if env.CookiesBrowser == "" && env.CookiesFile == "" {
+		return queue.Fail(i18n.F("Butuh login %s. Pilih browser yang sudah login %s di Pengaturan › Download › Login lewat cookies browser.",
+			"Logging in to %s is needed. Choose a browser that is logged in to %s in Settings › Download › Sign in with browser cookies.", site, site), detail)
+	}
+	return queue.Fail(i18n.F("Login %s tidak terbaca atau kedaluwarsa. Buka %s di browser itu, pastikan sudah login, lalu coba lagi.",
+		"The %s login can't be read or has expired. Open %s in that browser, make sure you're logged in, then try again.", site, site), detail)
+}
+
+// uniqueID returns id, or id-2, id-3… when it is already taken: entry IDs key the list in the UI.
+func uniqueID(seen map[string]bool, id string) string {
+	u := id
+	for n := 2; seen[u]; n++ {
+		u = id + "-" + strconv.Itoa(n)
+	}
+	seen[u] = true
+	return u
 }
 
 // friendlySocialError maps yt-dlp/gallery-dl output about social posts to a short message.
@@ -420,6 +460,8 @@ func metaString(m map[string]any, key string) string {
 		return v
 	case float64:
 		return strconv.FormatInt(int64(v), 10)
+	case json.Number:
+		return v.String()
 	}
 	return ""
 }
@@ -479,11 +521,15 @@ func SocialFileName(col *Collection, e Entry, width int) string {
 	if u := firstNonEmpty(e.uploader, col.uploader); u != "" {
 		name = u + " - " + name
 	}
-	if col.Type == TypeProfile {
-		name = firstNonEmpty(e.uploader, col.uploader) + " - " + strings.TrimSuffix(shorten(e.Title, 60), "…")
+	list := col.Type == TypeProfile || col.Type == TypeBoard || col.Type == TypeSearch
+	if list {
+		name = strings.TrimSuffix(shorten(e.Title, 60), "…")
+		if u := firstNonEmpty(e.uploader, col.uploader); u != "" {
+			name = u + " - " + name
+		}
 	}
 	id := col.postID
-	if col.Type == TypeProfile {
+	if list {
 		id = e.ID
 	}
 	if col.Type == TypePost && len(col.Entries) > 1 {
@@ -507,6 +553,17 @@ func SocialFileName(col *Collection, e Entry, width int) string {
 
 // PostFolderName names the subfolder of a multi-item post or a TikTok profile.
 func PostFolderName(col *Collection) string {
+	if col.Source == SourcePinterest {
+		switch col.Type {
+		case TypeProfile, TypeBoard:
+			return naming.SanitizeFileName("Pinterest " + col.Title)
+		case TypeSearch:
+			return naming.SanitizeFileName(i18n.L("Pinterest cari ", "Pinterest search ") + col.Title)
+		}
+	}
+	if col.Source == SourceX && col.Type == TypeProfile {
+		return naming.SanitizeFileName("X " + col.Title)
+	}
 	if col.Type == TypeProfile {
 		return naming.SanitizeFileName("TikTok " + col.Title)
 	}
@@ -685,6 +742,10 @@ func sourceReferer(url string) string {
 		return "https://www.instagram.com/"
 	case strings.Contains(url, "fbcdn"):
 		return "https://www.facebook.com/"
+	case strings.Contains(url, "pinimg.com"):
+		return "https://www.pinterest.com/"
+	case strings.Contains(url, "twimg.com"):
+		return "https://x.com/"
 	}
 	return ""
 }
