@@ -139,7 +139,7 @@ func collectionDir(base string, col *downloader.Collection, subfolders bool) str
 	case downloader.TypePlaylist, downloader.TypeChannel, downloader.TypeAlbum, downloader.TypeArtist:
 		name := strings.ReplaceAll(naming.SanitizeFileName(col.Title), "%", "")
 		return filepath.Join(base, name)
-	case downloader.TypeProfile:
+	case downloader.TypeProfile, downloader.TypeBoard, downloader.TypeSearch:
 		return filepath.Join(base, strings.ReplaceAll(downloader.PostFolderName(col), "%", ""))
 	case downloader.TypePost:
 		if len(col.Entries) > 1 {

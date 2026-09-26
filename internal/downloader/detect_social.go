@@ -92,7 +92,12 @@ func fbID(u *url.URL) string {
 // hasKnownDomain lets SplitLinks accept links pasted without "https://".
 func hasKnownDomain(s string) bool {
 	low := strings.ToLower(s)
-	for _, d := range []string{"youtu", "spotify", "tiktok", "instagram.com", "instagr.am", "facebook.com", "fb.watch", "fb.com"} {
+	for _, p := range []string{"x.com/", "www.x.com/", "mobile.x.com/"} {
+		if strings.HasPrefix(low, p) {
+			return true
+		}
+	}
+	for _, d := range []string{"youtu", "spotify", "tiktok", "instagram.com", "instagr.am", "facebook.com", "fb.watch", "fb.com", "pinterest.", "pin.it", "twitter.com", "fxtwitter.com", "vxtwitter.com", "fixupx.com", "fixvx.com"} {
 		if strings.Contains(low, d) {
 			return true
 		}

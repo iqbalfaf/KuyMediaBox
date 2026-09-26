@@ -63,7 +63,7 @@
           <span class="hint ellipsis" title={settings.value.cookiesFile}><Icon name="file" size={12} /> {settings.value.cookiesFile}</span>
         {/if}
         <p class="hint">
-          {L('Untuk video dibatasi umur, khusus member, atau post yang butuh login. Login dulu di browser tersebut.', 'For age-restricted, members-only or login-only posts. Sign in with that browser first.')}
+          {L('Untuk video dibatasi umur, khusus member, profil X, atau post yang butuh login. Login dulu di browser tersebut.', 'For age-restricted, members-only or login-only posts and X profiles. Sign in with that browser first.')}
           {#if settings.value.cookiesBrowser && settings.value.cookiesBrowser !== 'firefox'}{L(' Chrome/Edge/Brave harus ditutup saat mengunduh; bila gagal, pakai Firefox atau file cookies.txt.', ' Close Chrome/Edge/Brave while downloading; if it fails, use Firefox or a cookies.txt file.')}{/if}
         </p>
       </div>
