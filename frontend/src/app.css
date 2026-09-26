@@ -61,6 +61,10 @@
   --ig-fg: #ff8fbf;
   --fb-bg: #172a40;
   --fb-fg: #8ab8ff;
+  --x-bg: #2a2d33;
+  --x-fg: #e7e9ea;
+  --pi-bg: #3a1419;
+  --pi-fg: #ff7a8a;
   --shadow: rgba(0, 0, 0, 0.45);
   --font: 'Plus Jakarta Sans', system-ui, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, monospace;
@@ -131,6 +135,10 @@
   --ig-fg: #b8266a;
   --fb-bg: #e3edfd;
   --fb-fg: #1f5fbf;
+  --x-bg: #e6e8eb;
+  --x-fg: #0f1419;
+  --pi-bg: #fde6e9;
+  --pi-fg: #c8102e;
   --shadow: rgba(30, 40, 60, 0.18);
   color-scheme: light;
 }

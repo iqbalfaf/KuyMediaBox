@@ -1,4 +1,4 @@
-// Package downloader reads YouTube, Spotify, TikTok, Instagram and Facebook links and downloads
+// Package downloader reads YouTube, Spotify, TikTok, Instagram, Facebook, X and Pinterest links and downloads
 // their items with yt-dlp (Spotify tracks are matched to YouTube through spotDL's metadata;
 // pictures from social posts come from gallery-dl).
 package downloader
@@ -16,6 +16,8 @@ const (
 	SourceTikTok    = "tiktok"
 	SourceInstagram = "instagram"
 	SourceFacebook  = "facebook"
+	SourcePinterest = "pinterest"
+	SourceX         = "x"
 	SourceOther     = "other"
 
 	TypeVideo    = "video"
@@ -25,7 +27,9 @@ const (
 	TypeAlbum    = "album"
 	TypeArtist   = "artist"
 	TypePost     = "post"    // one social post: video, pictures or both
-	TypeProfile  = "profile" // TikTok profile (list of posts)
+	TypeProfile  = "profile" // TikTok, X or Pinterest user (list of posts)
+	TypeBoard    = "board"   // Pinterest board
+	TypeSearch   = "search"  // Pinterest search results
 	TypeUnknown  = "unknown"
 )
 
@@ -39,9 +43,9 @@ type Link struct {
 	Short  bool   `json:"short"` // short share link, resolved before reading
 }
 
-// IsSocial reports whether a source is TikTok, Instagram or Facebook.
+// IsSocial reports whether a source is TikTok, Instagram, Facebook, X or Pinterest.
 func IsSocial(source string) bool {
-	return source == SourceTikTok || source == SourceInstagram || source == SourceFacebook
+	return source == SourceTikTok || source == SourceInstagram || source == SourceFacebook || source == SourcePinterest || source == SourceX
 }
 
 var (
@@ -72,6 +76,12 @@ func Detect(raw string) Link {
 	host := strings.ToLower(strings.TrimPrefix(u.Hostname(), "www."))
 	host = strings.TrimPrefix(host, "m.")
 	if l, ok := detectSocial(host, u, raw); ok {
+		return l
+	}
+	if l, ok := detectPinterest(host, u, raw); ok {
+		return l
+	}
+	if l, ok := detectX(host, u); ok {
 		return l
 	}
 

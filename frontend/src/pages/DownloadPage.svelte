@@ -99,9 +99,9 @@
   }
 
   const hasSpotify = $derived(dl.rows.some((r) => r.link.source === 'spotify'))
-  // gallery-dl only matters for TikTok/Facebook photo posts.
+  // gallery-dl reads TikTok/Facebook photo posts and every X and Pinterest link.
   const needsGallery = $derived(
-    dl.rows.some((r) => (r.link.photo && (r.link.source === 'tiktok' || r.link.source === 'facebook')) || r.error.includes('gallery-dl')),
+    dl.rows.some((r) => (r.link.photo && (r.link.source === 'tiktok' || r.link.source === 'facebook')) || r.link.source === 'pinterest' || r.link.source === 'x' || r.error.includes('gallery-dl')),
   )
   const toolIds = $derived([
     'ytdlp', 'ffmpeg', 'jsruntime',
@@ -147,7 +147,7 @@
   /** A link that holds exactly one item is shown as a single row, without a group header. */
   function isSingle(r: LinkRow): boolean {
     const t = r.col?.type
-    return !!r.col && r.col.entries.length === 1 && t !== 'playlist' && t !== 'channel' && t !== 'album' && t !== 'artist' && t !== 'profile'
+    return !!r.col && r.col.entries.length === 1 && t !== 'playlist' && t !== 'channel' && t !== 'album' && t !== 'artist' && t !== 'profile' && t !== 'board' && t !== 'search'
   }
 
   function entryKindLabel(e: Entry | undefined): string {
@@ -167,6 +167,7 @@
       return `Channel${who} · ${col.entries.length} ${L('konten', 'items')}${tabs ? ` (${tabs})` : ''}`
     }
     if (isSocial(col.source)) {
+      if ((col.source === 'pinterest' || col.source === 'x') && (col.type === 'profile' || col.type === 'board' || col.type === 'search')) return `${typeLabel[col.type]}${who} · ${kindSummary(list)}`
       if (col.type === 'profile') return `${typeLabel.profile}${who} · ${list.length} video${L('', list.length === 1 ? '' : 's')}`
       return `${isSingle(r) ? entryKindLabel(list[0]) : 'Post'}${who}${isSingle(r) ? '' : ` · ${kindSummary(list)}`}`
     }
@@ -317,7 +318,7 @@
   </div>
 {/snippet}
 
-<PageHeader title="Download" subtitle={L('YouTube, TikTok, Instagram, Facebook & Spotify — tempel link-nya, otomatis masuk ke kategorinya.', 'YouTube, TikTok, Instagram, Facebook & Spotify — paste the link and it lands in its category automatically.')} />
+<PageHeader title="Download" subtitle={L('YouTube, TikTok, Instagram, Facebook, X, Pinterest & Spotify — tempel link-nya, otomatis masuk ke kategorinya.', 'YouTube, TikTok, Instagram, Facebook, X, Pinterest & Spotify — paste the link and it lands in its category automatically.')} />
 <ToolBanner ids={toolIds} why={L('Dibutuhkan untuk membaca link dan mengunduh. Sekali pasang, dipakai seterusnya.', 'Needed to read links and download. Install once, use forever.')} />
 
 <div class="body">
@@ -326,7 +327,7 @@
       <form class="input-row" onsubmit={(e) => { e.preventDefault(); submit() }}>
         <div class="input-wrap">
           <span class="lic"><Icon name="link" /></span>
-          <input class="url" aria-label={L('Link yang akan diunduh', 'Link to download')} placeholder={L('Tempel link YouTube, TikTok, Instagram, Facebook, atau Spotify…', 'Paste a YouTube, TikTok, Instagram, Facebook or Spotify link…')} bind:value={dl.input} />
+          <input class="url" aria-label={L('Link yang akan diunduh', 'Link to download')} placeholder={L('Tempel link YouTube, TikTok, Instagram, Facebook, X, Pinterest, atau Spotify…', 'Paste a YouTube, TikTok, Instagram, Facebook, X, Pinterest or Spotify link…')} bind:value={dl.input} />
         </div>
         <button type="button" class="btn tall" onclick={paste}><Icon name="clipboard" size={16} />{L('Tempel', 'Paste')}</button>
         <button type="submit" class="btn-accent tall" disabled={!dl.input.trim()}>{L('Periksa link', 'Check link')}</button>
@@ -344,6 +345,8 @@
             <div><span class="badge tt"><Icon name="play" size={10} stroke={3} />TikTok</span> {L('video · foto slide + musik · profil', 'videos · photo slides + sound · profiles')}</div>
             <div><span class="badge ig"><Icon name="image" size={10} stroke={3} />Instagram</span> {L('reel · post foto & video · carousel', 'reels · photo & video posts · carousels')}</div>
             <div><span class="badge fb"><Icon name="play" size={10} stroke={3} />Facebook</span> {L('video · reel · foto', 'videos · reels · photos')}</div>
+            <div><span class="badge x"><Icon name="at" size={10} stroke={3} />X</span> {L('post foto & video · profil (perlu login)', 'photo & video posts · profiles (login needed)')}</div>
+            <div><span class="badge pi"><Icon name="pin" size={10} stroke={3} />Pinterest</span> {L('pin foto & video · board · profil · pencarian', 'photo & video pins · boards · profiles · search')}</div>
             <div><span class="badge sp"><Icon name="music" size={10} stroke={3} />Spotify</span> {L('lagu · album · playlist · artis', 'tracks · albums · playlists · artists')}</div>
           </div>
         </div>
@@ -396,7 +399,7 @@
                 <Icon name="loader" size={16} class="spin" />
                 <div class="gs-text">
                   <span class="ellipsis" title={r.link.url}>{shortUrl(r.link.url)}</span>
-                  <span class="gs-sub">{L('Membaca isi link…', 'Reading the link…')} {r.link.type === 'channel' ? L('Channel besar bisa butuh beberapa menit.', 'Large channels can take a few minutes.') : ''}</span>
+                  <span class="gs-sub">{L('Membaca isi link…', 'Reading the link…')} {r.link.type === 'channel' ? L('Channel besar bisa butuh beberapa menit.', 'Large channels can take a few minutes.') : r.link.type === 'board' || r.link.type === 'profile' || r.link.type === 'search' ? L('Daftar besar bisa butuh hingga satu menit.', 'Large lists can take up to a minute.') : ''}</span>
                 </div>
                 <button class="mini" aria-label={L('Hapus link', 'Remove link')} title={L('Hapus link', 'Remove link')} onclick={() => removeRow(r.id)}><Icon name="x" size={14} /></button>
               </div>
@@ -425,7 +428,7 @@
                       indeterminate={gs.some}
                       onchange={(e) => setAll(r, (e.currentTarget as HTMLInputElement).checked)}
                     />
-                    {#if col.type === 'channel' || col.type === 'profile'}
+                    {#if col.type === 'channel' || col.type === 'profile' || col.type === 'search'}
                       {@const t = tile(col.title)}
                       <div class="avatar" style="background: {t.bg}; color: {t.fg}">{initials(col.title)}</div>
                     {:else if col.thumbnail}
@@ -437,7 +440,7 @@
                       <span class="ch-title ellipsis" title={col.title}>{col.title || L('Tanpa judul', 'Untitled')}</span>
                       <span class="ch-sub ellipsis">{linkSummary(r)}</span>
                     </div>
-                    {#if col.type === 'playlist' || col.type === 'album' || col.type === 'artist'}
+                    {#if ['playlist', 'album', 'artist', 'board', 'search'].includes(col.type) || (col.type === 'profile' && (col.source === 'pinterest' || col.source === 'x'))}
                       <form class="range" onsubmit={(e) => { e.preventDefault(); onRange(r) }}>
                         <label for="rentang-{r.id}">{L('Rentang', 'Range')}</label>
                         <input id="rentang-{r.id}" class="text-input" bind:value={r.range} onblur={() => onRange(r)} />
@@ -705,6 +708,14 @@
     background: var(--fb-bg);
     color: var(--fb-fg);
   }
+  .badge.x {
+    background: var(--x-bg);
+    color: var(--x-fg);
+  }
+  .badge.pi {
+    background: var(--pi-bg);
+    color: var(--pi-fg);
+  }
   .mini {
     width: 32px;
     height: 32px;
@@ -817,6 +828,12 @@
   }
   .tabs .dot.fb {
     background: #4d94ff;
+  }
+  .tabs .dot.x {
+    background: var(--x-fg);
+  }
+  .tabs .dot.pi {
+    background: #e60023;
   }
   .tabs .dot.ot {
     background: var(--text-3);
@@ -1062,6 +1079,12 @@
   }
   .ph-v .dot.fb {
     background: #4d94ff;
+  }
+  .ph-v .dot.x {
+    background: var(--x-fg);
+  }
+  .ph-v .dot.pi {
+    background: #e60023;
   }
   .ph-v .dot.ot {
     background: var(--text-3);
