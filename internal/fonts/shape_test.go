@@ -51,7 +51,10 @@ func TestShapeArabicAndDevanagari(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("%s: %d runes → %d glyphs", fh.Name, len([]rune(hi)), len(shh.Glyphs))
-	if len(shh.Glyphs) >= len([]rune(hi)) {
+	// Windows Server images (CI) have no Devanagari font (Nirmala UI): nothing to shape with.
+	if !fh.Covers(hi) {
+		t.Logf("no installed font covers Devanagari (fell back to %s); conjunct check skipped", fh.Name)
+	} else if len(shh.Glyphs) >= len([]rune(hi)) {
 		t.Error("Devanagari conjuncts were not formed")
 	}
 	sub, err := MakeSubsetWith(f, ar, buf)
