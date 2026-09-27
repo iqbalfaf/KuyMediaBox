@@ -62,16 +62,40 @@ export function targetShort(o: VideoOptions): number {
   return o.format === 'gif' ? 480 : 0
 }
 
-/** Output size after scaling (never upscales), mirrors mediaconv.OutputSize. */
+const frameRatios: Record<string, [number, number]> = { '9:16': [9, 16], '1:1': [1, 1], '4:5': [4, 5], '16:9': [16, 9], '4:3': [4, 3] }
+const evenRound = (v: number) => Math.round(v / 2) * 2
+const evenFloor = (v: number) => Math.floor(v / 2) * 2
+
+/** Picture size after rotation and the manual crop (mirrors mediaconv.contentSize). */
+export function contentSize(w: number, h: number, o: VideoOptions): [number, number] {
+  if (o.rotate === 90 || o.rotate === 270) [w, h] = [h, w]
+  if (o.crop?.w > 0 && w && h) return [Math.max(2, evenFloor(w * o.crop.w)), Math.max(2, evenFloor(h * o.crop.h))]
+  return [w, h]
+}
+
+/** Canvas of a frame choice before scaling (mirrors mediaconv.frameArea). */
+function frameArea(w: number, h: number, o: VideoOptions): [number, number] {
+  const r = frameRatios[o.frame ?? '']
+  if (!r || !w || !h) return [w, h]
+  const want = r[0] / r[1]
+  if (o.frameFit === 'crop') {
+    if (w / h > want) return [Math.max(2, evenFloor(h * want)), h - (h % 2)]
+    return [w - (w % 2), Math.max(2, evenFloor(w / want))]
+  }
+  const short = Math.min(w, h)
+  return want >= 1 ? [evenRound(short * want), short - (short % 2)] : [short - (short % 2), evenRound(short / want)]
+}
+
+/** Output size after crop, frame and scaling (never upscales), mirrors mediaconv.OutputSize. */
 export function outputSize(w: number, h: number, o: VideoOptions): [number, number] {
   let target = targetShort(o)
   if (o.format === 'gif' && target === 0) target = 480
   if (o.codec === 'copy' && o.format !== 'gif') return [w, h]
-  if (o.rotate === 90 || o.rotate === 270) [w, h] = [h, w]
+  ;[w, h] = frameArea(...contentSize(w, h, o), o)
   if (!w || !h || !target || Math.min(w, h) <= target) return [w, h]
   // ffmpeg's "-2" rounds the scaled side to the nearest even number.
-  if (w >= h) return [Math.round((w * target) / h / 2) * 2, target]
-  return [target, Math.round((h * target) / w / 2) * 2]
+  if (w >= h) return [evenRound((w * target) / h), target]
+  return [target, evenRound((h * target) / w)]
 }
 
 export const lossyAudio: Record<string, boolean> = { mp3: true, m4a: true, ogg: true, opus: true, flac: false, wav: false }

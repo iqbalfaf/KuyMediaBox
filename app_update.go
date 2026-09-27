@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"kuymediabox/internal/appdir"
 	"kuymediabox/internal/i18n"
 	"kuymediabox/internal/queue"
@@ -17,7 +15,7 @@ import (
 )
 
 // Version is the app version. Release builds set it with -ldflags "-X main.Version=x.y.z".
-var Version = "0.1.5"
+var Version = "0.5.0"
 
 type updateState struct {
 	mu         sync.Mutex
@@ -104,7 +102,7 @@ func (a *App) InstallUpdate() error {
 	}
 	go func() {
 		time.Sleep(700 * time.Millisecond)
-		wruntime.Quit(a.ctx)
+		a.quitApp() // really quit, even with the tray on
 	}()
 	return nil
 }

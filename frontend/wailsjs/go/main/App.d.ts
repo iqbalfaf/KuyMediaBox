@@ -9,8 +9,11 @@ import {config} from '../models';
 import {tools} from '../models';
 import {queue} from '../models';
 import {imageconv} from '../models';
+import {mediaconv} from '../models';
 
 export function AddPaths(arg1:string,arg2:Array<string>):Promise<Array<main.FileItem>>;
+
+export function AddSubscription(arg1:string,arg2:number,arg3:Array<string>,arg4:downloader.Options,arg5:boolean):Promise<main.SubscriptionInfo>;
 
 export function AnalyzeLink(arg1:string):Promise<downloader.Collection>;
 
@@ -18,13 +21,19 @@ export function CancelAfterQueue():Promise<main.AfterQueue>;
 
 export function CancelKind(arg1:string):Promise<void>;
 
+export function CancelModel(arg1:string,arg2:string):Promise<void>;
+
 export function CancelTask(arg1:string):Promise<void>;
 
 export function CertInfo(arg1:string,arg2:string):Promise<pdf.CertInfo>;
 
+export function CheckSubscription(arg1:string):Promise<void>;
+
 export function CheckUpdate():Promise<updater.Info>;
 
 export function ClearHistory():Promise<void>;
+
+export function CloseWindow():Promise<void>;
 
 export function CollectionDir(arg1:string):Promise<string>;
 
@@ -32,13 +41,23 @@ export function CreateCertificate(arg1:string,arg2:string,arg3:string,arg4:numbe
 
 export function DataFolder():Promise<string>;
 
+export function DeleteModel(arg1:string,arg2:string):Promise<void>;
+
 export function DetectLinks(arg1:string):Promise<Array<downloader.Link>>;
+
+export function DiscardPendingDownloads():Promise<void>;
+
+export function ExportSettings(arg1:Record<string, string>):Promise<string>;
 
 export function ForgetCollection(arg1:string):Promise<void>;
 
 export function ForgetTasks(arg1:Array<string>):Promise<void>;
 
 export function GetAfterQueue():Promise<main.AfterQueue>;
+
+export function GetAutostart():Promise<boolean>;
+
+export function GetCLICommand():Promise<main.CLICommand>;
 
 export function GetCapabilities():Promise<main.Capabilities>;
 
@@ -48,6 +67,8 @@ export function GetHWEncoders():Promise<Record<string, Array<string>>>;
 
 export function GetHistory():Promise<Array<history.Entry>>;
 
+export function GetLinkProtocol():Promise<boolean>;
+
 export function GetSendTo():Promise<boolean>;
 
 export function GetSettings():Promise<config.Settings>;
@@ -56,9 +77,17 @@ export function GetTools():Promise<Array<tools.Status>>;
 
 export function GetVersion():Promise<string>;
 
+export function ImportSettings():Promise<main.ImportResult>;
+
+export function InstallModel(arg1:string,arg2:string):Promise<void>;
+
 export function InstallTool(arg1:string):Promise<void>;
 
 export function InstallUpdate():Promise<void>;
+
+export function ListModels(arg1:string):Promise<Array<main.ModelStatus>>;
+
+export function ListSubscriptions():Promise<Array<main.SubscriptionInfo>>;
 
 export function ListTasks():Promise<Array<queue.Info>>;
 
@@ -72,11 +101,15 @@ export function PathExists(arg1:Array<string>):Promise<Record<string, boolean>>;
 
 export function PdfCompare(arg1:string,arg2:string):Promise<pdf.CompareResult>;
 
+export function PdfDetails(arg1:string,arg2:string):Promise<pdf.DocDetails>;
+
 export function PdfDoc(arg1:string,arg2:string):Promise<pdf.DocInfo>;
 
 export function PdfEnvironment():Promise<main.PdfEnv>;
 
 export function PdfFind(arg1:string,arg2:string,arg3:boolean):Promise<Array<pdf.Rect>>;
+
+export function PdfFormFields(arg1:string,arg2:string):Promise<Array<pdf.FormField>>;
 
 export function PdfOcrLanguages():Promise<Array<pdf.OCRLanguage>>;
 
@@ -84,7 +117,11 @@ export function PdfSaveCapture(arg1:string):Promise<main.FileItem>;
 
 export function PdfScan():Promise<main.FileItem>;
 
+export function PdfTSAServers():Promise<Array<string>>;
+
 export function PdfWarmup():Promise<void>;
+
+export function PendingDownloads():Promise<main.PendingSummary>;
 
 export function PickDirectory(arg1:string,arg2:string):Promise<string>;
 
@@ -96,25 +133,43 @@ export function PickFolder(arg1:string):Promise<Array<main.FileItem>>;
 
 export function PickToolPath(arg1:string):Promise<void>;
 
+export function QuitApp():Promise<void>;
+
 export function RecheckTools():Promise<Array<tools.Status>>;
 
 export function RemoveHistory(arg1:Array<string>):Promise<void>;
 
+export function RemoveSubscription(arg1:string):Promise<void>;
+
 export function ResetToolPath(arg1:string):Promise<void>;
+
+export function ResumePendingDownloads():Promise<number>;
 
 export function RevealFile(arg1:string):Promise<void>;
 
 export function RoutePaths(arg1:Array<string>):Promise<main.OpenRequest>;
 
+export function RunWorkflow(arg1:string,arg2:Array<string>):Promise<number>;
+
 export function SaveSettings(arg1:config.Settings):Promise<config.Settings>;
 
 export function SetAfterQueue(arg1:string):Promise<main.AfterQueue>;
 
+export function SetAutostart(arg1:boolean):Promise<boolean>;
+
+export function SetCLICommand(arg1:boolean):Promise<main.CLICommand>;
+
 export function SetEntrySource(arg1:string,arg2:string,arg3:string):Promise<downloader.Entry>;
+
+export function SetLinkProtocol(arg1:boolean):Promise<boolean>;
 
 export function SetSendTo(arg1:boolean):Promise<boolean>;
 
+export function SetSubscription(arg1:string,arg2:boolean,arg3:number):Promise<void>;
+
 export function StartAudio(arg1:Array<main.JobItem>,arg2:main.AudioJob):Promise<Array<main.JobRef>>;
+
+export function StartCollage(arg1:Array<main.JobItem>,arg2:main.CollageJob):Promise<Array<main.JobRef>>;
 
 export function StartDownloads(arg1:string,arg2:Array<string>,arg3:downloader.Options):Promise<Array<main.JobRef>>;
 
@@ -126,6 +181,22 @@ export function StartPdfCombine(arg1:string,arg2:Array<main.PdfJob>,arg3:main.Pd
 
 export function StartPdfEdit(arg1:main.PdfEditRequest):Promise<main.JobRef>;
 
+export function StartPdfForm(arg1:main.PdfJob,arg2:Array<pdf.FormField>,arg3:boolean):Promise<main.JobRef>;
+
+export function StartPdfMeta(arg1:main.PdfJob,arg2:pdf.Meta,arg3:Array<pdf.Bookmark>,arg4:boolean):Promise<main.JobRef>;
+
+export function StartSlideshow(arg1:Array<main.JobItem>,arg2:mediaconv.SlideOptions):Promise<Array<main.JobRef>>;
+
+export function StartSubtitle(arg1:Array<main.JobItem>,arg2:main.SubtitleJob):Promise<Array<main.JobRef>>;
+
 export function StartVideo(arg1:Array<main.JobItem>,arg2:main.VideoJob):Promise<Array<main.JobRef>>;
 
+export function SubtitleLanguages():Promise<Array<string>>;
+
+export function SyncRecipes(arg1:Array<main.Recipe>):Promise<void>;
+
 export function TakeLaunchFiles():Promise<main.OpenRequest>;
+
+export function TakeLaunchLinks():Promise<Array<string>>;
+
+export function ToolsDetected():Promise<boolean>;

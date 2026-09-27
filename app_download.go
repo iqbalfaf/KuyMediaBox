@@ -52,8 +52,17 @@ func (a *App) DetectLinks(text string) []downloader.Link {
 
 // AnalyzeLink reads what a link contains (video, playlist, channel, Spotify list).
 func (a *App) AnalyzeLink(raw string) (*downloader.Collection, error) {
+	a.waitTools()
 	link := downloader.Detect(raw)
 	env := a.env()
+	if link.Short && !downloader.IsSocial(link.Source) {
+		// b23.tv, on.soundcloud.com, …: find the real page first.
+		if final, err := downloader.ResolveRedirect(context.Background(), link.URL); err == nil {
+			if l := downloader.Detect(final); l.Source == link.Source && l.Type != downloader.TypeUnknown {
+				link = l
+			}
+		}
+	}
 	var col *downloader.Collection
 	var err error
 	switch {
@@ -139,7 +148,7 @@ func collectionDir(base string, col *downloader.Collection, subfolders bool) str
 	case downloader.TypePlaylist, downloader.TypeChannel, downloader.TypeAlbum, downloader.TypeArtist:
 		name := strings.ReplaceAll(naming.SanitizeFileName(col.Title), "%", "")
 		return filepath.Join(base, name)
-	case downloader.TypeProfile, downloader.TypeBoard, downloader.TypeSearch:
+	case downloader.TypeProfile, downloader.TypeBoard, downloader.TypeSearch, downloader.TypeStory:
 		return filepath.Join(base, strings.ReplaceAll(downloader.PostFolderName(col), "%", ""))
 	case downloader.TypePost:
 		if len(col.Entries) > 1 {
@@ -151,6 +160,7 @@ func collectionDir(base string, col *downloader.Collection, subfolders bool) str
 
 // StartDownloads queues the selected entries of a collection.
 func (a *App) StartDownloads(key string, ids []string, o downloader.Options) ([]JobRef, error) {
+	a.waitTools()
 	a.colMu.Lock()
 	col := a.collections[key]
 	a.colMu.Unlock()
@@ -197,7 +207,11 @@ func (a *App) StartDownloads(key string, ids []string, o downloader.Options) ([]
 		return nil, errors.New(i18n.L("spotDL belum terpasang. Buka Pengaturan untuk mengunduhnya.", "spotDL is not installed. Open Settings to download it."))
 	}
 
-	dir := collectionDir(a.downloadBase(), col, a.cfg.Get().DownloadSubfolders)
+	base := a.downloadBase()
+	if o.OutDir != "" {
+		base = o.OutDir
+	}
+	dir := collectionDir(base, col, a.cfg.Get().DownloadSubfolders)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf(i18n.L("Folder download tidak bisa dipakai (%s): %w", "Download folder can't be used (%s): %w"), dir, err)
 	}
@@ -257,6 +271,9 @@ func (a *App) StartDownloads(key string, ids []string, o downloader.Options) ([]
 				return err
 			}
 		}
+		if o.Lyrics && o.Mode == "audio" && e.Artist != "" {
+			run = withLyrics(e, run)
+		}
 		if list != nil {
 			run = list.wrap(e, title, run)
 		}
@@ -267,7 +284,30 @@ func (a *App) StartDownloads(key string, ids []string, o downloader.Options) ([]
 	for i := range out {
 		out[i].TaskID = taskIDs[i]
 	}
+	if !a.cli {
+		a.pending.add(col, o, out) // the window resumes its own downloads only
+	}
+	if o.Workflow != "" {
+		if err := a.flowAfterDownload(o.Workflow, taskIDs); err != nil {
+			a.emit("flow:done", FlowResult{Workflow: o.Workflow, Error: err.Error()})
+		}
+	}
 	return out, nil
+}
+
+// withLyrics saves the song's lyrics (LRCLIB) next to the downloaded file. Songs without
+// lyrics just don't get a file.
+func withLyrics(e downloader.Entry, run queue.RunFunc) queue.RunFunc {
+	return func(ctx context.Context, r queue.Reporter) error {
+		rec := &outRecorder{Reporter: r}
+		err := run(ctx, rec)
+		if rec.path != "" && (err == nil || errors.Is(err, queue.ErrSkipped)) {
+			if l, lerr := downloader.FetchLyrics(ctx, e.Artist, e.Title, e.Album, e.Duration); lerr == nil {
+				_, _ = downloader.WriteLRC(rec.path, l, e.Artist, e.Title, e.Album)
+			}
+		}
+		return err
+	}
 }
 
 // m3uWriter keeps a playlist file in step with finished downloads.

@@ -65,6 +65,14 @@
   --x-fg: #e7e9ea;
   --pi-bg: #3a1419;
   --pi-fg: #ff7a8a;
+  --sc-bg: #3a2210;
+  --sc-fg: #ff9a5c;
+  --tw-bg: #261a40;
+  --tw-fg: #b99bff;
+  --rd-bg: #3a1a10;
+  --rd-fg: #ff8a5c;
+  --bl-bg: #10283a;
+  --bl-fg: #6cc8ff;
   --shadow: rgba(0, 0, 0, 0.45);
   --font: 'Plus Jakarta Sans', system-ui, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, monospace;
@@ -139,6 +147,14 @@
   --x-fg: #0f1419;
   --pi-bg: #fde6e9;
   --pi-fg: #c8102e;
+  --sc-bg: #ffeadd;
+  --sc-fg: #c24100;
+  --tw-bg: #ece4ff;
+  --tw-fg: #6a2fd6;
+  --rd-bg: #ffe8df;
+  --rd-fg: #c23600;
+  --bl-bg: #dff3fd;
+  --bl-fg: #0077aa;
   --shadow: rgba(30, 40, 60, 0.18);
   color-scheme: light;
 }

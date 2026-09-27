@@ -80,6 +80,9 @@ type Options struct {
 	SectionEnd   string `json:"sectionEnd"`   // ("" = to the end)
 	SponsorBlock string `json:"sponsorBlock"` // off | mark | remove (YouTube)
 	Playlist     bool   `json:"playlist"`     // write an .m3u8 playlist for albums/playlists
+	Lyrics       bool   `json:"lyrics"`       // save lyrics (.lrc) next to songs (Spotify)
+	Workflow     string `json:"workflow"`     // workflow run on every downloaded file ("" = none)
+	OutDir       string `json:"outDir"`       // download folder instead of the one in the settings (command line)
 }
 
 // Normalize fills defaults.

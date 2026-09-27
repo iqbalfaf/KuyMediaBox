@@ -76,38 +76,41 @@ func writeFont(tables map[string][]byte) []byte {
 	for t := range tables {
 		tags = append(tags, t)
 	}
-	sort.Strings(tags)
+	sort.Strings(tags) // readers binary-search the table directory
 	n := len(tags)
 	sr, es := 1, 0
 	for sr*2 <= n {
 		sr *= 2
 		es++
 	}
-	hdr := make([]byte, 12+16*n)
-	binary.BigEndian.PutUint32(hdr[0:], 0x00010000)
-	binary.BigEndian.PutUint16(hdr[4:], uint16(n))
-	binary.BigEndian.PutUint16(hdr[6:], uint16(sr*16))
-	binary.BigEndian.PutUint16(hdr[8:], uint16(es))
-	binary.BigEndian.PutUint16(hdr[10:], uint16(n*16-sr*16))
-	out := hdr
+	// The whole directory is written before any table data is appended: appending to the
+	// header slice would reallocate it and lose the entries written afterwards.
+	size := 12 + 16*n
+	offsets := make([]int, n)
+	for i, t := range tags {
+		offsets[i] = size
+		size += (len(tables[t]) + 3) &^ 3
+	}
+	out := make([]byte, size)
+	binary.BigEndian.PutUint32(out[0:], 0x00010000)
+	binary.BigEndian.PutUint16(out[4:], uint16(n))
+	binary.BigEndian.PutUint16(out[6:], uint16(sr*16))
+	binary.BigEndian.PutUint16(out[8:], uint16(es))
+	binary.BigEndian.PutUint16(out[10:], uint16(n*16-sr*16))
 	headAt := -1
 	for i, t := range tags {
 		d := tables[t]
 		if t == "head" && len(d) >= 12 {
 			d = append([]byte(nil), d...)
 			binary.BigEndian.PutUint32(d[8:], 0) // checkSumAdjustment, fixed below
-			tables[t] = d
-			headAt = len(out)
+			headAt = offsets[i]
 		}
-		r := hdr[12+16*i:]
+		r := out[12+16*i:]
 		copy(r, t)
 		binary.BigEndian.PutUint32(r[4:], checksum(d))
-		binary.BigEndian.PutUint32(r[8:], uint32(len(out)))
+		binary.BigEndian.PutUint32(r[8:], uint32(offsets[i]))
 		binary.BigEndian.PutUint32(r[12:], uint32(len(d)))
-		out = append(out, d...)
-		for len(out)%4 != 0 {
-			out = append(out, 0)
-		}
+		copy(out[offsets[i]:], d)
 	}
 	if headAt >= 0 {
 		binary.BigEndian.PutUint32(out[headAt+8:], 0xB1B0AFBA-checksum(out))
@@ -126,6 +129,7 @@ type Subset struct {
 	BBox       [4]float64
 	UnitsPerEm int
 	PostScript string
+	Remap      map[uint16]uint16 // original glyph id → id in Data (shaped text)
 }
 
 // Width returns the width of text in points at size.
@@ -141,7 +145,11 @@ func (s *Subset) Width(text string, size float64) float64 {
 }
 
 // MakeSubset builds a subset of face with every rune of text.
-func MakeSubset(face *Face, text string) (*Subset, error) {
+func MakeSubset(face *Face, text string) (*Subset, error) { return MakeSubsetWith(face, text, nil) }
+
+// MakeSubsetWith also keeps the glyphs extra (original ids from shaping: ligatures and
+// contextual forms that no character maps to).
+func MakeSubsetWith(face *Face, text string, extra []uint16) (*Subset, error) {
 	src := face.Data
 	dir, err := tableDir(src)
 	if err != nil {
@@ -215,6 +223,13 @@ func MakeSubset(face *Face, text string) (*Subset, error) {
 		add(int(g))
 		gidOf[r] = newID[int(g)]
 	}
+	for _, g := range extra {
+		add(int(g))
+	}
+	remap := map[uint16]uint16{}
+	for old, nw := range newID {
+		remap[uint16(old)] = nw
+	}
 
 	// glyf + loca (long) with component references renumbered.
 	var newGlyf []byte
@@ -275,7 +290,7 @@ func MakeSubset(face *Face, text string) (*Subset, error) {
 	post := make([]byte, 32)
 	binary.BigEndian.PutUint32(post, 0x00030000) // format 3: no glyph names
 
-	tables := map[string][]byte{"head": newHead, "hhea": newHhea, "maxp": newMaxp, "loca": newLoca, "glyf": newGlyf, "hmtx": newHmtx, "post": post}
+	tables := map[string][]byte{"head": newHead, "hhea": newHhea, "maxp": newMaxp, "loca": newLoca, "glyf": newGlyf, "hmtx": newHmtx, "post": post, "cmap": cmap4(gidOf)}
 	for _, tag := range []string{"cvt ", "fpgm", "prep", "OS/2"} {
 		if d := get(tag); d != nil {
 			tables[tag] = d
@@ -285,7 +300,7 @@ func MakeSubset(face *Face, text string) (*Subset, error) {
 		tables["name"] = d
 	}
 
-	s := &Subset{Data: writeFont(tables), GID: gidOf, Widths: widths, UnitsPerEm: upem}
+	s := &Subset{Data: writeFont(tables), GID: gidOf, Widths: widths, UnitsPerEm: upem, Remap: remap}
 	scale := 1000 / float64(upem)
 	s.BBox = [4]float64{
 		float64(int16(binary.BigEndian.Uint16(head[36:]))) * scale, float64(int16(binary.BigEndian.Uint16(head[38:]))) * scale,
@@ -299,6 +314,50 @@ func MakeSubset(face *Face, text string) (*Subset, error) {
 	}
 	s.PostScript = postScriptName(face)
 	return s, nil
+}
+
+// cmap4 is a Windows Unicode (3,1) format 4 character map of the subset. PDF readers use
+// the glyph ids directly, but a font without cmap is invalid for many tools.
+func cmap4(gidOf map[rune]uint16) []byte {
+	var runes []rune
+	for r, g := range gidOf {
+		if r > 0 && r < 0xFFFF && g != 0 {
+			runes = append(runes, r)
+		}
+	}
+	sort.Slice(runes, func(i, j int) bool { return runes[i] < runes[j] })
+	segs := len(runes) + 1 // one segment per character, plus the 0xFFFF end marker
+	sub := make([]byte, 14+8*segs+2)
+	binary.BigEndian.PutUint16(sub[0:], 4)
+	binary.BigEndian.PutUint16(sub[2:], uint16(len(sub)))
+	binary.BigEndian.PutUint16(sub[6:], uint16(2*segs))
+	sr, es := 1, 0
+	for sr*2 <= segs {
+		sr *= 2
+		es++
+	}
+	binary.BigEndian.PutUint16(sub[8:], uint16(2*sr))
+	binary.BigEndian.PutUint16(sub[10:], uint16(es))
+	binary.BigEndian.PutUint16(sub[12:], uint16(2*segs-2*sr))
+	endAt, startAt := 14, 14+2*segs+2
+	deltaAt, rangeAt := startAt+2*segs, startAt+4*segs
+	for i := 0; i < segs; i++ {
+		code, delta := uint16(0xFFFF), uint16(1)
+		if i < len(runes) {
+			code = uint16(runes[i])
+			delta = gidOf[runes[i]] - code // modulo 65536, as the format defines
+		}
+		binary.BigEndian.PutUint16(sub[endAt+2*i:], code)
+		binary.BigEndian.PutUint16(sub[startAt+2*i:], code)
+		binary.BigEndian.PutUint16(sub[deltaAt+2*i:], delta)
+		binary.BigEndian.PutUint16(sub[rangeAt+2*i:], 0)
+	}
+	out := make([]byte, 12, 12+len(sub))
+	binary.BigEndian.PutUint16(out[2:], 1)  // one table
+	binary.BigEndian.PutUint16(out[4:], 3)  // Windows
+	binary.BigEndian.PutUint16(out[6:], 1)  // Unicode BMP
+	binary.BigEndian.PutUint32(out[8:], 12) // offset
+	return append(out, sub...)
 }
 
 // components returns the byte offsets of the glyph-index fields of a composite glyph.

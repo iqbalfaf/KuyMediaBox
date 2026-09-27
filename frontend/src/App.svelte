@@ -11,10 +11,16 @@
   import DownloadPage from './pages/DownloadPage.svelte'
   import SettingsPage from './pages/SettingsPage.svelte'
   import PdfPage from './pages/PdfPage.svelte'
+  import SubtitlePage from './pages/SubtitlePage.svelte'
+  import WorkflowPage from './pages/WorkflowPage.svelte'
+  import { flowDrop, initFlows } from './lib/stores/flows.svelte'
+  import { scheduleRecipeSync } from './lib/modules'
   import PasswordDialog from './components/PasswordDialog.svelte'
   import TextDialog from './components/TextDialog.svelte'
   import TagDialog from './components/TagDialog.svelte'
   import CompareDialog from './components/CompareDialog.svelte'
+  import TrimDialog from './components/TrimDialog.svelte'
+  import CropDialog from './components/CropDialog.svelte'
   import AfterQueueBanner from './components/AfterQueueBanner.svelte'
   import HistoryPage from './pages/HistoryPage.svelte'
   import { initAfter, initHistory } from './lib/stores/history.svelte'
@@ -25,7 +31,7 @@
   import { api, runtime } from './lib/api'
   import { initApp, nav, settings, toast } from './lib/stores/app.svelte'
   import { initTasks } from './lib/stores/tasks.svelte'
-  import { audioConv, imageConv, videoConv } from './lib/stores/converter.svelte'
+  import { audioConv, imageConv, subtitleConv, videoConv } from './lib/stores/converter.svelte'
   import { addLinks } from './lib/stores/download.svelte'
   import { initUpdate } from './lib/stores/update.svelte'
 
@@ -41,16 +47,38 @@
         return L('Download selesai', 'Download finished')
       case 'pdf':
         return L('Alat PDF selesai', 'PDF tools finished')
+      case 'subtitle':
+        return L('Subtitle otomatis selesai', 'Automatic subtitles finished')
     }
     return L('Tugas selesai', 'Tasks finished')
   }
 
   onMount(() => {
+    initFlows()
+    scheduleRecipeSync(3000) // presets for workflows & the command line
     initApp()
     initTasks()
     initUpdate()
     initHistory()
     initAfter()
+
+    // Downloads cut off when the app was closed last time.
+    api
+      .pendingDownloads()
+      .then((p) => {
+        if (p.items > 0 && nav.page !== 'download')
+          toast(L(`${p.items} unduhan dari sesi sebelumnya belum selesai — buka halaman Download untuk melanjutkan`, `${p.items} download${p.items === 1 ? '' : 's'} from last time didn't finish — open the Download page to resume`), 'info')
+      })
+      .catch(() => {})
+
+    // Links from the browser (kuymediabox://download?url=…) — at start and while running.
+    const openLinks = (links: string[]) => {
+      if (!links?.length) return
+      nav.page = 'download'
+      addLinks(links.join('\n'))
+    }
+    api.takeLaunchLinks().then(openLinks).catch(() => {})
+    runtime.on('links:open', openLinks)
 
     // Files from Explorer ("Send to") — at start and while running.
     api.takeLaunchFiles().then(openRequest).catch(() => {})
@@ -70,6 +98,12 @@
           break
         case 'audio':
           audioConv.addPaths(paths)
+          break
+        case 'subtitle':
+          subtitleConv.addPaths(paths)
+          break
+        case 'flows':
+          flowDrop.fn?.(paths)
           break
         case 'pdf':
           if (pdfDrop.fn) pdfDrop.fn(paths)
@@ -153,6 +187,10 @@
       <VideoPage />
     {:else if nav.page === 'audio'}
       <AudioPage />
+    {:else if nav.page === 'subtitle'}
+      <SubtitlePage />
+    {:else if nav.page === 'flows'}
+      <WorkflowPage />
     {:else if nav.page === 'download'}
       <DownloadPage />
     {:else if nav.page === 'pdf'}
@@ -175,6 +213,8 @@
 <TextDialog />
 <TagDialog />
 <CompareDialog />
+<TrimDialog />
+<CropDialog />
 <AfterQueueBanner />
 
 <style>

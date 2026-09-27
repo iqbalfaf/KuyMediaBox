@@ -56,8 +56,31 @@ type Options struct {
 	Rotate       int       `json:"rotate"`       // clockwise: 0 90 180 270
 	FlipH        bool      `json:"flipH"`
 	FlipV        bool      `json:"flipV"`
-	Crop         string    `json:"crop"` // "" or an aspect ratio "1:1", "16:9", "4:5", …
+	Crop         string    `json:"crop"`    // "" or an aspect ratio "1:1", "16:9", "4:5", …
+	CropBox      Box       `json:"cropBox"` // manual crop in fractions of the (rotated) picture
 	Watermark    Watermark `json:"watermark"`
+
+	AIUpscale   int    `json:"aiUpscale"`   // 0, 2, 3 or 4: enlarge with Real-ESRGAN first
+	AIModel     string `json:"aiModel"`     // photo | anime
+	RemoveBG    bool   `json:"removeBg"`    // cut the subject out (transparent background)
+	BGModel     string `json:"bgModel"`     // general | people | fast
+	BGMask      bool   `json:"bgMask"`      // save the black-and-white mask instead
+	PNGCompress string `json:"pngCompress"` // "" | lossless (oxipng) | small (pngquant + oxipng)
+}
+
+// Box is a manual crop in fractions (0..1). W == 0 means none.
+type Box struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+	W float64 `json:"w"`
+	H float64 `json:"h"`
+}
+
+// Hooks run the optional AI tools; the app sets them when the tools are installed.
+var Hooks struct {
+	Upscale     func(ctx context.Context, img image.Image, scale int, model string) (image.Image, error)
+	RemoveBG    func(ctx context.Context, img image.Image, model string, maskOnly bool) (image.Image, error)
+	OptimizePNG func(ctx context.Context, path, mode string) error
 }
 
 // Formats lists the output formats.
@@ -100,6 +123,32 @@ func (o *Options) Normalize() {
 	}
 	o.IcoSizes = normalizeIcoSizes(o.IcoSizes)
 	o.Watermark.normalize()
+	switch o.AIUpscale {
+	case 2, 3, 4:
+	default:
+		o.AIUpscale = 0
+	}
+	if o.AIModel != "anime" {
+		o.AIModel = "photo"
+	}
+	switch o.BGModel {
+	case "people", "fast":
+	default:
+		o.BGModel = "general"
+	}
+	if !o.RemoveBG {
+		o.BGMask = false
+	}
+	if o.Format != "png" || (o.PNGCompress != "lossless" && o.PNGCompress != "small") {
+		o.PNGCompress = ""
+	}
+	b := &o.CropBox
+	clamp := func(v float64) float64 { return math.Max(0, math.Min(v, 1)) }
+	b.X, b.Y = clamp(b.X), clamp(b.Y)
+	b.W, b.H = math.Min(clamp(b.W), 1-b.X), math.Min(clamp(b.H), 1-b.Y)
+	if b.W < 0.01 || b.H < 0.01 || (b.W > 0.999 && b.H > 0.999) {
+		*b = Box{}
+	}
 }
 
 // Size is width × height.
@@ -117,8 +166,14 @@ func TargetSize(w, h int, o Options) Size {
 	if o.Rotate == 90 || o.Rotate == 270 {
 		w, h = h, w
 	}
+	if c := o.CropBox; c.W > 0 {
+		w, h = max(1, int((c.X+c.W)*float64(w))-int(c.X*float64(w))), max(1, int((c.Y+c.H)*float64(h))-int(c.Y*float64(h)))
+	}
 	if cw, ch := cropSize(w, h, o.Crop); cw > 0 {
 		w, h = cw, ch
+	}
+	if o.AIUpscale > 0 {
+		w, h = w*o.AIUpscale, h*o.AIUpscale
 	}
 	nw, nh := w, h
 	switch o.ResizeMode {
@@ -188,6 +243,23 @@ func Convert(ctx context.Context, in, out string, o Options, ffmpegPath string, 
 	progress(0.3)
 
 	img = transform(img, o)
+	if o.AIUpscale > 0 {
+		if Hooks.Upscale == nil {
+			return errors.New(i18n.L("Real-ESRGAN belum terpasang (Pengaturan › Tools pendukung)", "Real-ESRGAN isn't installed (Settings › Supporting tools)"))
+		}
+		if img, err = Hooks.Upscale(ctx, img, o.AIUpscale, o.AIModel); err != nil {
+			return err
+		}
+	}
+	if o.RemoveBG {
+		if Hooks.RemoveBG == nil {
+			return errors.New(i18n.L("Hapus latar belum siap: pasang ONNX Runtime dan unduh modelnya", "Background removal isn't ready: install ONNX Runtime and download a model"))
+		}
+		if img, err = Hooks.RemoveBG(ctx, img, o.BGModel, o.BGMask); err != nil {
+			return err
+		}
+	}
+	progress(0.4)
 	b := img.Bounds()
 	ts := TargetSize(b.Dx(), b.Dy(), Options{Format: o.Format, ResizeMode: o.ResizeMode, Longest: o.Longest, Percent: o.Percent, Width: o.Width, Height: o.Height})
 	if ts.W != b.Dx() || ts.H != b.Dy() {
@@ -222,6 +294,15 @@ func Convert(ctx context.Context, in, out string, o Options, ffmpegPath string, 
 	if err := os.WriteFile(out, data, 0o644); err != nil {
 		_ = os.Remove(out)
 		return fmt.Errorf(i18n.L("tidak bisa membuat file hasil: %w", "can't create the output file: %w"), err)
+	}
+	if o.PNGCompress != "" {
+		if Hooks.OptimizePNG == nil {
+			return errors.New(i18n.L("oxipng/pngquant belum terpasang (Pengaturan › Tools pendukung)", "oxipng/pngquant isn't installed (Settings › Supporting tools)"))
+		}
+		progress(0.9)
+		if err := Hooks.OptimizePNG(ctx, out, o.PNGCompress); err != nil {
+			return err
+		}
 	}
 	progress(1)
 	return nil

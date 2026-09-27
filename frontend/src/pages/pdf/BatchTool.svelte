@@ -32,7 +32,7 @@
     return {
       id: `u${Date.now()}-${seq++}`, path, name: path, ext: 'url', size: 0, width: 0, height: 0, duration: 0, format: '', videoCodec: '', fps: 0,
       audioCodec: '', sampleRate: 0, bitsPerSample: 0, channels: 0, hasVideo: false, hasAudio: false, hasCover: false, pages: 0, encrypted: false, locked: false,
-      subCodec: '', subFile: '', tags: null, error: '',
+      subCodec: '', subFile: '', tags: null, cue: '', cueTracks: 0, error: '',
     }
   }
   function addUrls() {
@@ -82,6 +82,16 @@
         return L('PDF bertanda tangan digital', 'Digitally signed PDF')
       case 'pdfacheck':
         return o.pdfaCheck.flavour === '0' ? L('Cek PDF/A', 'PDF/A check') : `PDF/A-${o.pdfaCheck.flavour}`
+      case 'nup':
+        return `${o.nup.n}-up · ${o.nup.paper}`
+      case 'booklet':
+        return `${L('Buklet', 'Booklet')} · ${o.nup.paper}`
+      case 'pdf2txt':
+        return 'TXT'
+      case 'pdf2md':
+        return 'Markdown'
+      case 'pdf2csv':
+        return 'CSV'
     }
     return 'PDF'
   })

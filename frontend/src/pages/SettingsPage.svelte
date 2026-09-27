@@ -28,6 +28,7 @@
     { kind: 'audio', label: 'Audio', icon: 'music' },
     { kind: 'download', label: 'Download', icon: 'download' },
     { kind: 'pdf', label: 'PDF', icon: 'fileText' },
+    { kind: 'subtitle', label: 'Subtitle', icon: 'subtitles' },
   ])
 
   let checking = $state(false)
@@ -83,12 +84,13 @@
   async function resetAllFolders() {
     if (!settings.value) return
     await saveSettings({
-      outputs: { image: { mode: 'default', dir: '' }, video: { mode: 'default', dir: '' }, audio: { mode: 'default', dir: '' }, download: { mode: 'default', dir: '' }, pdf: { mode: 'default', dir: '' } },
+      outputs: { image: { mode: 'default', dir: '' }, video: { mode: 'default', dir: '' }, audio: { mode: 'default', dir: '' }, download: { mode: 'default', dir: '' }, pdf: { mode: 'default', dir: '' }, subtitle: { mode: 'same', dir: '' } },
     })
     toast(L('Semua folder hasil kembali ke default', 'All output folders reset to default'), 'ok')
   }
 
-  const allDefault = $derived(folderRows.every((r) => outputOf(r.kind).mode === 'default'))
+  // Subtitles sit next to the video by default.
+  const allDefault = $derived(folderRows.every((r) => outputOf(r.kind).mode === (r.kind === 'subtitle' ? 'same' : 'default')))
 
   // Open-source projects KuyMediaBox is built on (GitHub owner/repo).
   const credits = $derived<{ name: string; repo: string; role: string }[]>([
@@ -103,6 +105,12 @@
     { name: 'go-pdfium', repo: 'klippa-app/go-pdfium', role: L('Tampilan & teks PDF (PDFium)', 'PDF rendering & text (PDFium)') },
     { name: 'wazero', repo: 'tetratelabs/wazero', role: L('Menjalankan PDFium (WebAssembly)', 'Runs PDFium (WebAssembly)') },
     { name: 'LibreOffice', repo: 'LibreOffice/core', role: L('Konversi dokumen Office (opsional)', 'Office conversion (optional)') },
+    { name: 'whisper.cpp', repo: 'ggml-org/whisper.cpp', role: L('Subtitle otomatis (opsional)', 'Automatic subtitles (optional)') },
+    { name: 'Real-ESRGAN', repo: 'xinntao/Real-ESRGAN', role: L('Perbesar gambar dengan AI (opsional)', 'AI picture upscaling (optional)') },
+    { name: 'ONNX Runtime', repo: 'microsoft/onnxruntime', role: L('Mesin AI hapus latar (opsional)', 'AI engine for background removal (optional)') },
+    { name: 'rembg', repo: 'danielgatis/rembg', role: L('Model hapus latar (U²-Net, IS-Net)', 'Background models (U²-Net, IS-Net)') },
+    { name: 'oxipng', repo: 'oxipng/oxipng', role: L('Kompres PNG tanpa turun kualitas (opsional)', 'Lossless PNG compression (optional)') },
+    { name: 'pngquant', repo: 'kornelski/pngquant', role: L('Kompres PNG dengan palet warna (opsional)', 'Palette PNG compression (optional)') },
     { name: 'imaging', repo: 'disintegration/imaging', role: L('Ubah ukuran gambar', 'Image resizing') },
     { name: 'webp', repo: 'gen2brain/webp', role: L('Format WEBP', 'WEBP format') },
     { name: 'avif', repo: 'gen2brain/avif', role: L('Format AVIF', 'AVIF format') },
@@ -110,6 +118,48 @@
     { name: 'Gorilla WebSocket', repo: 'gorilla/websocket', role: L('HTML ke PDF lewat browser', 'HTML to PDF through the browser') },
     { name: 'Fontsource', repo: 'fontsource/fontsource', role: 'Plus Jakarta Sans · JetBrains Mono' },
   ])
+
+  // ---- settings backup ----
+  let backupBusy = $state(false)
+  async function exportAll() {
+    backupBusy = true
+    try {
+      const ui: Record<string, string> = {}
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i)
+        if (k?.startsWith('kmb.')) ui[k] = localStorage.getItem(k) ?? ''
+      }
+      const path = await api.exportSettings(ui)
+      if (path) {
+        const name = path.split(/[\\/]/).pop()
+        toast(L(`Cadangan disimpan: ${name}`, `Backup saved: ${name}`), 'ok')
+      }
+    } catch (e) {
+      toast(errText(e), 'err')
+    } finally {
+      backupBusy = false
+    }
+  }
+  async function importAll() {
+    backupBusy = true
+    try {
+      const res = await api.importSettings()
+      if (!res) return
+      for (const [k, v] of Object.entries(res.ui ?? {})) {
+        try {
+          localStorage.setItem(k, v)
+        } catch {
+          /* storage full */
+        }
+      }
+      toast(L(`Pengaturan dipulihkan (${res.presets} preset, ${res.workflows} alur kerja). Memuat ulang…`, `Settings restored (${res.presets} presets, ${res.workflows} workflows). Reloading…`), 'ok')
+      setTimeout(() => location.reload(), 1200)
+    } catch (e) {
+      toast(errText(e), 'err')
+    } finally {
+      backupBusy = false
+    }
+  }
 </script>
 
 <PageHeader title={L('Pengaturan', 'Settings')} subtitle={L('Kelola tools pendukung dan cara file disimpan.', 'Manage helper tools and how files are saved.')} />
@@ -222,6 +272,17 @@
   </div>
 
   <div class="col-side">
+  <section class="card" aria-label={L('Cadangan pengaturan', 'Settings backup')}>
+    <div class="head"><h2>{L('Cadangan pengaturan', 'Settings backup')}</h2></div>
+    <div class="gbody">
+      <p class="hint">{L('Simpan semua pengaturan, preset, alur kerja, dan folder pantauan ke satu file .json — untuk pindah ke PC baru atau berbagi preset.', 'Save every setting, preset, workflow and watched folder into one .json file — to move to a new PC or share presets.')}</p>
+      <div class="row">
+        <button class="btn" onclick={exportAll} disabled={backupBusy}><Icon name="download" size={16} />{L('Ekspor…', 'Export…')}</button>
+        <button class="btn" onclick={importAll} disabled={backupBusy}><Icon name="upload" size={16} />{L('Impor…', 'Import…')}</button>
+      </div>
+    </div>
+  </section>
+
   <section class="card" aria-label={L('Tentang dan update', 'About and updates')}>
     <div class="head"><h2>{L('Tentang & update', 'About & updates')}</h2></div>
     <div class="gbody">
@@ -656,5 +717,9 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+  }
+  .row {
+    display: flex;
+    gap: 8px;
   }
 </style>

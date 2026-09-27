@@ -44,6 +44,18 @@ func detectSocial(host string, u *url.URL, raw string) (Link, bool) {
 		if strings.HasPrefix(p, "/share/") {
 			return Link{Source: SourceInstagram, Type: TypePost, Short: true, Photo: true, URL: raw}, true
 		}
+		if m := reIGStory.FindStringSubmatch(p); m != nil {
+			if m[1] == "highlights" && m[2] != "" {
+				return Link{Source: SourceInstagram, Type: TypeStory, ID: m[2], URL: "https://www.instagram.com/stories/highlights/" + m[2] + "/"}, true
+			}
+			if m[1] != "highlights" {
+				u := "https://www.instagram.com/stories/" + m[1] + "/"
+				if m[2] != "" {
+					u += m[2] + "/"
+				}
+				return Link{Source: SourceInstagram, Type: TypeStory, ID: firstNonEmpty(m[2], m[1]), URL: u}, true
+			}
+		}
 		return Link{Source: SourceInstagram, Type: TypeUnknown, URL: raw}, true
 	case "facebook.com", "web.facebook.com", "mbasic.facebook.com", "fb.com":
 		switch {
@@ -97,7 +109,8 @@ func hasKnownDomain(s string) bool {
 			return true
 		}
 	}
-	for _, d := range []string{"youtu", "spotify", "tiktok", "instagram.com", "instagr.am", "facebook.com", "fb.watch", "fb.com", "pinterest.", "pin.it", "twitter.com", "fxtwitter.com", "vxtwitter.com", "fixupx.com", "fixvx.com"} {
+	for _, d := range []string{"youtu", "spotify", "tiktok", "instagram.com", "instagr.am", "facebook.com", "fb.watch", "fb.com", "pinterest.", "pin.it", "twitter.com", "fxtwitter.com", "vxtwitter.com", "fixupx.com", "fixvx.com",
+		"soundcloud.com", "twitch.tv", "reddit.com", "redd.it", "bilibili.", "b23.tv"} {
 		if strings.Contains(low, d) {
 			return true
 		}

@@ -51,7 +51,9 @@ func Words(chars []Char) []Word {
 		}
 		if cur != nil {
 			h := max(cur.Y1-cur.Y0, c.Y1-c.Y0)
-			sameLine := c.Y0 < cur.Y1-h*0.3 && c.Y1 > cur.Y0+h*0.3
+			// Boxes are tight around the glyph, so punctuation (". , ' -") only overlaps
+			// the bottom or top of the word: it belongs to it when it lies inside its height.
+			sameLine := c.Y0 < cur.Y1-h*0.3 && c.Y1 > cur.Y0+h*0.3 || inside(c.Y0, c.Y1, cur.Y0, cur.Y1)
 			gap := c.X0 - cur.X1
 			if !sameLine || gap > h*0.6 || gap < -h*1.5 {
 				flush()
@@ -69,6 +71,13 @@ func Words(chars []Char) []Word {
 	return out
 }
 
+// inside reports whether a small glyph box [y0, y1] lies within the height of a line
+// [ly0, ly1] (with a little room for glyphs that stick out, like commas).
+func inside(y0, y1, ly0, ly1 float64) bool {
+	h := ly1 - ly0
+	return h > 0 && y1-y0 < h*0.6 && y0 >= ly0-h*0.15 && y1 <= ly1+h*0.3
+}
+
 // Lines groups words into rows (top to bottom, left to right).
 func Lines(words []Word) []Line {
 	ws := append([]Word(nil), words...)
@@ -80,7 +89,7 @@ func Lines(words []Word) []Line {
 		for i := len(lines) - 1; i >= 0 && i >= len(lines)-3; i-- {
 			l := &lines[i]
 			h := l.Y1 - l.Y0
-			if cy > l.Y0+h*0.1 && cy < l.Y1-h*0.1 {
+			if cy > l.Y0+h*0.1 && cy < l.Y1-h*0.1 || inside(w.Y0, w.Y1, l.Y0, l.Y1) {
 				l.Words = append(l.Words, w)
 				l.X0, l.Y0, l.X1, l.Y1 = min(l.X0, w.X0), min(l.Y0, w.Y0), max(l.X1, w.X1), max(l.Y1, w.Y1)
 				l.Size = max(l.Size, w.Size)

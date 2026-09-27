@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -51,7 +52,7 @@ func acceptExt(kind, ext string) bool {
 		return imageconv.InputExts[ext]
 	case queue.KindVideo:
 		return videoExts[ext]
-	case queue.KindAudio:
+	case queue.KindAudio, queue.KindSubtitle:
 		return audioExts[ext] || videoExts[ext]
 	}
 	return false
@@ -83,6 +84,8 @@ type FileItem struct {
 	SubCodec      string            `json:"subCodec"`  // first subtitle track inside the file
 	SubFile       string            `json:"subFile"`   // subtitle file next to the video
 	Tags          map[string]string `json:"tags"`      // audio: title, artist, album, …
+	Cue           string            `json:"cue"`       // audio: cue sheet next to the file
+	CueTracks     int               `json:"cueTracks"` // number of songs in the cue sheet
 	Error         string            `json:"error"`
 }
 
@@ -141,6 +144,7 @@ func collect(kind string, paths []string) []string {
 
 // AddPaths turns dropped/picked paths into file items with media info.
 func (a *App) AddPaths(kind string, paths []string) []FileItem {
+	a.waitTools()
 	files := collect(kind, paths)
 	items := make([]FileItem, len(files))
 	ffprobe := a.tools.Path(tools.FFprobe)
@@ -223,25 +227,33 @@ func (a *App) describe(kind, path, ffprobe string) FileItem {
 	if kind == queue.KindVideo {
 		it.SubFile = mediaconv.FindSubtitle(path)
 	}
+	if kind == queue.KindAudio && !info.HasVideo {
+		if cue := mediaconv.FindCue(path); cue != "" {
+			if c, err := mediaconv.ParseCue(cue); err == nil {
+				it.Cue, it.CueTracks = cue, len(c.Tracks)
+			}
+		}
+	}
 	switch {
 	case kind == queue.KindVideo && !info.HasVideo:
 		it.Error = i18n.L("Tidak ada video di file ini", "This file has no video")
-	case kind == queue.KindAudio && !info.HasAudio:
+	case (kind == queue.KindAudio || kind == queue.KindSubtitle) && !info.HasAudio:
 		it.Error = i18n.L("Tidak ada audio di file ini", "This file has no audio")
 	}
 	return it
 }
 
 var dialogFilters = map[string]wruntime.FileFilter{
-	queue.KindImage: {DisplayName: "Images", Pattern: "*.jpg;*.jpeg;*.jfif;*.png;*.webp;*.gif;*.bmp;*.tif;*.tiff;*.heic;*.heif;*.avif;*.ico"},
-	queue.KindVideo: {DisplayName: "Video", Pattern: "*.mp4;*.mkv;*.mov;*.avi;*.webm;*.flv;*.wmv;*.3gp;*.ts;*.m4v;*.mpg;*.mpeg;*.mts;*.m2ts;*.ogv;*.vob"},
-	queue.KindAudio: {DisplayName: "Audio & video", Pattern: "*.mp3;*.wav;*.flac;*.aac;*.m4a;*.ogg;*.opus;*.wma;*.aiff;*.aif;*.amr;*.ape;*.wv;*.mka;*.oga;*.mp4;*.mkv;*.mov;*.avi;*.webm;*.flv;*.wmv;*.m4v"},
-	kindPDF:         {DisplayName: "PDF", Pattern: "*.pdf"},
-	kindPDFImage:    {DisplayName: "Images", Pattern: "*.jpg;*.jpeg;*.jfif;*.png;*.webp;*.gif;*.bmp;*.tif;*.tiff;*.heic;*.heif;*.avif"},
-	kindWord:        {DisplayName: "Word", Pattern: "*.doc;*.docx;*.docm;*.dot;*.dotx;*.odt;*.rtf;*.wpd"},
-	kindExcel:       {DisplayName: "Excel", Pattern: "*.xls;*.xlsx;*.xlsm;*.xlsb;*.ods;*.csv"},
-	kindPPT:         {DisplayName: "PowerPoint", Pattern: "*.ppt;*.pptx;*.pptm;*.pps;*.ppsx;*.odp"},
-	kindHTML:        {DisplayName: "HTML", Pattern: "*.html;*.htm;*.mhtml;*.svg"},
+	queue.KindImage:    {DisplayName: "Images", Pattern: "*.jpg;*.jpeg;*.jfif;*.png;*.webp;*.gif;*.bmp;*.tif;*.tiff;*.heic;*.heif;*.avif;*.ico"},
+	queue.KindVideo:    {DisplayName: "Video", Pattern: "*.mp4;*.mkv;*.mov;*.avi;*.webm;*.flv;*.wmv;*.3gp;*.ts;*.m4v;*.mpg;*.mpeg;*.mts;*.m2ts;*.ogv;*.vob"},
+	queue.KindAudio:    {DisplayName: "Audio & video", Pattern: "*.mp3;*.wav;*.flac;*.aac;*.m4a;*.ogg;*.opus;*.wma;*.aiff;*.aif;*.amr;*.ape;*.wv;*.mka;*.oga;*.mp4;*.mkv;*.mov;*.avi;*.webm;*.flv;*.wmv;*.m4v"},
+	queue.KindSubtitle: {DisplayName: "Video & audio", Pattern: "*.mp4;*.mkv;*.mov;*.avi;*.webm;*.flv;*.wmv;*.3gp;*.ts;*.m4v;*.mpg;*.mpeg;*.mts;*.m2ts;*.mp3;*.wav;*.flac;*.aac;*.m4a;*.ogg;*.opus;*.wma"},
+	kindPDF:            {DisplayName: "PDF", Pattern: "*.pdf"},
+	kindPDFImage:       {DisplayName: "Images", Pattern: "*.jpg;*.jpeg;*.jfif;*.png;*.webp;*.gif;*.bmp;*.tif;*.tiff;*.heic;*.heif;*.avif"},
+	kindWord:           {DisplayName: "Word", Pattern: "*.doc;*.docx;*.docm;*.dot;*.dotx;*.odt;*.rtf;*.wpd"},
+	kindExcel:          {DisplayName: "Excel", Pattern: "*.xls;*.xlsx;*.xlsm;*.xlsb;*.ods;*.csv"},
+	kindPPT:            {DisplayName: "PowerPoint", Pattern: "*.ppt;*.pptx;*.pptm;*.pps;*.ppsx;*.odp"},
+	kindHTML:           {DisplayName: "HTML", Pattern: "*.html;*.htm;*.mhtml;*.svg"},
 }
 
 // PickFiles opens a multi-file dialog for a converter page.
@@ -253,8 +265,8 @@ func (a *App) PickFiles(kind string) ([]FileItem, error) {
 	switch kind {
 	case queue.KindImage, kindPDFImage:
 		filter.DisplayName = i18n.L("Gambar", "Images")
-	case queue.KindAudio:
-		filter.DisplayName = i18n.L("Audio & video", "Audio & video")
+	case queue.KindAudio, queue.KindSubtitle:
+		filter.DisplayName = i18n.L("Video & audio", "Video & audio")
 	}
 	paths, err := wruntime.OpenMultipleFilesDialog(a.ctx, wruntime.OpenDialogOptions{
 		Title:   i18n.L("Pilih file", "Choose files"),
@@ -280,6 +292,18 @@ type JobItem struct {
 	ID   string          `json:"id"`
 	Path string          `json:"path"`
 	Tags *mediaconv.Tags `json:"tags,omitempty"` // audio tag editor
+	// Set by workflows and the command line: result folder for this file instead of the
+	// module's, and Plain keeps the source name (no suffix) for in-between results.
+	OutDir string `json:"outDir,omitempty"`
+	Plain  bool   `json:"plain,omitempty"`
+}
+
+// itemOut applies a per-file result folder.
+func itemOut(out naming.OutputSpec, dir string) naming.OutputSpec {
+	if dir == "" {
+		return out
+	}
+	return naming.OutputSpec{Mode: config.OutputCustom, Dir: dir}
 }
 
 func fileSize(p string) int64 {
@@ -324,7 +348,10 @@ func (a *App) convertTaskSuffix(item JobItem, out naming.OutputSpec, suffix, ext
 		if suffix == "" {
 			suffix = s.Suffix
 		}
-		target, release, err := a.namer.Reserve(item.Path, out, suffix, ext, s.Conflict)
+		if item.Plain {
+			suffix = ""
+		}
+		target, release, err := a.namer.Reserve(item.Path, itemOut(out, item.OutDir), suffix, ext, s.Conflict)
 		if errors.Is(err, naming.ErrExists) {
 			r.SetOutput(target, 0)
 			return queue.Skip(i18n.L("File hasil sudah ada", "Output file already exists"))
@@ -355,6 +382,7 @@ func (a *App) convertTaskSuffix(item JobItem, out naming.OutputSpec, suffix, ext
 
 // StartImage queues image conversions.
 func (a *App) StartImage(items []JobItem, o imageconv.Options) ([]JobRef, error) {
+	a.waitTools()
 	o.Normalize()
 	out, err := a.resolveOutput(queue.KindImage)
 	if err != nil {
@@ -385,6 +413,16 @@ type VideoJob struct {
 	Audio       mediaconv.AudioOptions `json:"audio"`
 	FrameEvery  float64                `json:"frameEvery"`  // frames: seconds between pictures
 	FrameFormat string                 `json:"frameFormat"` // frames: jpg | png
+	Sheet       SheetOptions           `json:"sheet"`       // sheet: contact sheet layout
+}
+
+// SheetOptions lay out a contact sheet (a grid of pictures from the video).
+type SheetOptions struct {
+	Cols   int    `json:"cols"`   // 2 … 10
+	Rows   int    `json:"rows"`   // 1 … 20
+	Width  int    `json:"width"`  // width of one picture in pixels
+	Format string `json:"format"` // jpg | png
+	Times  bool   `json:"times"`  // timestamp on every picture
 }
 
 func errNoFFmpeg() error {
@@ -393,6 +431,7 @@ func errNoFFmpeg() error {
 
 // StartVideo queues video conversions (or audio extraction, joining, frame export).
 func (a *App) StartVideo(items []JobItem, job VideoJob) ([]JobRef, error) {
+	a.waitTools()
 	out, err := a.resolveOutput(queue.KindVideo)
 	if err != nil {
 		return nil, err
@@ -410,7 +449,7 @@ func (a *App) StartVideo(items []JobItem, job VideoJob) ([]JobRef, error) {
 	if job.Video.HW != "" {
 		enc = a.allEncoders()
 	}
-	if job.Mode != "audio" && job.Mode != "frames" && job.Video.Codec != "copy" && job.Video.Format != "gif" {
+	if job.Mode != "audio" && job.Mode != "frames" && job.Mode != "sheet" && job.Video.Codec != "copy" && job.Video.Format != "gif" {
 		if job.Video.HW != "" {
 			if e := mediaconv.HWEncoder(job.Video.HW, job.Video.Codec); e == "" || !enc[e] {
 				return nil, fmt.Errorf(i18n.L("Akselerasi GPU %s tidak mendukung codec %s di PC ini", "GPU acceleration %s doesn't support %s on this PC"), strings.ToUpper(job.Video.HW), strings.ToUpper(job.Video.Codec))
@@ -422,6 +461,9 @@ func (a *App) StartVideo(items []JobItem, job VideoJob) ([]JobRef, error) {
 	if err := checkTrim(job.Video.TrimStart, job.Video.TrimEnd); err != nil {
 		return nil, err
 	}
+	if err := checkMusic(job.Video); err != nil {
+		return nil, err
+	}
 	if job.Mode == "merge" {
 		return a.startMergeVideo(items, job, out, ff, probe, enc)
 	}
@@ -431,6 +473,11 @@ func (a *App) StartVideo(items []JobItem, job VideoJob) ([]JobRef, error) {
 		spec := queue.Spec{Title: filepath.Base(it.Path), Input: it.Path, InSize: fileSize(it.Path)}
 		if job.Mode == "frames" {
 			spec.Run = a.framesTask(it, out, job, ff, probe)
+			specs[i] = spec
+			continue
+		}
+		if job.Mode == "sheet" {
+			spec.Run = a.sheetTask(it, out, job.Sheet, ff, probe)
 			specs[i] = spec
 			continue
 		}
@@ -464,6 +511,12 @@ func (a *App) StartVideo(items []JobItem, job VideoJob) ([]JobRef, error) {
 				return queue.Fail(err.Error(), "")
 			}
 			defer os.RemoveAll(work)
+			if vo.Watermark.Enabled {
+				w, h := mediaconv.OutputSize(info.Width, info.Height, vo)
+				if vo.WatermarkFile, err = watermarkLayer(vo.Watermark, w, h, work, ff); err != nil {
+					return err
+				}
+			}
 			plan, err := mediaconv.VideoPlan(it.Path, tmp, info, vo, enc, work)
 			if err != nil {
 				return queue.Fail(err.Error(), "")
@@ -473,6 +526,26 @@ func (a *App) StartVideo(items []JobItem, job VideoJob) ([]JobRef, error) {
 		specs[i] = spec
 	}
 	return refs(items, a.queue.AddMany(queue.KindVideo, specs)), nil
+}
+
+// watermarkLayer draws the watermark at the video size into work.
+func watermarkLayer(w imageconv.Watermark, width, height int, work, ff string) (string, error) {
+	out := filepath.Join(work, "watermark.png")
+	if err := mediaconv.WatermarkLayer(w, width, height, out, ff); err != nil {
+		return "", queue.Fail(i18n.L("Watermark tidak bisa dibuat (logo rusak atau tidak ditemukan?)", "The watermark can't be made (logo damaged or missing?)"), err.Error())
+	}
+	return out, nil
+}
+
+// checkMusic makes sure the background music of a video job can be read.
+func checkMusic(o mediaconv.VideoOptions) error {
+	if o.Music.File == "" {
+		return nil
+	}
+	if _, err := os.Stat(o.Music.File); err != nil {
+		return fmt.Errorf(i18n.L("File musik latar tidak ditemukan: %s", "Background music file not found: %s"), filepath.Base(o.Music.File))
+	}
+	return nil
 }
 
 func checkTrim(start, end string) error {
@@ -494,7 +567,7 @@ func (a *App) framesTask(it JobItem, out naming.OutputSpec, job VideoJob, ff, pr
 		format = "jpg"
 	}
 	suffix := i18n.L("_bingkai", "_frames")
-	return a.folderTask(it.Path, out, suffix, func(ctx context.Context, dir, name string, r queue.Reporter) ([]string, error) {
+	return a.folderTask(it.Path, itemOut(out, it.OutDir), suffix, func(ctx context.Context, dir, name string, r queue.Reporter) ([]string, error) {
 		info, err := ffmpeg.Probe(ctx, probe, it.Path)
 		if err != nil {
 			return nil, queue.Fail(i18n.L("File tidak bisa dibaca", "File can't be read"), err.Error())
@@ -509,6 +582,76 @@ func (a *App) framesTask(it JobItem, out naming.OutputSpec, job VideoJob, ff, pr
 		files, _ := filepath.Glob(filepath.Join(dir, "*."+format))
 		return files, nil
 	})
+}
+
+// sheetTask saves a contact sheet: pictures spread evenly over the video in a grid.
+func (a *App) sheetTask(it JobItem, out naming.OutputSpec, o SheetOptions, ff, probe string) queue.RunFunc {
+	o.Cols = max(2, min(o.Cols, 10))
+	o.Rows = max(1, min(o.Rows, 20))
+	o.Width = max(160, min(o.Width, 960))
+	if o.Format != "png" {
+		o.Format = "jpg"
+	}
+	return a.convertTaskSuffix(it, out, i18n.L("_lembar", "_sheet"), o.Format, func(ctx context.Context, tmp string, r queue.Reporter) error {
+		info, err := ffmpeg.Probe(ctx, probe, it.Path)
+		if err != nil {
+			return queue.Fail(i18n.L("File tidak bisa dibaca", "File can't be read"), err.Error())
+		}
+		if !info.HasVideo || info.Duration <= 0 {
+			return queue.Fail(i18n.L("Durasi video tidak diketahui", "Unknown video duration"), "")
+		}
+		work, err := os.MkdirTemp(appdir.TempDir(), "sheet-*")
+		if err != nil {
+			return queue.Fail(err.Error(), "")
+		}
+		defer os.RemoveAll(work)
+		n := o.Cols * o.Rows
+		cells := make([]imageconv.SheetCell, 0, n)
+		r.Message(i18n.L("Mengambil gambar…", "Taking pictures…"))
+		for i := 0; i < n; i++ {
+			t := info.Duration * (float64(i) + 0.5) / float64(n)
+			pic := filepath.Join(work, fmt.Sprintf("%03d.png", i))
+			args := []string{"-ss", strconv.FormatFloat(t, 'f', 3, 64), "-i", it.Path, "-frames:v", "1", "-vf", fmt.Sprintf("scale=%d:-2", o.Width), pic}
+			if err := ffmpeg.RunIn(ctx, ff, work, args, 0, nil); err != nil {
+				return err
+			}
+			if _, err := os.Stat(pic); err != nil {
+				continue // past the last frame
+			}
+			label := ""
+			if o.Times {
+				label = clock(t)
+			}
+			cells = append(cells, imageconv.SheetCell{Path: pic, Label: label})
+			r.Progress(float64(i+1) / float64(n+1))
+		}
+		header := []string{filepath.Base(it.Path), fmt.Sprintf("%s · %d×%d · %s · %s", clock(info.Duration), info.Width, info.Height, strings.ToUpper(info.VideoCodec), humanSize(fileSize(it.Path)))}
+		r.Message(i18n.L("Menyusun lembar…", "Building the sheet…"))
+		if err := imageconv.ContactSheet(cells, header, o.Cols, o.Width, tmp, o.Format); err != nil {
+			return queue.Fail(i18n.L("Lembar kontak tidak bisa dibuat", "The contact sheet can't be made"), err.Error())
+		}
+		return nil
+	})
+}
+
+// clock formats seconds as h:mm:ss or m:ss.
+func clock(sec float64) string {
+	s := int(sec + 0.5)
+	if s >= 3600 {
+		return fmt.Sprintf("%d:%02d:%02d", s/3600, s%3600/60, s%60)
+	}
+	return fmt.Sprintf("%d:%02d", s/60, s%60)
+}
+
+func humanSize(n int64) string {
+	switch {
+	case n >= 1<<30:
+		return fmt.Sprintf("%.1f GB", float64(n)/(1<<30))
+	case n >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
+	default:
+		return fmt.Sprintf("%d KB", n>>10)
+	}
 }
 
 // startMergeVideo joins all items into one video named after the first one.
@@ -528,7 +671,19 @@ func (a *App) startMergeVideo(items []JobItem, job VideoJob, out naming.OutputSp
 		if err != nil {
 			return err
 		}
-		plan, err := mediaconv.MergeVideoPlan(paths, infos, tmp, job.Video, enc)
+		vo := job.Video
+		if vo.Watermark.Enabled {
+			work, err := os.MkdirTemp(appdir.TempDir(), "vid-*")
+			if err != nil {
+				return queue.Fail(err.Error(), "")
+			}
+			defer os.RemoveAll(work)
+			w, h := mediaconv.OutputSize(infos[0].Width, infos[0].Height, vo)
+			if vo.WatermarkFile, err = watermarkLayer(vo.Watermark, w-w%2, h-h%2, work, ff); err != nil {
+				return err
+			}
+		}
+		plan, err := mediaconv.MergeVideoPlan(paths, infos, tmp, vo, enc)
 		if err != nil {
 			return queue.Fail(err.Error(), "")
 		}
@@ -568,6 +723,7 @@ type AudioJob struct {
 
 // StartAudio queues audio conversions or one join of all items.
 func (a *App) StartAudio(items []JobItem, job AudioJob) ([]JobRef, error) {
+	a.waitTools()
 	out, err := a.resolveOutput(queue.KindAudio)
 	if err != nil {
 		return nil, err
@@ -583,6 +739,16 @@ func (a *App) StartAudio(items []JobItem, job AudioJob) ([]JobRef, error) {
 	}
 	if job.Mode == "merge" {
 		return a.startMergeAudio(items, o, out, ff, probe)
+	}
+	if job.Mode == "cue" {
+		if o.Format == mediaconv.FormatOriginal {
+			return nil, errors.New(i18n.L("Pilih format hasil untuk memisah lagu", "Pick an output format to split the tracks"))
+		}
+		specs := make([]queue.Spec, len(items))
+		for i, it := range items {
+			specs[i] = queue.Spec{Title: filepath.Base(it.Path), Input: it.Path, InSize: fileSize(it.Path), Run: a.cueTask(it, o, out, ff, probe)}
+		}
+		return refs(items, a.queue.AddMany(queue.KindAudio, specs)), nil
 	}
 	specs := make([]queue.Spec, len(items))
 	for i, it := range items {
@@ -612,6 +778,68 @@ func (a *App) StartAudio(items []JobItem, job AudioJob) ([]JobRef, error) {
 		})}
 	}
 	return refs(items, a.queue.AddMany(queue.KindAudio, specs)), nil
+}
+
+// cueTask splits an album file into one file per song of its cue sheet, with tags.
+func (a *App) cueTask(it JobItem, o mediaconv.AudioOptions, out naming.OutputSpec, ff, probe string) queue.RunFunc {
+	return a.folderTask(it.Path, itemOut(out, it.OutDir), "", func(ctx context.Context, dir, name string, r queue.Reporter) ([]string, error) {
+		cuePath := mediaconv.FindCue(it.Path)
+		if cuePath == "" {
+			return nil, queue.Fail(i18n.L("File CUE tidak ditemukan di samping file ini", "No CUE file found next to this file"), "")
+		}
+		cue, err := mediaconv.ParseCue(cuePath)
+		if err != nil {
+			return nil, queue.Fail(err.Error(), "")
+		}
+		info, err := ffmpeg.Probe(ctx, probe, it.Path)
+		if err != nil {
+			return nil, queue.Fail(i18n.L("File tidak bisa dibaca", "File can't be read"), err.Error())
+		}
+		cover := findCover(filepath.Dir(it.Path))
+		var files []string
+		for i, t := range cue.Tracks {
+			if t.Start >= info.Duration && info.Duration > 0 {
+				break
+			}
+			r.Message(fmt.Sprintf(i18n.L("Lagu %d dari %d", "Track %d of %d"), i+1, len(cue.Tracks)))
+			to := o
+			to.TrimStart, to.TrimEnd = cue.TrackRange(i)
+			tags := cue.TrackTags(i)
+			tags.Cover = cover
+			title := t.Title
+			if title == "" {
+				title = fmt.Sprintf(i18n.L("Lagu %d", "Track %d"), t.Number)
+			}
+			file := filepath.Join(dir, naming.SanitizeFileName(fmt.Sprintf("%02d - %s", t.Number, title))+"."+o.Format)
+			plan, err := mediaconv.AudioPlan(it.Path, file, info, to, tags, 0, 0)
+			if err != nil {
+				return nil, queue.Fail(err.Error(), "")
+			}
+			n := len(cue.Tracks)
+			err = ffmpeg.RunIn(ctx, ff, "", plan.Passes[0], plan.Duration, func(p float64, _ string) {
+				if p >= 0 {
+					r.Progress((float64(i) + p) / float64(n))
+				}
+			})
+			if err != nil {
+				return nil, err
+			}
+			files = append(files, file)
+		}
+		return files, nil
+	})
+}
+
+// findCover returns the album picture of a folder (cover.jpg, folder.jpg, front.png, …).
+func findCover(dir string) string {
+	for _, n := range []string{"cover", "folder", "front", "album", "Cover", "Folder", "Front"} {
+		for _, ext := range []string{".jpg", ".jpeg", ".png"} {
+			if p := filepath.Join(dir, n+ext); exists(p) {
+				return p
+			}
+		}
+	}
+	return ""
 }
 
 func (a *App) startMergeAudio(items []JobItem, o mediaconv.AudioOptions, out naming.OutputSpec, ff, probe string) ([]JobRef, error) {
@@ -699,6 +927,11 @@ func (a *App) startWatched(rule config.WatchRule, paths []string) error {
 		if err = json.Unmarshal(rule.Options, &job); err == nil {
 			job.Mode = "convert"
 			_, err = a.StartAudio(items, job)
+		}
+	case "flow":
+		var o flowWatch
+		if err = json.Unmarshal(rule.Options, &o); err == nil {
+			_, err = a.RunWorkflow(o.Workflow, paths)
 		}
 	}
 	return err

@@ -28,7 +28,11 @@ const (
 )
 
 // OutputKinds are the modules that have their own result folder.
-var OutputKinds = []string{"image", "video", "audio", "download", "pdf"}
+var OutputKinds = []string{"image", "video", "audio", "download", "pdf", "subtitle"}
+
+// defaultModes are the result folders that differ from the module's default folder:
+// subtitles go next to the video so players find them.
+var defaultModes = map[string]string{"subtitle": OutputSame}
 
 // Output is where one module saves its results.
 type Output struct {
@@ -50,7 +54,7 @@ const (
 )
 
 // DefaultParallel is how many tasks of each kind run at the same time by default.
-var DefaultParallel = map[string]int{"image": 3, "video": 1, "audio": 2, "download": 2, "pdf": 2}
+var DefaultParallel = map[string]int{"image": 3, "video": 1, "audio": 2, "download": 2, "pdf": 2, "subtitle": 1}
 
 // MaxParallel caps the parallel tasks per kind.
 const MaxParallel = 8
@@ -62,9 +66,29 @@ var CookieBrowsers = []string{"chrome", "edge", "firefox", "brave", "opera", "vi
 type WatchRule struct {
 	ID      string          `json:"id"`
 	Dir     string          `json:"dir"`
-	Kind    string          `json:"kind"`    // image | video | audio
+	Kind    string          `json:"kind"`    // image | video | audio | flow (options: {"workflow": id})
 	Options json.RawMessage `json:"options"` // the module's settings when the rule was saved
 	Enabled bool            `json:"enabled"`
+}
+
+// FlowStep is one step of a workflow: a module with the settings it had when the step was
+// saved (the same JSON its page sends to the backend).
+type FlowStep struct {
+	Kind   string          `json:"kind"`   // image | video | audio | subtitle | pdf
+	Tool   string          `json:"tool"`   // PDF tool id
+	Preset string          `json:"preset"` // preset id the step was made from ("current" = page settings)
+	Label  string          `json:"label"`  // preset name shown in the editor
+	Job    json.RawMessage `json:"job"`
+}
+
+// FlowKinds are the modules a workflow step can use.
+var FlowKinds = []string{"image", "video", "audio", "subtitle", "pdf"}
+
+// Workflow runs its steps one after another: the result of a step is the input of the next.
+type Workflow struct {
+	ID    string     `json:"id"`
+	Name  string     `json:"name"`
+	Steps []FlowStep `json:"steps"`
 }
 
 // Settings are the user's global preferences.
@@ -85,8 +109,10 @@ type Settings struct {
 	SpotifyTemplate    string            `json:"spotifyTemplate"` // Spotify, "" = built-in
 	SpotifyLogin       bool              `json:"spotifyLogin"`    // spotDL --user-auth (private playlists)
 	ClipboardWatch     bool              `json:"clipboardWatch"`
+	Tray               bool              `json:"tray"`            // closing the window keeps the app running in the tray
 	DownloadLimitKB    int               `json:"downloadLimitKB"` // total download speed limit, 0 = none
 	Watch              []WatchRule       `json:"watch"`
+	Workflows          []Workflow        `json:"workflows"`
 	ToolPaths          map[string]string `json:"toolPaths"`
 }
 
@@ -104,13 +130,18 @@ func Defaults() Settings {
 		Theme:              ThemeDark,
 		Parallel:           map[string]int{},
 		Watch:              []WatchRule{},
+		Workflows:          []Workflow{},
 		ToolPaths:          map[string]string{},
 	}
 	for k, v := range DefaultParallel {
 		s.Parallel[k] = v
 	}
 	for _, k := range OutputKinds {
-		s.Outputs[k] = Output{Mode: OutputDefault}
+		mode := defaultModes[k]
+		if mode == "" {
+			mode = OutputDefault
+		}
+		s.Outputs[k] = Output{Mode: mode}
 	}
 	return s
 }
@@ -122,7 +153,10 @@ func (s *Settings) Normalize() {
 		s.Outputs = map[string]Output{}
 	}
 	for _, k := range OutputKinds {
-		o := s.Outputs[k]
+		o, ok := s.Outputs[k]
+		if !ok { // a module added in a newer version
+			o = d.Outputs[k]
+		}
 		o.Dir = strings.TrimSpace(o.Dir)
 		switch o.Mode {
 		case OutputDefault:
@@ -180,7 +214,7 @@ func (s *Settings) Normalize() {
 	rules := []WatchRule{}
 	for _, r := range s.Watch {
 		r.Dir = strings.TrimSpace(r.Dir)
-		if r.Dir == "" || (r.Kind != "image" && r.Kind != "video" && r.Kind != "audio") || r.ID == "" {
+		if r.Dir == "" || (r.Kind != "image" && r.Kind != "video" && r.Kind != "audio" && r.Kind != "flow") || r.ID == "" {
 			continue
 		}
 		if len(r.Options) == 0 || !json.Valid(r.Options) {
@@ -189,6 +223,26 @@ func (s *Settings) Normalize() {
 		rules = append(rules, r)
 	}
 	s.Watch = rules
+	flows := []Workflow{}
+	for _, w := range s.Workflows {
+		w.Name = strings.TrimSpace(w.Name)
+		if w.ID == "" || w.Name == "" {
+			continue
+		}
+		steps := []FlowStep{}
+		for _, st := range w.Steps {
+			if !slices.Contains(FlowKinds, st.Kind) {
+				continue
+			}
+			if len(st.Job) == 0 || !json.Valid(st.Job) {
+				st.Job = json.RawMessage("{}")
+			}
+			steps = append(steps, st)
+		}
+		w.Steps = steps
+		flows = append(flows, w)
+	}
+	s.Workflows = flows
 	if s.ToolPaths == nil {
 		s.ToolPaths = map[string]string{}
 	}
@@ -313,8 +367,12 @@ func parse(data []byte) Settings {
 	s.NameTemplate, s.SpotifyTemplate = parsed.NameTemplate, parsed.SpotifyTemplate
 	s.SpotifyLogin, s.ClipboardWatch = parsed.SpotifyLogin, parsed.ClipboardWatch
 	s.DownloadLimitKB = parsed.DownloadLimitKB
+	s.Tray = parsed.Tray
 	if parsed.Watch != nil {
 		s.Watch = parsed.Watch
+	}
+	if parsed.Workflows != nil {
+		s.Workflows = parsed.Workflows
 	}
 	if parsed.ToolPaths != nil {
 		s.ToolPaths = parsed.ToolPaths
@@ -340,6 +398,11 @@ func (st *Store) Get() Settings {
 		c.Parallel[k] = v
 	}
 	c.Watch = append([]WatchRule{}, st.s.Watch...)
+	c.Workflows = make([]Workflow, len(st.s.Workflows))
+	for i, w := range st.s.Workflows {
+		w.Steps = append([]FlowStep{}, w.Steps...)
+		c.Workflows[i] = w
+	}
 	return c
 }
 

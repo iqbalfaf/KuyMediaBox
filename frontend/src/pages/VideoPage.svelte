@@ -13,41 +13,28 @@
   import AudioFormatPanel from '../components/AudioFormatPanel.svelte'
   import PresetBar from '../components/PresetBar.svelte'
   import TrimFields, { trimError } from '../components/TrimFields.svelte'
+  import Switch from '../components/Switch.svelte'
+  import WatermarkFields from '../components/WatermarkFields.svelte'
+  import DenoiseSelect from '../components/DenoiseSelect.svelte'
+  import { pickTrim } from '../components/TrimDialog.svelte'
+  import { pickCrop } from '../components/CropDialog.svelte'
   import Icon from '../components/Icon.svelte'
+  import { errText } from '../lib/api'
+  import { toast } from '../lib/stores/app.svelte'
   import { api } from '../lib/api'
   import { caps, hasTool } from '../lib/stores/app.svelte'
   import { videoConv as conv } from '../lib/stores/converter.svelte'
   import { load, save } from '../lib/stores/persist'
+  import { videoDefaults, videoBuiltins } from '../lib/modules'
   import { bytes, codec, duration, fps, tile } from '../lib/format'
-  import { codecOptionLabel, crfFor, lossyAudio, maxCrf, outputSize, videoFormats } from '../lib/media'
-  import type { AudioOptions, FileItem, VideoOptions } from '../lib/types'
+  import { codecOptionLabel, contentSize, crfFor, lossyAudio, maxCrf, outputSize, videoFormats } from '../lib/media'
+  import type { AudioOptions, FileItem, SheetOptions, VideoOptions } from '../lib/types'
 
-  type Mode = 'video' | 'audio' | 'merge' | 'frames'
-  const defaults: { mode: Mode; v: VideoOptions; a: AudioOptions; frameEvery: number; frameFormat: 'jpg' | 'png' } = {
-    mode: 'video',
-    v: {
-      format: 'mp4', codec: 'h264', quality: 'seimbang', manual: false, crf: 23, preset: 'medium', resolution: '720', custom: 540,
-      targetMB: 0, bitrateK: 0, hw: '', trimStart: '', trimEnd: '', fps: 'original', fpsCustom: 25, audioMode: 'auto', audioBitrate: 128,
-      rotate: 0, flipH: false, flipV: false, subtitles: 'none',
-    },
-    a: {
-      format: 'mp3', bitrate: 192, vbr: false, vbrLevel: 'high', channels: 'source', sampleRate: 'source', keepMetadata: true,
-      trimStart: '', trimEnd: '', fadeIn: 0, fadeOut: 0, normalize: false, loudness: -16, removeSilence: false, speed: 1, pitch: 0,
-    },
-    frameEvery: 5,
-    frameFormat: 'jpg',
-  }
+  const defaults = videoDefaults
   const st = $state(load('kmb.video', defaults))
   $effect(() => save('kmb.video', $state.snapshot(st)))
 
-  const builtins = $derived([
-    { id: 'b-wa', name: L('WhatsApp (maks. 16 MB, 720p)', 'WhatsApp (max 16 MB, 720p)'), value: { mode: 'video', v: { format: 'mp4', codec: 'h264', resolution: '720', targetMB: 15, fps: '30', audioMode: 'aac', audioBitrate: 96 } } },
-    { id: 'b-discord', name: L('Discord (maks. 10 MB)', 'Discord (max 10 MB)'), value: { mode: 'video', v: { format: 'mp4', codec: 'h264', resolution: '720', targetMB: 9.5, audioMode: 'aac', audioBitrate: 96 } } },
-    { id: 'b-email', name: L('Email (maks. 8 MB, 480p)', 'Email (max 8 MB, 480p)'), value: { mode: 'video', v: { format: 'mp4', codec: 'h264', resolution: '480', targetMB: 7.5, audioMode: 'aac', audioBitrate: 64 } } },
-    { id: 'b-yt', name: L('Upload YouTube 1080p', 'YouTube upload 1080p'), value: { mode: 'video', v: { format: 'mp4', codec: 'h264', resolution: '1080', targetMB: 0, quality: 'tinggi', manual: false, audioMode: 'aac', audioBitrate: 192 } } },
-    { id: 'b-gif', name: L('GIF pendek (480p, 12 fps)', 'Short GIF (480p, 12 fps)'), value: { mode: 'video', v: { format: 'gif', resolution: '480', fps: '12' } } },
-    { id: 'b-mp3', name: L('Ambil lagu (MP3 320)', 'Grab the song (MP3 320)'), value: { mode: 'audio', a: { format: 'mp3', bitrate: 320 } } },
-  ])
+  const builtins = $derived(videoBuiltins())
 
   // GPU encoders are tested once per session (a few seconds), when the page opens.
   let hw = $state<Record<string, string[]>>({})
@@ -120,18 +107,64 @@
       return [lossyAudio[st.a.format] ? (st.a.vbr && st.a.format !== 'm4a' ? `${f} · VBR` : `${f} · ${st.a.bitrate} kbps`) : `${f} · lossless`, L('Audio saja', 'Audio only')]
     }
     if (st.mode === 'frames') return [`${st.frameFormat.toUpperCase()} · ${L('tiap', 'every')} ${st.frameEvery} ${L('dtk', 's')}`, L('Folder berisi gambar', 'A folder of pictures')]
+    if (st.mode === 'sheet') return [`${st.sheet.format.toUpperCase()} · ${st.sheet.cols}×${st.sheet.rows}`, `${st.sheet.cols * st.sheet.rows} ${L('gambar dalam satu lembar', 'pictures on one sheet')}`]
     if (isGif) {
       const [w, h] = outputSize(it.width, it.height, st.v)
       return [`GIF · ${w}×${h}`, fpsLabel()]
     }
-    if (isCopy) return [`${st.v.format.toUpperCase()} · ${L('salin', 'copy')}`, L('Tanpa encode ulang', 'No re-encode')]
+    if (isCopy) return [`${st.v.format.toUpperCase()} · ${L('salin', 'copy')}`, st.v.music.file ? L('Video disalin, musik ditambahkan', 'Video copied, music added') : L('Tanpa encode ulang', 'No re-encode')]
     const [w, h] = outputSize(it.width, it.height, st.v)
     const res = w && h ? `${Math.min(w, h)}p` : ''
     const q = st.v.targetMB > 0 ? `≤ ${st.v.targetMB} MB` : st.v.bitrateK > 0 ? `${st.v.bitrateK} kbps` : st.v.manual ? `CRF ${crfFor(st.v)}` : `${L('Kualitas', 'Quality')} ${qualityName[st.v.quality] ?? st.v.quality}`
     const gpu = st.v.hw ? ` · GPU` : ''
-    return [`${st.v.format.toUpperCase()} · ${codec(st.v.codec)}${res ? ` · ${res}` : ''}${gpu}`, w && h && (w !== it.width || h !== it.height) ? `${L('Menjadi', 'Becomes')} ${w}×${h} · ${q}` : q]
+    const fx = edits()
+    return [`${st.v.format.toUpperCase()} · ${codec(st.v.codec)}${res ? ` · ${res}` : ''}${gpu}`, (w && h && (w !== it.width || h !== it.height) ? `${L('Menjadi', 'Becomes')} ${w}×${h} · ${q}` : q) + (fx ? ` · ${fx}` : '')]
   }
 
+  /** Short summary of the editing options, for the result column. */
+  function edits(): string {
+    const e: string[] = []
+    if (st.mode !== 'video') return st.mode === 'merge' && st.v.watermark.enabled ? 'watermark' : ''
+    if (st.v.speed !== 1) e.push(`${st.v.speed}×`)
+    if (st.v.reverse) e.push(L('mundur', 'reversed'))
+    if (st.v.frame) e.push(st.v.frame)
+    if (st.v.crop.w > 0) e.push('crop')
+    if (st.v.stabilize) e.push(L('stabil', 'stabilised'))
+    if (st.v.watermark.enabled) e.push('watermark')
+    if (st.v.music.file) e.push(L('musik', 'music'))
+    if (st.v.denoise !== 'off') e.push(L('tanpa noise', 'denoised'))
+    return e.join(' · ')
+  }
+
+  /** The file the preview dialogs show: the first usable one. */
+  const previewItem = $derived(conv.items.find((it) => !it.error && it.hasVideo))
+
+  function openTrim() {
+    const it = previewItem
+    if (!it) return
+    pickTrim({ title: it.name, path: it.path, duration: it.duration, hasVideo: true, start: st.v.trimStart, end: st.v.trimEnd }, (s, e) => {
+      st.v.trimStart = s
+      st.v.trimEnd = e
+    })
+  }
+
+  function openCrop() {
+    const it = previewItem
+    if (!it) return
+    pickCrop({ title: it.name, path: it.path, duration: it.duration, rotate: st.v.rotate, flipH: st.v.flipH, flipV: st.v.flipV, box: $state.snapshot(st.v.crop) }, (b) => (st.v.crop = b))
+  }
+
+  async function pickMusic() {
+    try {
+      const p = await api.pickFile(L('Pilih musik latar', 'Choose background music'), L('Audio', 'Audio'), '*.mp3;*.m4a;*.aac;*.wav;*.flac;*.ogg;*.opus;*.wma')
+      if (p) st.v.music.file = p
+    } catch (e) {
+      toast(errText(e), 'err')
+    }
+  }
+
+  const baseName = (p: string) => p.split(/[\\/]/).pop() ?? p
+  const reverseLong = $derived(st.v.reverse && conv.items.some((it) => !it.error && it.duration > 60) && !st.v.trimEnd)
   const pending = $derived(conv.pending())
   const invalidCustom = $derived(encodes && st.v.resolution === 'custom' && !(st.v.custom >= 16))
   const trimBad = $derived(st.mode !== 'merge' && trimError(st.v.trimStart, st.v.trimEnd) !== '')
@@ -145,6 +178,7 @@
       audio: $state.snapshot(st.a),
       frameEvery: st.frameEvery,
       frameFormat: st.frameFormat,
+      sheet: $state.snapshot(st.sheet),
     }
     if (st.mode === 'merge') {
       // Joining uses every file in list order.
@@ -159,6 +193,7 @@
   const startLabel = $derived.by(() => {
     if (st.mode === 'merge') return `${L('Gabungkan', 'Join')} ${conv.items.filter((it) => !it.error).length} video`
     if (st.mode === 'frames') return `${L('Ambil frame', 'Export frames')}${pending.length ? ` (${pending.length})` : ''}`
+    if (st.mode === 'sheet') return `${L('Buat lembar kontak', 'Make contact sheets')}${pending.length ? ` (${pending.length})` : ''}`
     return conv.hasUnprocessed() || pending.length === 0 ? `${L('Mulai konversi', 'Start converting')}${pending.length ? ` (${pending.length})` : ''}` : `${L('Konversi ulang', 'Convert again')} (${pending.length})`
   })
 </script>
@@ -231,12 +266,15 @@
           { value: 'audio', label: 'Audio' },
           { value: 'merge', label: L('Gabung', 'Join') },
           { value: 'frames', label: 'Frame' },
+          { value: 'sheet', label: L('Lembar', 'Sheet') },
         ]}
       />
       {#if st.mode === 'merge'}
         <p class="hint">{L('Semua video di daftar digabung jadi satu, sesuai urutan (atur dengan tombol ↑↓). Ukuran & fps mengikuti video pertama.', 'All videos in the list are joined into one, in list order (use ↑↓). Size & fps follow the first video.')}</p>
       {:else if st.mode === 'frames'}
         <p class="hint">{L('Setiap video menghasilkan folder berisi gambar.', 'Each video produces a folder of pictures.')}</p>
+      {:else if st.mode === 'sheet'}
+        <p class="hint">{L('Lembar kontak: satu gambar berisi banyak cuplikan yang tersebar rata dari awal sampai akhir video, plus info file.', 'Contact sheet: one picture with many snapshots spread evenly through the video, plus file info.')}</p>
       {/if}
 
       {#if st.mode === 'video' || st.mode === 'merge'}
@@ -460,6 +498,68 @@
               {#if st.v.rotate || st.v.flipH || st.v.flipV}<button class="link" onclick={() => { st.v.rotate = 0; st.v.flipH = false; st.v.flipV = false }}>Reset</button>{/if}
             </div>
           </div>
+
+          {#if st.mode === 'video'}
+            <div class="sec">
+              <span class="label">{L('Bingkai & crop', 'Frame & crop')}</span>
+              <Chips
+                bind:value={st.v.frame}
+                columns={5}
+                small
+                options={[
+                  { value: '', label: L('Asli', 'Original') }, { value: '9:16', label: '9:16' }, { value: '1:1', label: '1:1' },
+                  { value: '4:5', label: '4:5' }, { value: '16:9', label: '16:9' },
+                ]}
+              />
+              {#if st.v.frame}
+                <Segmented
+                  label={L('Cara mengisi bingkai', 'How to fill the frame')}
+                  bind:value={st.v.frameFit}
+                  options={[
+                    { value: 'blur', label: L('Latar blur', 'Blurred') },
+                    { value: 'pad', label: L('Bar hitam', 'Black bars') },
+                    { value: 'crop', label: L('Potong', 'Crop') },
+                  ]}
+                />
+                <p class="hint">
+                  {st.v.frameFit === 'blur'
+                    ? L('Video utuh di tengah, sisa ruang diisi versi blur dari video itu sendiri — gaya Reels/TikTok.', 'The whole video in the middle, the empty space filled with a blurred copy of it — Reels/TikTok style.')
+                    : st.v.frameFit === 'pad'
+                      ? L('Video utuh di tengah dengan bar hitam.', 'The whole video in the middle with black bars.')
+                      : L('Bagian tengah video dipotong agar pas bingkai.', 'The middle of the video is cut out to fill the frame.')}
+                </p>
+              {/if}
+              <div class="inline">
+                <button class="btn grow" onclick={openCrop} disabled={!previewItem} title={previewItem ? '' : L('Tambahkan video dulu', 'Add a video first')}>
+                  <Icon name="crop" size={16} />{st.v.crop.w > 0 ? L('Ubah area crop', 'Change the crop area') : L('Crop manual…', 'Manual crop…')}
+                </button>
+                {#if st.v.crop.w > 0}
+                  <button class="btn icon" aria-label={L('Hapus crop', 'Remove crop')} title={L('Hapus crop', 'Remove crop')} onclick={() => (st.v.crop = { x: 0, y: 0, w: 0, h: 0 })}><Icon name="x" size={16} /></button>
+                {/if}
+              </div>
+              {#if st.v.crop.w > 0 && previewItem}
+                {@const c = contentSize(previewItem.width, previewItem.height, st.v)}
+                <p class="hint">{L('Area crop', 'Crop area')}: {c[0]}×{c[1]} px ({previewItem.name})</p>
+              {/if}
+            </div>
+
+            <div class="sec">
+              <span class="label">{L('Kecepatan', 'Speed')}</span>
+              <Chips
+                bind:value={st.v.speed}
+                columns={4}
+                small
+                options={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4].map((v) => ({ value: v, label: v === 1 ? 'Normal' : `${v}×` }))}
+              />
+              {#if st.v.speed !== 1}<p class="hint">{st.v.speed < 1 ? L('Gerak lambat; suara ikut melambat tanpa berubah nada.', 'Slow motion; the sound slows down without changing pitch.') : L('Dipercepat; suara ikut cepat tanpa berubah nada.', 'Sped up; the sound follows without changing pitch.')}</p>{/if}
+              <Switch bind:checked={st.v.reverse} label={L('Putar balik', 'Reverse')} hint={L('Video (dan suaranya) diputar mundur — untuk klip pendek', 'Video (and sound) play backwards — for short clips')} />
+              {#if reverseLong}<p class="hint warn">{L('Video panjang butuh memori besar untuk diputar balik. Potong dulu ke bagian yang pendek.', 'Long videos need a lot of memory to reverse. Trim to a short part first.')}</p>{/if}
+            </div>
+
+            <Switch bind:checked={st.v.stabilize} label={L('Stabilisasi', 'Stabilise')} hint={L('Meredam goyangan rekaman HP (dianalisis dulu, jadi lebih lama)', 'Smooths shaky phone footage (analysed first, so slower)')} />
+          {/if}
+
+          <WatermarkFields bind:wm={st.v.watermark} hint={L('Teks atau logo di setiap frame video', 'Text or a logo on every frame')} />
         {/if}
 
         {#if !isGif}
@@ -488,7 +588,41 @@
                 </div>
               {/if}
             </div>
+            {#if st.v.audioMode !== 'mute'}
+              <DenoiseSelect bind:value={st.v.denoise} />
+            {/if}
           </div>
+
+          {#if st.mode === 'video' && st.v.audioMode !== 'mute'}
+            <div class="sec">
+              <span class="label">{L('Musik latar', 'Background music')}</span>
+              <div class="inline">
+                <button class="btn grow" onclick={pickMusic}><Icon name="music" size={16} />{st.v.music.file ? L('Ganti musik', 'Change music') : L('Tambah musik latar…', 'Add background music…')}</button>
+                {#if st.v.music.file}
+                  <button class="btn icon" aria-label={L('Hapus musik', 'Remove music')} title={L('Hapus musik', 'Remove music')} onclick={() => (st.v.music.file = '')}><Icon name="x" size={16} /></button>
+                {/if}
+              </div>
+              {#if st.v.music.file}
+                <span class="hint ellipsis" title={st.v.music.file}>{baseName(st.v.music.file)}</span>
+                <Segmented
+                  label={L('Cara memakai musik', 'How to use the music')}
+                  bind:value={st.v.music.mode}
+                  options={[
+                    { value: 'mix', label: L('Campur', 'Mix') },
+                    { value: 'replace', label: L('Ganti suara asli', 'Replace sound') },
+                  ]}
+                />
+                <label class="t12" for="mus-vol">{L('Volume musik', 'Music volume')} · {Math.round(st.v.music.volume * 100)}%</label>
+                <input id="mus-vol" type="range" min="0.05" max="2" step="0.05" bind:value={st.v.music.volume} />
+                {#if st.v.music.mode === 'mix'}
+                  <label class="t12" for="mus-orig">{L('Volume suara asli', 'Original sound volume')} · {Math.round(st.v.music.original * 100)}%</label>
+                  <input id="mus-orig" type="range" min="0" max="2" step="0.05" bind:value={st.v.music.original} />
+                  <Switch bind:checked={st.v.music.duck} label={L('Musik mengecil saat ada suara', 'Duck music under speech')} hint={L('Ducking: musik otomatis pelan saat orang bicara', 'Ducking: the music gets quieter while people talk')} />
+                {/if}
+                <Switch bind:checked={st.v.music.loop} label={L('Ulangi musik', 'Loop the music')} hint={L('Musik diulang sampai video selesai, lalu fade out', 'Repeats until the video ends, then fades out')} />
+              {/if}
+            </div>
+          {/if}
 
           {#if st.mode === 'video'}
             <div class="sec">
@@ -511,8 +645,21 @@
             </div>
           {/if}
         {/if}
+      {:else if st.mode === 'sheet'}
+        <div class="sec">
+          <span class="label">{L('Kolom', 'Columns')}</span>
+          <Chips bind:value={st.sheet.cols} columns={5} small options={[2, 3, 4, 5, 6].map((n) => ({ value: n, label: String(n) }))} />
+          <span class="label">{L('Baris', 'Rows')}</span>
+          <Chips bind:value={st.sheet.rows} columns={5} small options={[2, 3, 4, 5, 8].map((n) => ({ value: n, label: String(n) }))} />
+          <span class="label">{L('Lebar tiap gambar', 'Width of each picture')}</span>
+          <Chips bind:value={st.sheet.width} columns={4} small options={[240, 320, 480, 640].map((n) => ({ value: n, label: `${n} px` }))} />
+          <span class="label">{L('Format', 'Format')}</span>
+          <Segmented label={L('Format gambar', 'Picture format')} bind:value={st.sheet.format} options={[{ value: 'jpg', label: 'JPG' }, { value: 'png', label: 'PNG' }]} />
+          <Switch bind:checked={st.sheet.times} label={L('Tampilkan waktu', 'Show timestamps')} hint={L('Waktu cuplikan di pojok tiap gambar', 'The time of each snapshot in its corner')} />
+        </div>
       {:else if st.mode === 'audio'}
         <AudioFormatPanel bind:o={st.a} />
+        <DenoiseSelect bind:value={st.a.denoise} />
       {:else}
         <div class="sec">
           <span class="label">{L('Ambil gambar setiap', 'Take a picture every')}</span>
@@ -538,9 +685,15 @@
         </div>
       {/if}
 
-      {#if st.mode !== 'merge'}
+      {#if st.mode !== 'merge' && st.mode !== 'sheet'}
         <div class="sec">
-          <TrimFields bind:start={st.v.trimStart} bind:end={st.v.trimEnd} label={L('Potong (opsional)', 'Trim (optional)')} />
+          <TrimFields
+            bind:start={st.v.trimStart}
+            bind:end={st.v.trimEnd}
+            label={L('Potong (opsional)', 'Trim (optional)')}
+            onpick={previewItem ? openTrim : undefined}
+            pickHint={previewItem ? `${L('Pratinjau', 'Preview')}: ${previewItem.name}` : ''}
+          />
           {#if isCopy && st.mode === 'video' && st.v.trimStart}<p class="hint">{L('Mode salin memotong di keyframe terdekat, jadi awalnya bisa bergeser sedikit.', 'Copy mode cuts at the nearest keyframe, so the start may shift slightly.')}</p>{/if}
         </div>
       {/if}
@@ -578,6 +731,12 @@
 </div>
 
 <style>
+  .warn {
+    color: var(--warn);
+  }
+  .grow {
+    flex: 1;
+  }
   .body {
     flex-grow: 1;
     min-height: 0;

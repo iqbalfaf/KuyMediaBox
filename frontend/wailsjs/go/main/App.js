@@ -6,6 +6,10 @@ export function AddPaths(arg1, arg2) {
   return window['go']['main']['App']['AddPaths'](arg1, arg2);
 }
 
+export function AddSubscription(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['AddSubscription'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function AnalyzeLink(arg1) {
   return window['go']['main']['App']['AnalyzeLink'](arg1);
 }
@@ -18,6 +22,10 @@ export function CancelKind(arg1) {
   return window['go']['main']['App']['CancelKind'](arg1);
 }
 
+export function CancelModel(arg1, arg2) {
+  return window['go']['main']['App']['CancelModel'](arg1, arg2);
+}
+
 export function CancelTask(arg1) {
   return window['go']['main']['App']['CancelTask'](arg1);
 }
@@ -26,12 +34,20 @@ export function CertInfo(arg1, arg2) {
   return window['go']['main']['App']['CertInfo'](arg1, arg2);
 }
 
+export function CheckSubscription(arg1) {
+  return window['go']['main']['App']['CheckSubscription'](arg1);
+}
+
 export function CheckUpdate() {
   return window['go']['main']['App']['CheckUpdate']();
 }
 
 export function ClearHistory() {
   return window['go']['main']['App']['ClearHistory']();
+}
+
+export function CloseWindow() {
+  return window['go']['main']['App']['CloseWindow']();
 }
 
 export function CollectionDir(arg1) {
@@ -46,8 +62,20 @@ export function DataFolder() {
   return window['go']['main']['App']['DataFolder']();
 }
 
+export function DeleteModel(arg1, arg2) {
+  return window['go']['main']['App']['DeleteModel'](arg1, arg2);
+}
+
 export function DetectLinks(arg1) {
   return window['go']['main']['App']['DetectLinks'](arg1);
+}
+
+export function DiscardPendingDownloads() {
+  return window['go']['main']['App']['DiscardPendingDownloads']();
+}
+
+export function ExportSettings(arg1) {
+  return window['go']['main']['App']['ExportSettings'](arg1);
 }
 
 export function ForgetCollection(arg1) {
@@ -60,6 +88,14 @@ export function ForgetTasks(arg1) {
 
 export function GetAfterQueue() {
   return window['go']['main']['App']['GetAfterQueue']();
+}
+
+export function GetAutostart() {
+  return window['go']['main']['App']['GetAutostart']();
+}
+
+export function GetCLICommand() {
+  return window['go']['main']['App']['GetCLICommand']();
 }
 
 export function GetCapabilities() {
@@ -78,6 +114,10 @@ export function GetHistory() {
   return window['go']['main']['App']['GetHistory']();
 }
 
+export function GetLinkProtocol() {
+  return window['go']['main']['App']['GetLinkProtocol']();
+}
+
 export function GetSendTo() {
   return window['go']['main']['App']['GetSendTo']();
 }
@@ -94,12 +134,28 @@ export function GetVersion() {
   return window['go']['main']['App']['GetVersion']();
 }
 
+export function ImportSettings() {
+  return window['go']['main']['App']['ImportSettings']();
+}
+
+export function InstallModel(arg1, arg2) {
+  return window['go']['main']['App']['InstallModel'](arg1, arg2);
+}
+
 export function InstallTool(arg1) {
   return window['go']['main']['App']['InstallTool'](arg1);
 }
 
 export function InstallUpdate() {
   return window['go']['main']['App']['InstallUpdate']();
+}
+
+export function ListModels(arg1) {
+  return window['go']['main']['App']['ListModels'](arg1);
+}
+
+export function ListSubscriptions() {
+  return window['go']['main']['App']['ListSubscriptions']();
 }
 
 export function ListTasks() {
@@ -126,6 +182,10 @@ export function PdfCompare(arg1, arg2) {
   return window['go']['main']['App']['PdfCompare'](arg1, arg2);
 }
 
+export function PdfDetails(arg1, arg2) {
+  return window['go']['main']['App']['PdfDetails'](arg1, arg2);
+}
+
 export function PdfDoc(arg1, arg2) {
   return window['go']['main']['App']['PdfDoc'](arg1, arg2);
 }
@@ -136,6 +196,10 @@ export function PdfEnvironment() {
 
 export function PdfFind(arg1, arg2, arg3) {
   return window['go']['main']['App']['PdfFind'](arg1, arg2, arg3);
+}
+
+export function PdfFormFields(arg1, arg2) {
+  return window['go']['main']['App']['PdfFormFields'](arg1, arg2);
 }
 
 export function PdfOcrLanguages() {
@@ -150,8 +214,16 @@ export function PdfScan() {
   return window['go']['main']['App']['PdfScan']();
 }
 
+export function PdfTSAServers() {
+  return window['go']['main']['App']['PdfTSAServers']();
+}
+
 export function PdfWarmup() {
   return window['go']['main']['App']['PdfWarmup']();
+}
+
+export function PendingDownloads() {
+  return window['go']['main']['App']['PendingDownloads']();
 }
 
 export function PickDirectory(arg1, arg2) {
@@ -174,6 +246,10 @@ export function PickToolPath(arg1) {
   return window['go']['main']['App']['PickToolPath'](arg1);
 }
 
+export function QuitApp() {
+  return window['go']['main']['App']['QuitApp']();
+}
+
 export function RecheckTools() {
   return window['go']['main']['App']['RecheckTools']();
 }
@@ -182,8 +258,16 @@ export function RemoveHistory(arg1) {
   return window['go']['main']['App']['RemoveHistory'](arg1);
 }
 
+export function RemoveSubscription(arg1) {
+  return window['go']['main']['App']['RemoveSubscription'](arg1);
+}
+
 export function ResetToolPath(arg1) {
   return window['go']['main']['App']['ResetToolPath'](arg1);
+}
+
+export function ResumePendingDownloads() {
+  return window['go']['main']['App']['ResumePendingDownloads']();
 }
 
 export function RevealFile(arg1) {
@@ -194,6 +278,10 @@ export function RoutePaths(arg1) {
   return window['go']['main']['App']['RoutePaths'](arg1);
 }
 
+export function RunWorkflow(arg1, arg2) {
+  return window['go']['main']['App']['RunWorkflow'](arg1, arg2);
+}
+
 export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
 }
@@ -202,16 +290,36 @@ export function SetAfterQueue(arg1) {
   return window['go']['main']['App']['SetAfterQueue'](arg1);
 }
 
+export function SetAutostart(arg1) {
+  return window['go']['main']['App']['SetAutostart'](arg1);
+}
+
+export function SetCLICommand(arg1) {
+  return window['go']['main']['App']['SetCLICommand'](arg1);
+}
+
 export function SetEntrySource(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetEntrySource'](arg1, arg2, arg3);
+}
+
+export function SetLinkProtocol(arg1) {
+  return window['go']['main']['App']['SetLinkProtocol'](arg1);
 }
 
 export function SetSendTo(arg1) {
   return window['go']['main']['App']['SetSendTo'](arg1);
 }
 
+export function SetSubscription(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetSubscription'](arg1, arg2, arg3);
+}
+
 export function StartAudio(arg1, arg2) {
   return window['go']['main']['App']['StartAudio'](arg1, arg2);
+}
+
+export function StartCollage(arg1, arg2) {
+  return window['go']['main']['App']['StartCollage'](arg1, arg2);
 }
 
 export function StartDownloads(arg1, arg2, arg3) {
@@ -234,10 +342,42 @@ export function StartPdfEdit(arg1) {
   return window['go']['main']['App']['StartPdfEdit'](arg1);
 }
 
+export function StartPdfForm(arg1, arg2, arg3) {
+  return window['go']['main']['App']['StartPdfForm'](arg1, arg2, arg3);
+}
+
+export function StartPdfMeta(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['StartPdfMeta'](arg1, arg2, arg3, arg4);
+}
+
+export function StartSlideshow(arg1, arg2) {
+  return window['go']['main']['App']['StartSlideshow'](arg1, arg2);
+}
+
+export function StartSubtitle(arg1, arg2) {
+  return window['go']['main']['App']['StartSubtitle'](arg1, arg2);
+}
+
 export function StartVideo(arg1, arg2) {
   return window['go']['main']['App']['StartVideo'](arg1, arg2);
 }
 
+export function SubtitleLanguages() {
+  return window['go']['main']['App']['SubtitleLanguages']();
+}
+
+export function SyncRecipes(arg1) {
+  return window['go']['main']['App']['SyncRecipes'](arg1);
+}
+
 export function TakeLaunchFiles() {
   return window['go']['main']['App']['TakeLaunchFiles']();
+}
+
+export function TakeLaunchLinks() {
+  return window['go']['main']['App']['TakeLaunchLinks']();
+}
+
+export function ToolsDetected() {
+  return window['go']['main']['App']['ToolsDetected']();
 }

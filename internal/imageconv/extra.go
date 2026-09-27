@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"hash/crc32"
 	"image"
 	"image/color"
@@ -19,7 +20,9 @@ import (
 	"github.com/disintegration/imaging"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
+	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
+	"golang.org/x/image/vector"
 
 	"kuymediabox/internal/fonts"
 )
@@ -68,6 +71,13 @@ func transform(img image.Image, o Options) image.Image {
 	}
 	if o.FlipV {
 		img = imaging.FlipV(img)
+	}
+	if c := o.CropBox; c.W > 0 {
+		b := img.Bounds()
+		r := image.Rect(int(c.X*float64(b.Dx())), int(c.Y*float64(b.Dy())), int((c.X+c.W)*float64(b.Dx())), int((c.Y+c.H)*float64(b.Dy())))
+		if r.Dx() >= 1 && r.Dy() >= 1 {
+			img = imaging.Crop(img, r.Add(b.Min))
+		}
 	}
 	b := img.Bounds()
 	if cw, ch := cropSize(b.Dx(), b.Dy(), o.Crop); cw > 0 && (cw != b.Dx() || ch != b.Dy()) {
@@ -219,34 +229,140 @@ func (w *Watermark) normalize() {
 	}
 }
 
+// Normalize fixes invalid watermark settings (and turns it off when it has nothing to draw).
+func (w *Watermark) Normalize() { w.normalize() }
+
+// WatermarkLayer draws the watermark on a transparent width×height picture and saves it as
+// PNG (the Video page lays it over every frame).
+func WatermarkLayer(w Watermark, width, height int, out, ffmpegPath string) error {
+	w.normalize()
+	if width <= 0 || height <= 0 || width > 16384 || height > 16384 {
+		return errors.New("invalid watermark size")
+	}
+	canvas := image.NewNRGBA(image.Rect(0, 0, width, height))
+	img, err := applyWatermark(context.Background(), canvas, w, ffmpegPath)
+	if err != nil {
+		return err
+	}
+	f, err := os.Create(out)
+	if err != nil {
+		return err
+	}
+	if err := (&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(f, img); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
+}
+
 // renderText draws text in a tight transparent image; px is the font size in pixels.
+// Every line gets a font that covers it; Arabic, Hebrew and Indic lines are shaped (joined
+// forms, conjuncts, right-to-left).
 func renderText(text string, px float64, bold bool, col color.Color) (*image.NRGBA, error) {
-	face := fonts.For(text, bold)
-	f, err := opentype.Parse(face.Data)
-	if err != nil {
-		return nil, err
+	type lineFont struct {
+		sf *opentype.Font
+		fc font.Face
+		m  font.Metrics
 	}
-	fc, err := opentype.NewFace(f, &opentype.FaceOptions{Size: px, DPI: 72, Hinting: font.HintingNone})
-	if err != nil {
-		return nil, err
+	faces := map[string]*lineFont{}
+	defer func() {
+		for _, lf := range faces {
+			lf.fc.Close()
+		}
+	}()
+	get := func(face *fonts.Face) (*lineFont, error) {
+		if lf, ok := faces[face.Name]; ok {
+			return lf, nil
+		}
+		sf, err := opentype.Parse(face.Data)
+		if err != nil {
+			return nil, err
+		}
+		fc, err := opentype.NewFace(sf, &opentype.FaceOptions{Size: px, DPI: 72, Hinting: font.HintingNone})
+		if err != nil {
+			return nil, err
+		}
+		lf := &lineFont{sf: sf, fc: fc, m: fc.Metrics()}
+		faces[face.Name] = lf
+		return lf, nil
 	}
-	defer fc.Close()
 	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
-	m := fc.Metrics()
-	lineH := (m.Ascent + m.Descent).Ceil()
-	width := 0
-	for _, l := range lines {
-		width = max(width, font.MeasureString(fc, l).Ceil())
+	type laid struct {
+		lf     *lineFont
+		shaped *fonts.Shaped
+		w      int
+	}
+	all := make([]laid, len(lines))
+	width, lineH, ascent := 0, 0, 0
+	for i, l := range lines {
+		face := fonts.For(l, bold)
+		lf, err := get(face)
+		if err != nil {
+			return nil, err
+		}
+		all[i].lf = lf
+		if fonts.NeedsShaping(l) {
+			if sh, err := fonts.Shape(face, l); err == nil {
+				all[i].shaped = &sh
+				all[i].w = int(math.Ceil(sh.Width * px / 1000))
+			}
+		}
+		if all[i].shaped == nil {
+			all[i].w = font.MeasureString(lf.fc, l).Ceil()
+		}
+		width = max(width, all[i].w)
+		lineH = max(lineH, (lf.m.Ascent + lf.m.Descent).Ceil())
+		ascent = max(ascent, lf.m.Ascent.Ceil())
 	}
 	pad := int(px / 6)
 	dst := image.NewNRGBA(image.Rect(0, 0, width+2*pad, lineH*len(lines)+2*pad))
-	d := &font.Drawer{Dst: dst, Src: image.NewUniform(col), Face: fc}
 	for i, l := range lines {
-		lw := font.MeasureString(fc, l).Ceil()
-		d.Dot = fixed.P(pad+(width-lw)/2, pad+i*lineH+m.Ascent.Ceil())
+		x := pad + (width-all[i].w)/2
+		base := pad + i*lineH + ascent
+		if all[i].shaped != nil {
+			drawShaped(dst, all[i].lf.sf, *all[i].shaped, float64(x), float64(base), px, col)
+			continue
+		}
+		d := &font.Drawer{Dst: dst, Src: image.NewUniform(col), Face: all[i].lf.fc, Dot: fixed.P(x, base)}
 		d.DrawString(l)
 	}
 	return dst, nil
+}
+
+// drawShaped rasterises shaped glyphs by glyph id (the font's character map can't reach
+// ligatures and contextual forms).
+func drawShaped(dst *image.NRGBA, f *opentype.Font, sh fonts.Shaped, x0, base, px float64, col color.Color) {
+	var buf sfnt.Buffer
+	b := dst.Bounds()
+	r := vector.NewRasterizer(b.Dx(), b.Dy())
+	ppem := fixed.Int26_6(math.Round(px * 64))
+	for _, g := range sh.Glyphs {
+		segs, err := f.LoadGlyph(&buf, sfnt.GlyphIndex(g.GID), ppem, nil)
+		if err != nil {
+			continue
+		}
+		ox, oy := float32(x0+g.X*px/1000), float32(base-g.Y*px/1000)
+		pt := func(p fixed.Point26_6) (float32, float32) { return ox + float32(p.X)/64, oy + float32(p.Y)/64 }
+		for _, s := range segs {
+			switch s.Op {
+			case sfnt.SegmentOpMoveTo:
+				r.MoveTo(pt(s.Args[0]))
+			case sfnt.SegmentOpLineTo:
+				r.LineTo(pt(s.Args[0]))
+			case sfnt.SegmentOpQuadTo:
+				ax, ay := pt(s.Args[0])
+				bx, by := pt(s.Args[1])
+				r.QuadTo(ax, ay, bx, by)
+			case sfnt.SegmentOpCubeTo:
+				ax, ay := pt(s.Args[0])
+				bx, by := pt(s.Args[1])
+				cx, cy := pt(s.Args[2])
+				r.CubeTo(ax, ay, bx, by, cx, cy)
+			}
+		}
+		r.ClosePath()
+	}
+	r.Draw(dst, b, image.NewUniform(col), image.Point{})
 }
 
 func applyWatermark(ctx context.Context, img image.Image, w Watermark, ffmpegPath string) (image.Image, error) {

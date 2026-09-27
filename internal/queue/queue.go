@@ -21,6 +21,7 @@ const (
 	KindAudio    = "audio"
 	KindDownload = "download"
 	KindPDF      = "pdf"
+	KindSubtitle = "subtitle"
 )
 
 // Task statuses.
@@ -128,7 +129,7 @@ type kindState struct {
 type batchStats struct{ active, done, failed, skipped, canceled int }
 
 // Limits holds the default max parallel tasks per kind.
-var Limits = map[string]int{KindImage: 3, KindVideo: 1, KindAudio: 2, KindDownload: 2, KindPDF: 2}
+var Limits = map[string]int{KindImage: 3, KindVideo: 1, KindAudio: 2, KindDownload: 2, KindPDF: 2, KindSubtitle: 1}
 
 // New creates a manager. emit receives every change; onIdle fires when a kind has no more
 // queued or running tasks after having some.

@@ -13,6 +13,7 @@ import (
 
 	"kuymediabox/internal/ffmpeg"
 	"kuymediabox/internal/i18n"
+	"kuymediabox/internal/imageconv"
 )
 
 // VideoOptions come from the Video page.
@@ -40,8 +41,21 @@ type VideoOptions struct {
 	FlipV        bool    `json:"flipV"`
 	Subtitles    string  `json:"subtitles"` // none embed burn
 
+	// Editing.
+	Speed     float64             `json:"speed"`     // 0.25 … 4 (1 = normal)
+	Reverse   bool                `json:"reverse"`   // play backwards
+	Crop      CropBox             `json:"crop"`      // manual crop (fractions of the rotated frame)
+	Frame     string              `json:"frame"`     // "" | 9:16 | 1:1 | 4:5 | 16:9 | 4:3
+	FrameFit  string              `json:"frameFit"`  // crop | blur | pad
+	Stabilize bool                `json:"stabilize"` // vid.stab, two passes
+	Denoise   string              `json:"denoise"`   // off light medium strong (the video's sound)
+	Music     Music               `json:"music"`     // background music
+	Watermark imageconv.Watermark `json:"watermark"` // text or logo on the picture
+
 	// SubFile is a subtitle file found next to the source (set by the app, not the UI).
 	SubFile string `json:"-"`
+	// WatermarkFile is the watermark drawn at the output size (set by the app).
+	WatermarkFile string `json:"-"`
 }
 
 // AudioOptions come from the Audio page and the "Ambil audio saja" mode.
@@ -61,8 +75,9 @@ type AudioOptions struct {
 	NormVolume    bool    `json:"normalize"`
 	Loudness      float64 `json:"loudness"` // LUFS target: -14, -16, -23
 	RemoveSilence bool    `json:"removeSilence"`
-	Speed         float64 `json:"speed"` // 0.5 … 2 (1 = normal)
-	Pitch         float64 `json:"pitch"` // semitones, -12 … 12
+	Speed         float64 `json:"speed"`   // 0.5 … 2 (1 = normal)
+	Pitch         float64 `json:"pitch"`   // semitones, -12 … 12
+	Denoise       string  `json:"denoise"` // off light medium strong
 }
 
 // Tags are the song details written by the tag editor (empty fields are cleared).
@@ -205,6 +220,7 @@ func (o *VideoOptions) Normalize() {
 	if o.BitrateK > 0 {
 		o.BitrateK = max(50, min(o.BitrateK, 200000))
 	}
+	o.normalizeEdits()
 }
 
 // crfFor maps the friendly quality choice to a CRF per codec.
@@ -291,19 +307,14 @@ func OutputSize(w, h int, o VideoOptions) (int, int) {
 	if o.Codec == "copy" && o.Format != "gif" {
 		return w, h
 	}
-	w, h = rotated(w, h, o)
+	cw, ch := contentSize(w, h, o)
 	target := targetShortSide(o)
 	if o.Format == "gif" && target == 0 {
 		target = 480
 	}
-	if ScaleFilter(w, h, target) == "" {
-		return w, h
-	}
 	// ffmpeg's "-2" rounds the scaled side to the nearest even number.
-	if w >= h {
-		return evenRound(float64(w) * float64(target) / float64(h)), target
-	}
-	return target, evenRound(float64(h) * float64(target) / float64(w))
+	aw, ah := frameArea(cw, ch, o)
+	return scaledSize(aw, ah, target)
 }
 
 // ParseTime reads "83", "83.5", "1:23", "01:02:03,5" as seconds. ok is false for bad input;
@@ -427,7 +438,8 @@ func VideoArgs(in, out string, info ffmpeg.Info, o VideoOptions, encoders map[st
 var textSubs = map[string]bool{"subrip": true, "srt": true, "ass": true, "ssa": true, "webvtt": true, "mov_text": true, "text": true}
 
 // VideoPlan builds the ffmpeg runs to convert in → out. work is a scratch folder (pass logs,
-// subtitle copies); it may be "" when neither target size nor burned subtitles are used.
+// subtitle copies, stabilisation data); it may be "" when neither target size, burned
+// subtitles, stabilisation nor a watermark are used.
 func VideoPlan(in, out string, info ffmpeg.Info, o VideoOptions, encoders map[string]bool, work string) (Plan, error) {
 	o.Normalize()
 	if !info.HasVideo {
@@ -437,27 +449,66 @@ func VideoPlan(in, out string, info ffmpeg.Info, o VideoOptions, encoders map[st
 	if err != nil {
 		return Plan{}, err
 	}
-	plan := Plan{Duration: outDuration(info.Duration, start, length)}
+	plan := Plan{Duration: outDuration(info.Duration, start, length) / o.Speed}
+	outW, outH := OutputSize(info.Width, info.Height, o)
+	if err := o.checkEdits(info, outW, outH, plan.Duration, work); err != nil {
+		return Plan{}, err
+	}
 	args := inputArgs(in, start, length)
+	nextInput := 1
+
+	// Stabilisation analyses the (rotated) picture first; the result file is read in the
+	// last pass, so both passes run in work.
+	var detect []string
+	if o.Stabilize {
+		chain := append(transformFilters(o), "vidstabdetect=shakiness=6:accuracy=12:result=kmbstab.trf")
+		detect = append(append([]string{}, args...), "-map", "0:v:0", "-vf", strings.Join(chain, ","), "-an", "-sn", "-f", "null", "-")
+		plan.Dir = work
+	}
 
 	if o.Format == "gif" {
-		w, h := rotated(info.Width, info.Height, o)
-		target := targetShortSide(o)
-		if target == 0 {
-			target = 480
+		wmIdx := -1
+		if o.Watermark.Enabled {
+			args = append(args, "-i", o.WatermarkFile)
+			wmIdx = nextInput
 		}
-		chain := transformFilters(o)
+		g := newGraph("0:v:0")
 		fps := fpsValue(o)
 		if fps == "" {
 			fps = "12"
 		}
-		chain = append(chain, "fps="+fps)
-		if scale := ScaleFilter(w, h, target); scale != "" {
-			chain = append(chain, scale+":flags=lanczos")
+		target := targetShortSide(o)
+		if target == 0 {
+			target = 480
 		}
-		vf := strings.Join(chain, ",") + ",split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5"
-		args = append(args, "-map", "0:v:0", "-vf", vf, "-loop", "0", "-f", "gif", out)
-		plan.Passes = [][]string{args}
+		if !o.visualEdits() {
+			// Frame rate first: fewer frames to scale.
+			g.add(transformFilters(o)...)
+			g.add("fps=" + fps)
+			w, h := rotated(info.Width, info.Height, o)
+			if scale := ScaleFilter(w, h, target); scale != "" {
+				g.add(scale + ":flags=lanczos")
+			}
+		} else {
+			pictureSteps(g, info.Width, info.Height, o, target, true)
+			timeSteps(g, o, info.FPS)
+			g.add("fps=" + fps)
+			if wmIdx >= 0 {
+				overlayWatermark(g, wmIdx)
+			}
+		}
+		palette := "split[pa][pb];[pa]palettegen=stats_mode=diff[pp];[pb][pp]paletteuse=dither=bayer:bayer_scale=5"
+		if chain, ok := g.linear(); ok {
+			args = append(args, "-map", "0:v:0", "-vf", chain+","+palette)
+		} else {
+			g.add(palette)
+			args = append(args, "-filter_complex", g.finish("vout"), "-map", "[vout]")
+		}
+		args = append(args, "-loop", "0", "-f", "gif", out)
+		if detect != nil {
+			plan.Passes = append(plan.Passes, detect)
+		}
+		plan.Passes = append(plan.Passes, args)
 		return plan, nil
 	}
 
@@ -505,39 +556,69 @@ func VideoPlan(in, out string, info ffmpeg.Info, o VideoOptions, encoders map[st
 			plan.Dir = work
 		}
 	}
+	subIdx := -1
 	if subIn != "" {
 		if start > 0 {
 			args = append(args, "-ss", secs(start))
 		}
 		args = append(args, "-i", subIn)
+		subIdx = nextInput
+		nextInput++
+	}
+	wmIdx := -1
+	if o.Watermark.Enabled {
+		args = append(args, "-i", o.WatermarkFile)
+		wmIdx = nextInput
+		nextInput++
+	}
+	musicIdx := -1
+	if o.Music.File != "" {
+		if o.Music.Loop {
+			args = append(args, "-stream_loop", "-1")
+		}
+		args = append(args, "-i", o.Music.File)
+		musicIdx = nextInput
 	}
 
-	mapSubs := func() {
+	mapSubs := func(a []string) []string {
 		if o.Subtitles != "embed" || !hasSub {
-			args = append(args, "-sn")
-			return
+			return append(a, "-sn")
 		}
-		if subIn != "" {
-			args = append(args, "-map", "1:0")
+		if subIdx >= 0 {
+			a = append(a, "-map", strconv.Itoa(subIdx)+":0")
 		} else {
-			args = append(args, "-map", "0:s:0?")
+			a = append(a, "-map", "0:s:0?")
 		}
 		switch o.Format {
 		case "mp4", "mov":
-			args = append(args, "-c:s", "mov_text")
+			a = append(a, "-c:s", "mov_text")
 		case "webm":
-			args = append(args, "-c:s", "webvtt")
+			a = append(a, "-c:s", "webvtt")
 		default: // mkv
 			low := strings.ToLower(subIn)
 			switch {
 			case subIn == "":
-				args = append(args, "-c:s", "copy")
+				a = append(a, "-c:s", "copy")
 			case strings.HasSuffix(low, ".ass") || strings.HasSuffix(low, ".ssa"):
-				args = append(args, "-c:s", "ass")
+				a = append(a, "-c:s", "ass")
 			default:
-				args = append(args, "-c:s", "srt")
+				a = append(a, "-c:s", "srt")
 			}
 		}
+		return a
+	}
+
+	// Sound: effects and music need a filter and re-encoding.
+	withAudio := (info.HasAudio || o.Music.File != "") && o.AudioMode != "mute"
+	var sound *graph
+	if withAudio && o.soundEdits() {
+		sound = soundSteps(o, info, musicIdx, plan.Duration)
+	}
+	audioCodec := func() []string {
+		if sound != nil && (o.AudioMode == "copy" || o.AudioMode == "auto") {
+			return containerAudio(o.Format)
+		}
+		return videoAudio(o, info)
 	}
 
 	if o.Codec == "copy" {
@@ -546,19 +627,28 @@ func VideoPlan(in, out string, info ffmpeg.Info, o VideoOptions, encoders map[st
 				codecName(info.VideoCodec), strings.ToUpper(o.Format), strings.ToUpper(VideoFormats[o.Format][0]))
 		}
 		args = append(args, "-map", "0:v:0")
-		withAudio := info.HasAudio && o.AudioMode != "mute"
-		if withAudio {
+		switch {
+		case sound != nil:
+			if chain, ok := sound.linear(); ok && sound.label == "0:a:0" {
+				args = append(args, "-map", "0:a:0", "-af", chain)
+			} else {
+				args = append(args, "-filter_complex", sound.finish("aout"), "-map", "[aout]")
+			}
+		case withAudio:
 			args = append(args, "-map", "0:a:0?")
 		}
 		args = append(args, "-c:v", "copy", "-dn", "-map_metadata", "0")
 		if withAudio {
-			args = append(args, videoAudio(o, info)...)
+			args = append(args, audioCodec()...)
 		} else {
 			args = append(args, "-an")
 		}
-		mapSubs()
+		args = mapSubs(args)
 		if o.Format == "mp4" || o.Format == "mov" {
 			args = append(args, "-movflags", "+faststart")
+		}
+		if o.Music.File != "" && plan.Duration > 0 {
+			args = append(args, "-t", secs(plan.Duration))
 		}
 		plan.Passes = [][]string{append(args, out)}
 		return plan, nil
@@ -575,24 +665,28 @@ func VideoPlan(in, out string, info ffmpeg.Info, o VideoOptions, encoders map[st
 		return Plan{}, fmt.Errorf(i18n.L("encoder %s tidak tersedia di FFmpeg ini", "the %s encoder isn't available in this FFmpeg"), strings.ToUpper(o.Codec))
 	}
 
-	// Video filters.
-	w, h := rotated(info.Width, info.Height, o)
-	chain := transformFilters(o)
-	if scale := ScaleFilter(w, h, targetShortSide(o)); scale != "" {
-		chain = append(chain, scale)
-	}
-	if fps := fpsValue(o); fps != "" {
-		chain = append(chain, "fps="+fps)
+	// Picture: rotate, stabilise, crop, frame, scale, burn subtitles, reverse, speed, fps,
+	// watermark.
+	picture := newGraph("0:v:0")
+	pictureSteps(picture, info.Width, info.Height, o, targetShortSide(o), false)
+	if fps := fpsValue(o); fps != "" && o.Speed == 1 {
+		picture.add("fps=" + fps)
 	}
 	if burnFile != "" {
 		if start > 0 { // subtitles are timed against the original timeline
-			chain = append(chain, "setpts=PTS+"+secs(start)+"/TB", "subtitles="+burnFile, "setpts=PTS-STARTPTS")
+			picture.add("setpts=PTS+"+secs(start)+"/TB", "subtitles="+burnFile, "setpts=PTS-STARTPTS")
 		} else {
-			chain = append(chain, "subtitles="+burnFile)
+			picture.add("subtitles=" + burnFile)
 		}
 	}
+	timeSteps(picture, o, info.FPS)
+	if fps := fpsValue(o); fps != "" && o.Speed != 1 {
+		picture.add("fps=" + fps)
+	}
+	if wmIdx >= 0 {
+		overlayWatermark(picture, wmIdx)
+	}
 
-	withAudio := info.HasAudio && o.AudioMode != "mute"
 	kbps := 0
 	if o.TargetMB > 0 {
 		if plan.Duration <= 0 {
@@ -615,18 +709,51 @@ func VideoPlan(in, out string, info ffmpeg.Info, o VideoOptions, encoders map[st
 		kbps = o.BitrateK
 	}
 
-	common := func(pass int) []string {
-		a := append([]string{}, args...)
-		a = append(a, "-map", "0:v:0")
-		if withAudio && pass != 1 {
-			a = append(a, "-map", "0:a:0?")
+	// streams returns the mapping and filters of a pass (pass 1 of two has no sound).
+	streams := func(pass int) []string {
+		var a []string
+		vchain, vlinear := picture.linear()
+		useSound := withAudio && pass != 1
+		schain, slinear := "", true
+		if useSound && sound != nil {
+			schain, slinear = sound.linear()
+			slinear = slinear && sound.label == "0:a:0"
 		}
-		a = append(a, "-dn", "-map_metadata", "0", "-c:v", enc)
-		a = append(a, encoderArgs(enc, o, kbps, pass)...)
-		if len(chain) > 0 {
-			a = append(a, "-vf", strings.Join(chain, ","))
+		if vlinear && slinear {
+			a = append(a, "-map", "0:v:0")
+			if useSound {
+				a = append(a, "-map", "0:a:0?")
+			}
+			if vchain != "" {
+				a = append(a, "-vf", vchain)
+			}
+			if schain != "" {
+				a = append(a, "-af", schain)
+			}
+			return a
+		}
+		parts := []string{picture.finish("vout")}
+		if useSound && sound != nil {
+			parts = append(parts, sound.finish("aout"))
+		}
+		a = append(a, "-filter_complex", strings.Join(parts, ";"), "-map", "[vout]")
+		if useSound {
+			if sound != nil {
+				a = append(a, "-map", "[aout]")
+			} else {
+				a = append(a, "-map", "0:a:0?")
+			}
 		}
 		return a
+	}
+	common := func(pass int) []string {
+		a := append([]string{}, args...)
+		a = append(a, streams(pass)...)
+		a = append(a, "-dn", "-map_metadata", "0", "-c:v", enc)
+		return append(a, encoderArgs(enc, o, kbps, pass)...)
+	}
+	if detect != nil {
+		plan.Passes = append(plan.Passes, detect)
 	}
 	// Two passes only for a target size: a chosen bitrate is a one-pass average.
 	twoPass := o.TargetMB > 0 && kbps > 0 && work != "" && (enc == "libx264" || enc == "libx265" || enc == "libvpx-vp9" || enc == "libaom-av1")
@@ -642,16 +769,15 @@ func VideoPlan(in, out string, info ffmpeg.Info, o VideoOptions, encoders map[st
 	}
 	final := common(pass)
 	if withAudio {
-		final = append(final, videoAudio(o, info)...)
+		final = append(final, audioCodec()...)
 	} else {
 		final = append(final, "-an")
 	}
-	args = final
-	mapSubs()
+	final = mapSubs(final)
 	if o.Format == "mp4" || o.Format == "mov" {
-		args = append(args, "-movflags", "+faststart")
+		final = append(final, "-movflags", "+faststart")
 	}
-	plan.Passes = append(plan.Passes, append(args, out))
+	plan.Passes = append(plan.Passes, append(final, out))
 	return plan, nil
 }
 
@@ -836,6 +962,8 @@ func FramesPlan(in, pattern string, info ffmpeg.Info, o VideoOptions, every floa
 // of the first one (after rotation and the resolution choice) and to one frame rate.
 func MergeVideoPlan(ins []string, infos []ffmpeg.Info, out string, o VideoOptions, encoders map[string]bool) (Plan, error) {
 	o.Normalize()
+	// Joining keeps the clips as they are: only the watermark and noise reduction apply.
+	o.Crop, o.Frame, o.Speed, o.Reverse, o.Stabilize, o.Music = CropBox{}, "", 1, false, false, Music{}
 	if len(ins) < 2 {
 		return Plan{}, errors.New(i18n.L("Pilih minimal 2 video untuk digabung", "Pick at least 2 videos to join"))
 	}
@@ -895,7 +1023,23 @@ func MergeVideoPlan(ins []string, infos []ffmpeg.Info, out string, o VideoOption
 	if withAudio {
 		a = 1
 	}
-	graph = append(graph, fmt.Sprintf("%sconcat=n=%d:v=1:a=%d[vout]%s", concatIn.String(), len(ins), a, map[bool]string{true: "[aout]", false: ""}[withAudio]))
+	vcat, acat := "vout", "aout"
+	wm := o.Watermark.Enabled && o.WatermarkFile != ""
+	denoise := DenoiseFilter(o.Denoise)
+	if wm {
+		vcat = "vcat"
+		args = append(args, "-i", o.WatermarkFile)
+	}
+	if denoise != "" {
+		acat = "acat"
+	}
+	graph = append(graph, fmt.Sprintf("%sconcat=n=%d:v=1:a=%d[%s]%s", concatIn.String(), len(ins), a, vcat, map[bool]string{true: "[" + acat + "]", false: ""}[withAudio]))
+	if wm {
+		graph = append(graph, fmt.Sprintf("[vcat][%d:v:0]overlay=0:0:format=auto[vout]", len(ins)))
+	}
+	if withAudio && denoise != "" {
+		graph = append(graph, "[acat]"+denoise+"[aout]")
+	}
 	args = append(args, "-filter_complex", strings.Join(graph, ";"), "-map", "[vout]")
 	if withAudio {
 		args = append(args, "-map", "[aout]")

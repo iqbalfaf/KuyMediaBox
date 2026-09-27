@@ -3,6 +3,8 @@ package main
 import (
 	"embed"
 	"log"
+	"net/http"
+	"os"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -12,12 +14,18 @@ import (
 	"kuymediabox/internal/config"
 	"kuymediabox/internal/pdf"
 	"kuymediabox/internal/platform"
+	"kuymediabox/internal/preview"
+	"kuymediabox/internal/tools"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
+	if cliRequested(os.Args[1:]) {
+		platform.AttachParentConsole()
+		os.Exit(runCLI(os.Args[1:]))
+	}
 	app := NewApp()
 	// Window colour before the page paints, matching the saved theme.
 	bg := &options.RGBA{R: 14, G: 16, B: 20, A: 255}
@@ -36,11 +44,17 @@ func main() {
 		BackgroundColour: bg,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
-			// Page and image previews for the PDF tools (/kmb/page, /kmb/img).
-			Middleware: pdf.Middleware,
+			// Page and image previews for the PDF tools (/kmb/page, /kmb/img) and media
+			// previews for the trim and crop dialogs (/kmb/media, /kmb/frame, /kmb/wave).
+			Middleware: func(next http.Handler) http.Handler {
+				return preview.Middleware(func() string { return app.tools.Path(tools.FFmpeg) }, pdf.Middleware(next))
+			},
 		},
-		OnStartup:  app.startup,
-		OnShutdown: app.shutdown,
+		OnStartup:     app.startup,
+		OnShutdown:    app.shutdown,
+		OnBeforeClose: app.beforeClose,
+		// Started with Windows: stay in the tray until the icon is clicked.
+		StartHidden: startedInTray() && app.cfg.Get().Tray,
 		// File drops are handled by the Wails runtime (OnFileDrop), which also blocks the
 		// WebView's own navigation. DisableWebViewDrop must stay off: on WebView2 runtimes that
 		// support it, it blocks external drops completely and file drag & drop stops working.

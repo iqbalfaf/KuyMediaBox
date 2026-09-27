@@ -37,8 +37,11 @@ export const defaultOptions: PdfOptions = {
   separate: false,
   html: { pageSize: 'a4', orientation: 'portrait', margin: 'normal', width: 1280, onePage: false, background: true },
   images: { pageSize: 'a4', orientation: 'auto', margin: 'small', quality: 90, combine: true },
-  digisign: { certFile: '', name: '', reason: '', location: '', contact: '', visible: true, position: 'br', page: 'last' },
+  digisign: { certFile: '', name: '', reason: '', location: '', contact: '', visible: true, position: 'br', page: 'last', tsa: '' },
   pdfaCheck: { flavour: '0' },
+  headerFooter: { topLeft: '', topCenter: '', topRight: '', bottomLeft: '', bottomCenter: '', bottomRight: '{n} / {total}', size: 9, color: '#444444', bold: false, margin: 24, line: false, pages: '', skipFirst: false, mirror: false },
+  nup: { mode: 'nup', n: 2, paper: 'A4', border: false, margin: 0 },
+  semicolon: true,
 }
 
 function mergeDefaults(saved: PdfOptions): PdfOptions {

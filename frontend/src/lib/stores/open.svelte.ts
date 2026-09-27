@@ -2,7 +2,7 @@ import { L } from '../i18n.svelte'
 import { api, errText } from '../api'
 import type { OpenRequest } from '../types'
 import { nav, toast } from './app.svelte'
-import { audioConv, imageConv, videoConv } from './converter.svelte'
+import { audioConv, imageConv, subtitleConv, videoConv } from './converter.svelte'
 import { convFor, pdfNav } from './pdf.svelte'
 
 /** Opens files on the page that fits them (Explorer "Send to", app arguments, downloads). */
@@ -20,6 +20,10 @@ export async function openRequest(req: OpenRequest | null) {
     case 'audio':
       nav.page = 'audio'
       await audioConv.addPaths(req.paths)
+      break
+    case 'subtitle':
+      nav.page = 'subtitle'
+      await subtitleConv.addPaths(req.paths)
       break
     case 'pdf': {
       nav.page = 'pdf'

@@ -243,6 +243,77 @@
   </div>
   {@render pages(L('Halaman yang diberi nomor', 'Pages to number'), o.numbers.pages, (v) => (o.numbers.pages = v))}
   <p class="hint">{L('Contoh: isi "2-" agar sampul tidak diberi nomor.', 'Example: enter "2-" to leave the cover unnumbered.')}</p>
+{:else if tool.id === 'headerfooter'}
+  <div class="sec">
+    <span class="label">{L('Header (atas)', 'Header (top)')}</span>
+    <div class="hf">
+      <input class="text-input" bind:value={o.headerFooter.topLeft} placeholder={L('Kiri', 'Left')} aria-label={L('Header kiri', 'Header left')} />
+      <input class="text-input" bind:value={o.headerFooter.topCenter} placeholder={L('Tengah', 'Centre')} aria-label={L('Header tengah', 'Header centre')} />
+      <input class="text-input" bind:value={o.headerFooter.topRight} placeholder={L('Kanan', 'Right')} aria-label={L('Header kanan', 'Header right')} />
+    </div>
+    <span class="label">{L('Footer (bawah)', 'Footer (bottom)')}</span>
+    <div class="hf">
+      <input class="text-input" bind:value={o.headerFooter.bottomLeft} placeholder={L('Kiri', 'Left')} aria-label={L('Footer kiri', 'Footer left')} />
+      <input class="text-input" bind:value={o.headerFooter.bottomCenter} placeholder={L('Tengah', 'Centre')} aria-label={L('Footer tengah', 'Footer centre')} />
+      <input class="text-input" bind:value={o.headerFooter.bottomRight} placeholder={L('Kanan', 'Right')} aria-label={L('Footer kanan', 'Footer right')} />
+    </div>
+    <p class="hint">{L('Kode: {n} nomor halaman, {total} jumlah halaman, {date} tanggal hari ini, {file} nama file. Huruf Arab, India, dll. didukung.', 'Codes: {n} page number, {total} page count, {date} today, {file} file name. Arabic, Indic, … scripts are supported.')}</p>
+  </div>
+  <div class="grid2">
+    <div class="sec tight">
+      <label class="label" for="hfsize">{L('Ukuran', 'Size')} (pt)</label>
+      <input id="hfsize" class="text-input" inputmode="numeric" value={o.headerFooter.size} oninput={(e) => num(e, (v) => (o.headerFooter.size = v), 5, 36)} />
+    </div>
+    <div class="sec tight">
+      <span class="label">{L('Warna', 'Colour')}</span>
+      <div class="row hfc">
+        <input class="color" type="color" bind:value={o.headerFooter.color} aria-label={L('Warna', 'Colour')} />
+        <label class="bold"><input type="checkbox" bind:checked={o.headerFooter.bold} /> {L('Tebal', 'Bold')}</label>
+      </div>
+    </div>
+  </div>
+  <div class="sec">
+    <span class="label">{L('Jarak dari tepi', 'Distance from the edge')}</span>
+    <Chips columns={3} small bind:value={o.headerFooter.margin} options={[{ value: 16, label: L('Dekat', 'Close') }, { value: 24, label: 'Normal' }, { value: 40, label: L('Jauh', 'Far') }]} />
+  </div>
+  <Switch bind:checked={o.headerFooter.line} label={L('Garis pemisah', 'Divider line')} hint={L('Garis tipis di bawah header dan di atas footer', 'A thin rule under the header and above the footer')} />
+  <Switch bind:checked={o.headerFooter.skipFirst} label={L('Lewati halaman sampul', 'Skip the cover page')} hint={L('Halaman 1 tidak diberi header & footer', 'Page 1 gets no header & footer')} />
+  <Switch bind:checked={o.headerFooter.mirror} label={L('Bolak-balik kiri/kanan', 'Mirror left/right')} hint={L('Untuk buku: halaman genap di sisi lain', 'For books: even pages on the other side')} />
+  {@render pages(L('Halaman', 'Pages'), o.headerFooter.pages, (v) => (o.headerFooter.pages = v))}
+{:else if tool.id === 'nup' || tool.id === 'booklet'}
+  <div class="sec">
+    <span class="label">{L('Halaman per lembar', 'Pages per sheet')}</span>
+    {#if tool.id === 'booklet'}
+      <Chips columns={2} bind:value={o.nup.n} options={[{ value: 2, label: L('2 (lipat 1×)', '2 (fold once)') }, { value: 4, label: L('4 (lipat 2×)', '4 (fold twice)') }]} />
+      <p class="hint">{L('Cetak bolak-balik dengan pengaturan biasa printer (balik di sisi panjang), tumpuk sesuai urutan, lalu lipat di tengah. Urutan & arah halaman sudah diatur.', 'Print double-sided with the usual printer setting (flip on the long edge), stack in order, then fold in the middle. Page order & direction are already arranged.')}</p>
+    {:else}
+      <Chips columns={4} small bind:value={o.nup.n} options={[2, 4, 6, 8, 9, 12, 16].map((v) => ({ value: v, label: String(v) }))} />
+    {/if}
+  </div>
+  <div class="sec">
+    <span class="label">{L('Ukuran kertas', 'Paper size')}</span>
+    <Chips columns={4} small bind:value={o.nup.paper} options={['A4', 'A3', 'F4', 'Letter'].map((v) => ({ value: v, label: v }))} />
+  </div>
+  <Switch bind:checked={o.nup.border} label={L('Bingkai tiap halaman', 'Frame every page')} hint={L('Garis tipis di sekeliling tiap halaman kecil', 'A thin line around each small page')} />
+{:else if tool.id === 'flatten'}
+  <p class="hint">{L('Isian formulir, tanda tangan, stempel, dan komentar dijadikan bagian halaman. Hasilnya tampil sama di semua aplikasi dan tidak bisa diubah lagi.', 'Form entries, signatures, stamps and comments become part of the page. The result looks the same everywhere and can no longer be changed.')}</p>
+{:else if tool.id === 'pdf2txt' || tool.id === 'pdf2md'}
+  <p class="hint">
+    {tool.id === 'pdf2md'
+      ? L('Teks besar/tebal jadi judul (#), butir jadi daftar (-), halaman dipisah garis (---). Cocok untuk Obsidian, Notion, atau ditempel ke AI.', 'Big/bold lines become headings (#), bullets become lists (-), pages are split by rules (---). Good for Obsidian, Notion or pasting into AI.')
+      : L('Paragraf dipertahankan; tiap halaman dipisah. PDF hasil scan perlu OCR PDF dulu.', 'Paragraphs are kept; pages are separated. Scanned PDFs need OCR PDF first.')}
+  </p>
+{:else if tool.id === 'pdf2csv'}
+  <Segmented
+    label={L('Pemisah kolom', 'Column separator')}
+    value={o.semicolon ? 'semi' : 'comma'}
+    onchange={(v) => (o.semicolon = v === 'semi')}
+    options={[
+      { value: 'semi', label: L('Titik koma ;', 'Semicolon ;') },
+      { value: 'comma', label: L('Koma ,', 'Comma ,') },
+    ]}
+  />
+  <p class="hint">{L('Titik koma cocok untuk Excel berbahasa Indonesia (koma dipakai untuk desimal). Semua halaman disatukan dalam satu file.', 'Semicolons suit Excel in languages with a decimal comma. All pages go into one file.')}</p>
 {:else if tool.id === 'pdf2img'}
   <div class="sec">
     <Segmented
@@ -366,6 +437,16 @@
 {/if}
 
 <style>
+  .hfc {
+    height: 40px;
+    align-items: center;
+    gap: 12px;
+  }
+  .hf {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
   .sec {
     display: flex;
     flex-direction: column;

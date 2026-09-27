@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -54,18 +55,33 @@ type App struct {
 	after      afterState
 	launch     launchArgs
 	watch      *watcher
+
+	toolsDetected atomic.Bool   // the first tool detection has finished
+	toolsReady    chan struct{} // closed when it has
+	toolsOnce     sync.Once
+	pending       *pendingStore
+	subs          *subStore
+	stopBg        context.CancelFunc // background jobs (subscriptions)
+	tray          trayState
+	flows         flowState
+	cli           bool // running from the command line, without a window
+	cliQuietDone  bool // command line: finished tasks are reported elsewhere (workflows)
 }
 
 // NewApp creates the application state.
 func NewApp() *App {
-	a := &App{cfg: config.Load(), namer: naming.NewNamer(), collections: map[string]*downloader.Collection{}, produced: map[string]bool{}}
+	a := &App{toolsReady: make(chan struct{}), cfg: config.Load(), namer: naming.NewNamer(), collections: map[string]*downloader.Collection{}, produced: map[string]bool{}}
 	i18n.Set(a.cfg.Get().Language)
 	a.tools = tools.New(a.cfg, func(list []tools.Status) { a.emit("tools:changed", list) })
 	a.queue = queue.New(func(info queue.Info) { a.emit("task:update", info) }, a.onBatchDone)
 	a.queue.OnFinish = a.recordFinished
 	a.hist = history.Default(appdir.DataDir())
+	a.pending = newPendingStore()
+	a.subs = newSubStore()
 	a.applyParallel(a.cfg.Get())
+	a.installImageHooks()
 	a.launch.paths = existingPaths(os.Args[1:])
+	a.launch.links = linksFromArgs(os.Args[1:])
 	return a
 }
 
@@ -83,13 +99,27 @@ func (a *App) startup(ctx context.Context) {
 	}
 	go func() {
 		a.tools.Detect(context.Background())
+		a.markToolsDetected()
 		a.tools.CheckUpdates(context.Background())
 	}()
 	go a.autoCheckUpdate()
 	a.startWatcher()
+	bg, stop := context.WithCancel(context.Background())
+	a.stopBg = stop
+	go a.runSubscriptions(bg)
+	if a.cfg.Get().Tray {
+		a.startTray()
+	}
+	a.refreshAutostart()
+	a.refreshCLICommand()
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	a.stopTray()
+	a.pending.stop() // downloads cut off by closing stay pending for next time
+	if a.stopBg != nil {
+		a.stopBg()
+	}
 	a.stopWatcher()
 	a.queue.Shutdown()
 	// Give killed processes a moment so temp files are released before cleanup.
@@ -102,6 +132,13 @@ func cleanTemp() {
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
 		_ = os.RemoveAll(filepath.Join(dir, e.Name()))
+	}
+	// Scratch folders of command-line runs that were killed.
+	entries, _ = os.ReadDir(appdir.DataDir())
+	for _, e := range entries {
+		if info, err := e.Info(); err == nil && e.IsDir() && strings.HasPrefix(e.Name(), cliTempPrefix) && time.Since(info.ModTime()) > 24*time.Hour {
+			_ = os.RemoveAll(filepath.Join(appdir.DataDir(), e.Name()))
+		}
 	}
 }
 
@@ -116,6 +153,8 @@ func kindTitle(kind string) string {
 		return i18n.L("Konversi audio selesai", "Audio conversion finished")
 	case queue.KindPDF:
 		return i18n.L("Alat PDF selesai", "PDF tools finished")
+	case queue.KindSubtitle:
+		return i18n.L("Subtitle otomatis selesai", "Automatic subtitles finished")
 	}
 	return i18n.L("Download selesai", "Download finished")
 }
@@ -161,6 +200,15 @@ func (a *App) SaveSettings(s config.Settings) (config.Settings, error) {
 		i18n.Set(saved.Language)
 		if saved.Language != cur.Language {
 			a.emit("tools:changed", a.tools.List()) // descriptions are translated
+		}
+		if saved.Tray != cur.Tray && a.ctx != nil {
+			if saved.Tray {
+				a.startTray()
+			} else {
+				// The icon stays until the app closes (the tray can't be restarted in the
+				// same process); closing the window quits again from now on.
+				_ = platform.SetAutostart(autostartName, "", false) // starting hidden needs the tray
+			}
 		}
 	}
 	return saved, err
@@ -240,6 +288,28 @@ func (a *App) RevealFile(path string) error {
 
 // GetTools returns the status of every external tool.
 func (a *App) GetTools() []tools.Status { return a.tools.List() }
+
+// ToolsDetected reports whether the tools have been looked for (so "missing" is real).
+func (a *App) ToolsDetected() bool { return a.toolsDetected.Load() }
+
+func (a *App) markToolsDetected() {
+	a.toolsOnce.Do(func() {
+		a.toolsDetected.Store(true)
+		close(a.toolsReady)
+	})
+}
+
+// waitTools waits (briefly) for the first tool detection, so links and files handed over at
+// start-up (browser links, "Send to") don't fail with "yt-dlp/FFmpeg not installed".
+func (a *App) waitTools() {
+	if a.toolsReady == nil {
+		return // built without NewApp (tests)
+	}
+	select {
+	case <-a.toolsReady:
+	case <-time.After(60 * time.Second):
+	}
+}
 
 // RecheckTools locates tools again and checks for updates.
 func (a *App) RecheckTools() []tools.Status {

@@ -203,3 +203,4 @@ export class Converter {
 export const imageConv = new Converter('image')
 export const videoConv = new Converter('video')
 export const audioConv = new Converter('audio')
+export const subtitleConv = new Converter('subtitle')

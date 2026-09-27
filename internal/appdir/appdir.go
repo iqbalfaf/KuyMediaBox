@@ -33,8 +33,15 @@ func DataDir() string {
 // ToolsDir holds tools the app downloaded itself.
 func ToolsDir() string { return ensure(filepath.Join(DataDir(), "bin")) }
 
+// tempName is the scratch folder's name; command-line runs use their own so the window's
+// cleanup never deletes their files (and theirs never deletes the window's).
+var tempName = "tmp"
+
+// UseOwnTemp gives this process its own scratch folder (name must be unique, e.g. with the pid).
+func UseOwnTemp(name string) { tempName = name }
+
 // TempDir is a scratch folder cleaned on startup.
-func TempDir() string { return ensure(filepath.Join(DataDir(), "tmp")) }
+func TempDir() string { return ensure(filepath.Join(DataDir(), tempName)) }
 
 // ExeDir is the folder that contains the running executable.
 func ExeDir() string {
@@ -49,7 +56,7 @@ func ExeDir() string {
 }
 
 // fallbackFolder is the usual folder name under the user profile, per module.
-var fallbackFolder = map[string]string{"image": "Pictures", "video": "Videos", "audio": "Music", "download": "Downloads", "pdf": "Documents"}
+var fallbackFolder = map[string]string{"image": "Pictures", "video": "Videos", "audio": "Music", "download": "Downloads", "pdf": "Documents", "subtitle": "Videos"}
 
 // DefaultOutputDir is the default result folder of a module:
 // Pictures\KuyMediaBox, Videos\KuyMediaBox, Music\KuyMediaBox, Downloads\KuyMediaBox or Documents\KuyMediaBox.

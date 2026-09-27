@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -211,6 +212,9 @@ func flatEntry(en ytInfo, tab string) (Entry, bool) {
 		e.Thumbnail = "https://i.ytimg.com/vi/" + en.ID + "/mqdefault.jpg"
 	} else {
 		e.URL = en.URL
+		if e.Title == "" {
+			e.Title = slugTitle(en.URL) // e.g. SoundCloud sets list only links
+		}
 	}
 	low := strings.ToLower(en.Title)
 	if e.ID == "" || low == "[private video]" || low == "[deleted video]" || strings.Contains(en.Availabilty, "private") {
@@ -220,6 +224,21 @@ func flatEntry(en ytInfo, tab string) (Entry, bool) {
 		return e, false
 	}
 	return e, true
+}
+
+var reSlugCopy = regexp.MustCompile(`-\d+$`)
+
+// slugTitle turns ".../world-on-fire-1" into "World on fire".
+func slugTitle(u string) string {
+	u = strings.TrimSuffix(strings.SplitN(u, "?", 2)[0], "/")
+	slug := u[strings.LastIndex(u, "/")+1:]
+	slug = reSlugCopy.ReplaceAllString(slug, "")
+	slug = strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(slug, "-", " "), "_", " "))
+	if slug == "" {
+		return ""
+	}
+	r := []rune(slug)
+	return strings.ToUpper(string(r[0])) + string(r[1:])
 }
 
 func trimTabSuffix(s string) string {

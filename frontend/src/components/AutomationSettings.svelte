@@ -4,9 +4,9 @@
   import Icon from './Icon.svelte'
   import Switch from './Switch.svelte'
   import Select from './Select.svelte'
-  import { api, errText } from '../lib/api'
+  import { api, errText, runtime } from '../lib/api'
   import { saveSettings, settings, shortPath, toast } from '../lib/stores/app.svelte'
-  import { load } from '../lib/stores/persist'
+  import { moduleJob, moduleState, type ModuleKind } from '../lib/modules'
   import type { WatchRule } from '../lib/types'
 
   const kinds = $derived<{ id: string; label: string; icon: string; def: number }[]>([
@@ -15,6 +15,7 @@
     { id: 'audio', label: 'Audio', icon: 'music', def: 2 },
     { id: 'download', label: 'Download', icon: 'download', def: 2 },
     { id: 'pdf', label: 'PDF', icon: 'fileText', def: 2 },
+    { id: 'subtitle', label: 'Subtitle', icon: 'subtitles', def: 1 },
   ])
 
   function setParallel(kind: string, n: number) {
@@ -46,19 +47,97 @@
     }
   }
 
+  // ---- tray & start with Windows ----
+  let autostart = $state(false)
+  let autoBusy = $state(false)
+  onMount(async () => {
+    try {
+      autostart = await api.getAutostart()
+    } catch {
+      /* not on Windows */
+    }
+  })
+  async function toggleTray(on: boolean) {
+    await saveSettings({ tray: on })
+    if (!on) autostart = false
+  }
+  async function toggleAutostart(on: boolean) {
+    autoBusy = true
+    try {
+      autostart = await api.setAutostart(on)
+      if (on) toast(L('KuyMediaBox akan mulai di tray saat Windows menyala', 'KuyMediaBox will start in the tray when Windows starts'), 'ok')
+    } catch (e) {
+      autostart = !on
+      toast(errText(e), 'err')
+    } finally {
+      autoBusy = false
+    }
+  }
+
+  // ---- the kmb command ----
+  let cli = $state<{ installed: boolean; path: string; onPath: boolean } | null>(null)
+  let cliBusy = $state(false)
+  onMount(async () => {
+    try {
+      cli = await api.getCLICommand()
+    } catch {
+      /* not on Windows */
+    }
+  })
+  async function toggleCLI(on: boolean) {
+    cliBusy = true
+    try {
+      cli = await api.setCLICommand(on)
+      if (on) toast(L('Perintah kmb terpasang — buka Command Prompt/PowerShell baru lalu ketik: kmb help', 'The kmb command is installed — open a new Command Prompt/PowerShell and type: kmb help'), 'ok')
+    } catch (e) {
+      toast(errText(e), 'err')
+    } finally {
+      cliBusy = false
+    }
+  }
+  const cliExamples = $derived([
+    'kmb convert video.mkv --preset "WhatsApp"',
+    'kmb flow "Video → lagu MP3" D:\\Video',
+    'kmb download https://youtu.be/… --audio',
+    'kmb pdf compress laporan.pdf',
+  ])
+
+  // ---- kuymediabox:// links from the browser ----
+  let linkProto = $state(false)
+  let linkBusy = $state(false)
+  onMount(async () => {
+    try {
+      linkProto = await api.getLinkProtocol()
+    } catch {
+      /* not on Windows */
+    }
+  })
+  async function toggleLinks(on: boolean) {
+    linkBusy = true
+    try {
+      linkProto = await api.setLinkProtocol(on)
+      toast(on ? L('Link dari browser sekarang terbuka di KuyMediaBox', 'Links from the browser now open in KuyMediaBox') : L('Pendaftaran link dihapus', 'Link registration removed'), 'ok')
+    } catch (e) {
+      linkProto = !on
+      toast(errText(e), 'err')
+    } finally {
+      linkBusy = false
+    }
+  }
+  const bookmarklet = "javascript:location.href='kuymediabox://download?url='+encodeURIComponent(location.href)"
+  async function copyBookmarklet() {
+    if (await runtime.clipboardSet(bookmarklet)) toast(L('Bookmarklet disalin — tempel sebagai alamat bookmark baru di browser', 'Bookmarklet copied — paste it as the address of a new browser bookmark'), 'ok')
+  }
+
   // ---- watched folders ----
   /** The settings a page uses right now, as the backend expects them. */
   function moduleOptions(kind: string): any {
-    if (kind === 'image') return load<any>('kmb.image', { o: {} }).o
-    if (kind === 'video') {
-      const v = load<any>('kmb.video', { mode: 'video', v: {}, a: {} })
-      return { mode: v.mode === 'audio' ? 'audio' : 'video', video: v.v, audio: v.a, frameEvery: 0, frameFormat: 'jpg' }
-    }
-    return { mode: 'convert', options: load<any>('kmb.audio', { a: {} }).a }
+    return moduleJob(kind as ModuleKind, moduleState(kind as ModuleKind))
   }
 
   function describe(r: WatchRule): string {
     const o = r.options ?? {}
+    if (r.kind === 'flow') return `${L('Alur kerja', 'Workflow')}: ${settings.value?.workflows?.find((w) => w.id === o.workflow)?.name ?? L('(dihapus)', '(deleted)')}`
     if (r.kind === 'image') return `${L('Gambar', 'Images')} → ${String(o.format ?? 'jpg').toUpperCase()}`
     if (r.kind === 'video') return o.mode === 'audio' ? `Video → ${String(o.audio?.format ?? 'mp3').toUpperCase()}` : `Video → ${String(o.video?.format ?? 'mp4').toUpperCase()} ${String(o.video?.codec ?? '').toUpperCase()}`
     return `Audio → ${String(o.options?.format ?? 'mp3').toUpperCase()}`
@@ -113,11 +192,61 @@
 
     <div class="block">
       <Switch
+        checked={settings.value.tray}
+        onchange={toggleTray}
+        label={L('Tetap jalan di tray saat jendela ditutup', 'Keep running in the tray when the window is closed')}
+        hint={L('Download, langganan, folder pantauan, dan pantau clipboard tetap bekerja. Keluar lewat klik kanan ikon di tray.', 'Downloads, subscriptions, watched folders and the clipboard watcher keep working. Quit by right-clicking the tray icon.')}
+      />
+      {#if settings.value.tray}
+        <Switch
+          checked={autostart}
+          onchange={(v) => !autoBusy && toggleAutostart(v)}
+          label={L('Mulai bersama Windows', 'Start with Windows')}
+          hint={L('Langsung ke tray tanpa membuka jendela, supaya langganan & folder pantauan selalu aktif.', 'Straight to the tray without a window, so subscriptions & watched folders are always on.')}
+        />
+      {/if}
+    </div>
+
+    <div class="block">
+      <Switch
         checked={sendTo}
         onchange={(v) => !sendBusy && toggleSendTo(v)}
         label={L('Menu klik kanan "Kirim ke › KuyMediaBox"', 'Right-click menu "Send to › KuyMediaBox"')}
         hint={L('Pilih file di Explorer, klik kanan › Kirim ke › KuyMediaBox. File masuk ke halaman yang cocok.', 'Select files in Explorer, right-click › Send to › KuyMediaBox. They open on the matching page.')}
       />
+    </div>
+
+    {#if cli}
+      <div class="block">
+        <Switch
+          checked={cli.installed}
+          onchange={(v) => !cliBusy && toggleCLI(v)}
+          label={L('Perintah "kmb" di Command Prompt', '"kmb" command in the Command Prompt')}
+          hint={L('Konversi, alur kerja, alat PDF, dan download dari terminal atau skrip — tanpa membuka jendela. Memakai preset & alur kerja dari aplikasi.', 'Convert, run workflows, PDF tools and downloads from a terminal or script — no window. Uses the presets & workflows from the app.')}
+        />
+        {#if cli.installed}
+          <div class="cli">
+            {#each cliExamples as ex}<code>{ex}</code>{/each}
+          </div>
+          {#if !cli.onPath}<p class="hint">{L('Folder perintah belum ada di PATH; jalankan dengan alamat lengkap:', "The command folder isn't on PATH; run it with the full path:")} <code>{cli.path}</code></p>{/if}
+        {/if}
+      </div>
+    {/if}
+
+    <div class="block">
+      <Switch
+        checked={linkProto}
+        onchange={(v) => !linkBusy && toggleLinks(v)}
+        label={L('Unduh dari browser dengan satu klik', 'One-click downloads from the browser')}
+        hint={L('Mendaftarkan link kuymediabox:// — halaman yang sedang dibuka langsung masuk ke halaman Download.', 'Registers kuymediabox:// links — the page you are viewing goes straight to the Download page.')}
+      />
+      {#if linkProto}
+        <div class="bm">
+          <code class="ellipsis" title={bookmarklet}>{bookmarklet}</code>
+          <button class="btn" onclick={copyBookmarklet}><Icon name="copy" size={14} />{L('Salin bookmarklet', 'Copy bookmarklet')}</button>
+        </div>
+        <p class="hint">{L('Buat bookmark baru di browser, tempel teks ini sebagai alamatnya, beri nama "Unduh ke KuyMediaBox". Klik bookmark itu saat membuka video YouTube, TikTok, dll.', 'Make a new browser bookmark, paste this text as its address and name it "Download with KuyMediaBox". Click it while viewing a YouTube, TikTok, … page.')}</p>
+      {/if}
     </div>
 
     <div class="block">
@@ -138,16 +267,20 @@
           <div class="wkind">
             <Select
               label={L('Jenis file', 'File type')}
-              value={r.kind}
-              onchange={(v) => updateWatch(r.id, { kind: v as WatchRule['kind'], options: moduleOptions(v) })}
+              value={r.kind === 'flow' ? `flow:${r.options?.workflow ?? ''}` : r.kind}
+              onchange={(v) =>
+                v.startsWith('flow:')
+                  ? updateWatch(r.id, { kind: 'flow', options: { workflow: v.slice(5) } })
+                  : updateWatch(r.id, { kind: v as WatchRule['kind'], options: moduleOptions(v) })}
               options={[
                 { value: 'image', label: L('Gambar', 'Images') },
                 { value: 'video', label: 'Video' },
                 { value: 'audio', label: 'Audio' },
+                ...(settings.value.workflows ?? []).map((w) => ({ value: `flow:${w.id}`, label: `${L('Alur kerja', 'Workflow')}: ${w.name}` })),
               ]}
             />
           </div>
-          <button class="mini" title={L('Pakai pengaturan halaman sekarang', 'Use the page settings from now')} aria-label={L('Perbarui pengaturan', 'Update settings')} onclick={() => { updateWatch(r.id, { options: moduleOptions(r.kind) }); toast(L('Pengaturan folder pantauan diperbarui', 'Watched folder settings updated'), 'ok') }}><Icon name="refresh" size={15} /></button>
+          <button class="mini" disabled={r.kind === 'flow'} title={L('Pakai pengaturan halaman sekarang', 'Use the page settings from now')} aria-label={L('Perbarui pengaturan', 'Update settings')} onclick={() => { updateWatch(r.id, { options: moduleOptions(r.kind) }); toast(L('Pengaturan folder pantauan diperbarui', 'Watched folder settings updated'), 'ok') }}><Icon name="refresh" size={15} /></button>
           <button class="mini" title={r.enabled ? L('Jeda', 'Pause') : L('Aktifkan', 'Resume')} aria-label={r.enabled ? L('Jeda', 'Pause') : L('Aktifkan', 'Resume')} onclick={() => updateWatch(r.id, { enabled: !r.enabled })}><Icon name={r.enabled ? 'pause' : 'play'} size={15} /></button>
           <button class="mini" title={L('Hapus', 'Remove')} aria-label={L('Hapus folder pantauan', 'Remove watched folder')} onclick={() => removeWatch(r.id)}><Icon name="trash" size={15} /></button>
         </div>
@@ -160,6 +293,22 @@
 {/if}
 
 <style>
+  .bm {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .bm code {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--inset);
+    border: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-2);
+  }
   .head {
     display: flex;
     align-items: center;
@@ -296,5 +445,19 @@
   .mini:hover {
     background: var(--hover);
     color: var(--text);
+  }
+  .cli {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--canvas);
+  }
+  .cli code {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 </style>

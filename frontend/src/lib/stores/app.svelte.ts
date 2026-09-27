@@ -94,7 +94,10 @@ export async function initApp() {
     toast(errText(e), 'err')
   }
   try {
-    toolState.list = await api.getTools()
+    const [list, detected] = await Promise.all([api.getTools(), api.toolsDetected()])
+    toolState.list = list
+    // Detection may have finished before this page listened for "tools:changed".
+    if (detected) toolState.loaded = true
   } catch {
     /* filled by events */
   }

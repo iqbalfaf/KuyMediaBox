@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,9 +11,19 @@ func TestDefaultsWhenFileMissing(t *testing.T) {
 	st := LoadFrom(filepath.Join(t.TempDir(), "none.json"))
 	s := st.Get()
 	for _, k := range OutputKinds {
-		if s.Outputs[k].Mode != OutputDefault {
-			t.Errorf("%s: mode %q, want default", k, s.Outputs[k].Mode)
+		want := OutputDefault
+		if k == "subtitle" {
+			want = OutputSame // subtitles sit next to the video
 		}
+		if s.Outputs[k].Mode != want {
+			t.Errorf("%s: mode %q, want %q", k, s.Outputs[k].Mode, want)
+		}
+	}
+	// A settings file from before the Subtitle page still gets "next to the video".
+	old := Settings{Outputs: map[string]Output{"video": {Mode: OutputDefault}}}
+	old.Normalize()
+	if old.Outputs["subtitle"].Mode != OutputSame {
+		t.Errorf("old settings: subtitle mode %q", old.Outputs["subtitle"].Mode)
 	}
 	if !s.Notify || !s.SkipDownloaded || !s.DownloadSubfolders || s.Suffix != "_converted" || s.Conflict != ConflictRename {
 		t.Errorf("unexpected defaults %+v", s)
@@ -56,6 +67,25 @@ func TestSaveLoadRoundTripAndPartialFile(t *testing.T) {
 	got := LoadFrom(p).Get()
 	if got.Outputs["video"].Dir != `D:\Hasil Video` || got.Notify || got.Language != LangEN || got.Outputs["image"].Mode != OutputDefault {
 		t.Fatalf("round trip %+v", got)
+	}
+
+	// Tray, workflows and workflow watch rules survive a restart; broken steps are dropped.
+	s = got
+	s.Tray = true
+	s.Workflows = []Workflow{
+		{ID: "w1", Name: " Lagu rapi ", Steps: []FlowStep{{Kind: "audio", Label: "MP3", Job: json.RawMessage(`{"mode":"convert"}`)}, {Kind: "bogus"}, {Kind: "pdf", Tool: "compress"}}},
+		{ID: "", Name: "no id"},
+	}
+	s.Watch = []WatchRule{{ID: "r1", Dir: `D:\Masuk`, Kind: "flow", Options: json.RawMessage(`{"workflow":"w1"}`), Enabled: true}}
+	if _, err := st.Set(s); err != nil {
+		t.Fatal(err)
+	}
+	got = LoadFrom(p).Get()
+	if !got.Tray || len(got.Workflows) != 1 || got.Workflows[0].Name != "Lagu rapi" || len(got.Workflows[0].Steps) != 2 {
+		t.Fatalf("workflows %+v tray %v", got.Workflows, got.Tray)
+	}
+	if string(got.Workflows[0].Steps[1].Job) != "{}" || len(got.Watch) != 1 || got.Watch[0].Kind != "flow" {
+		t.Fatalf("steps %+v watch %+v", got.Workflows[0].Steps, got.Watch)
 	}
 
 	// A file from an older version: missing keys keep their defaults, legacy download folder migrates.
