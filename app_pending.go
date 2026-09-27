@@ -161,6 +161,20 @@ func (p *pendingStore) take() []*pendingBatch {
 	return out
 }
 
+// restore puts back batches that couldn't be resumed (offline, site down), so they can be
+// tried again or discarded later.
+func (p *pendingStore) restore(list []*pendingBatch) {
+	if len(list) == 0 {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, b := range list {
+		p.batches[b.ID] = b
+	}
+	p.saveLocked()
+}
+
 func (p *pendingStore) summary() PendingSummary {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -194,12 +208,14 @@ func (a *App) ResumePendingDownloads() (int, error) {
 	batches := a.pending.take()
 	total := 0
 	var firstErr error
+	var failed []*pendingBatch
 	for _, b := range batches {
 		col, err := a.AnalyzeLink(b.URL)
 		if err != nil {
 			if firstErr == nil {
 				firstErr = fmt.Errorf("%s: %w", b.Title, err)
 			}
+			failed = append(failed, b)
 			continue
 		}
 		refs, err := a.StartDownloads(col.Key, b.IDs, b.Options)
@@ -207,10 +223,13 @@ func (a *App) ResumePendingDownloads() (int, error) {
 			if firstErr == nil {
 				firstErr = fmt.Errorf("%s: %w", b.Title, err)
 			}
+			a.ForgetCollection(col.Key)
+			failed = append(failed, b)
 			continue
 		}
 		total += len(refs)
 	}
+	a.pending.restore(failed)
 	if total == 0 && firstErr != nil {
 		return 0, fmt.Errorf(i18n.L("Unduhan tidak bisa dilanjutkan: %w", "The downloads can't be resumed: %w"), firstErr)
 	}

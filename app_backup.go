@@ -87,8 +87,9 @@ func (a *App) importBackup(path string) (*ImportResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	b = bytes.TrimPrefix(b, []byte{0xEF, 0xBB, 0xBF}) // edited by hand in Notepad
 	var f backupFile
-	if err := json.Unmarshal(bytes.TrimPrefix(b, []byte{0xEF, 0xBB, 0xBF}), &f); err != nil || f.App != backupApp {
+	if err := json.Unmarshal(b, &f); err != nil || f.App != backupApp {
 		return nil, errors.New(i18n.L("File ini bukan cadangan pengaturan KuyMediaBox", "This file isn't a KuyMediaBox settings backup"))
 	}
 	// Fields the backup doesn't have keep their current values (older versions).

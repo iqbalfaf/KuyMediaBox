@@ -191,6 +191,7 @@ func AnalyzeSpotify(ctx context.Context, env Env, link Link) (*Collection, error
 			song:      &songs[i],
 		})
 	}
+	uniqueEntryIDs(col.Entries)
 	return col, nil
 }
 

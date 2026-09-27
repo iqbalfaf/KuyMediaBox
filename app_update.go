@@ -15,7 +15,7 @@ import (
 )
 
 // Version is the app version. Release builds set it with -ldflags "-X main.Version=x.y.z".
-var Version = "0.5.0"
+var Version = "0.5.1"
 
 type updateState struct {
 	mu         sync.Mutex
@@ -93,7 +93,7 @@ func (a *App) InstallUpdate() error {
 	}
 
 	a.emit("update:progress", map[string]any{"stage": "install", "progress": 1})
-	for _, k := range []string{queue.KindImage, queue.KindVideo, queue.KindAudio, queue.KindDownload} {
+	for _, k := range []string{queue.KindImage, queue.KindVideo, queue.KindAudio, queue.KindDownload, queue.KindPDF, queue.KindSubtitle} {
 		a.queue.CancelKind(k)
 	}
 	if err := updater.Apply(path, info.Mode); err != nil {

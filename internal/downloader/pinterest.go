@@ -96,7 +96,7 @@ func pinterestCollection(ctx context.Context, env Env, link Link) (*Collection, 
 	case TypeSearch:
 		args = append(args, "--range", "1-"+strconv.Itoa(pinLimitSearch))
 	}
-	out, err := proc.Output(ctx, env.GalleryDL, append(args, link.URL)...)
+	out, err := proc.OutputKeep(ctx, env.GalleryDL, append(args, link.URL)...)
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}

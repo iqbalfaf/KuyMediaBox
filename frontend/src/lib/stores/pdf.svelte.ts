@@ -188,7 +188,7 @@ export interface OpenDoc {
 
 /** Opens a PDF for the page tools, asking for the password when it is locked. */
 export async function openDoc(path: string): Promise<OpenDoc | null> {
-  const name = path.split(/[\/]/).pop() ?? path
+  const name = path.split(/[\\/]/).pop() || path
   try {
     const info = await api.pdfDoc(path, '')
     return { path, name, password: '', info }

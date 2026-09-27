@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"kuymediabox/internal/config"
@@ -99,11 +100,13 @@ func TestReservedNamesAreUnique(t *testing.T) {
 
 func TestSanitize(t *testing.T) {
 	cases := map[string]string{
-		`a/b:c*?`:  "a_b_c__",
-		"  CON ":   "_CON",
-		"judul. ":  "judul",
-		"":         "file",
-		"Lagu Ok!": "Lagu Ok!",
+		`a/b:c*?`:                           "a_b_c__",
+		"  CON ":                            "_CON",
+		"judul. ":                           "judul",
+		"":                                  "file",
+		"Lagu Ok!":                          "Lagu Ok!",
+		"lpt9":                              "_lpt9",
+		strings.Repeat("a", 149) + ". sisa": strings.Repeat("a", 149),
 	}
 	for in, want := range cases {
 		if got := SanitizeFileName(in); got != want {

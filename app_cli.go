@@ -498,10 +498,7 @@ func (a *App) cliWait(w io.Writer) int {
 				}
 			}
 		}
-		a.flows.mu.Lock()
-		busy = busy || len(a.flows.tasks) > 0
-		a.flows.mu.Unlock()
-		if !busy {
+		if !busy && !a.flowsBusy() {
 			return failed
 		}
 	}

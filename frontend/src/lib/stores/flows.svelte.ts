@@ -16,7 +16,7 @@ export function initFlows() {
   runtime.on('flow:done', (r: FlowResult) => {
     flowResults.list = [{ ...r, at: Date.now() }, ...flowResults.list].slice(0, 100)
     if (r.error) {
-      const name = r.input ? r.input.split(/[\/]/).pop() : ''
+      const name = r.input ? r.input.split(/[\\/]/).pop() : ''
       toast(`${L('Alur kerja', 'Workflow')} "${r.workflow}"${name ? ` · ${name}` : ''}: ${r.error}`, 'err')
     }
   })

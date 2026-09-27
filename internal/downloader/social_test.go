@@ -155,3 +155,15 @@ func TestOptionsImageFormat(t *testing.T) {
 		t.Fatalf("got %q", o.ImageFormat)
 	}
 }
+
+func TestUniqueEntryIDs(t *testing.T) {
+	list := []Entry{{ID: "a"}, {ID: "b"}, {ID: "a"}, {ID: "a"}}
+	uniqueEntryIDs(list)
+	got := []string{list[0].ID, list[1].ID, list[2].ID, list[3].ID}
+	want := []string{"a", "b", "a-2", "a-3"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("ids = %v, want %v", got, want)
+		}
+	}
+}

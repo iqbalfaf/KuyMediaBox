@@ -90,7 +90,8 @@
   }
 
   // Subtitles sit next to the video by default.
-  const allDefault = $derived(folderRows.every((r) => outputOf(r.kind).mode === (r.kind === 'subtitle' ? 'same' : 'default')))
+  const defaultMode = (kind: OutputKind) => (kind === 'subtitle' ? 'same' : 'default')
+  const allDefault = $derived(folderRows.every((r) => outputOf(r.kind).mode === defaultMode(r.kind)))
 
   // Open-source projects KuyMediaBox is built on (GitHub owner/repo).
   const credits = $derived<{ name: string; repo: string; role: string }[]>([
@@ -189,7 +190,7 @@
             <button class="mini" title={folder ? `${L('Buka', 'Open')} ${folder}` : L('Mode dinamis: folder ikut lokasi file asli', 'Dynamic mode: the folder follows each source file')} aria-label={L(`Buka folder ${r.label}`, `Open ${r.label} folder`)} disabled={!folder} onclick={() => api.openFolder(folder)}>
               <Icon name="folderOpen" size={16} />
             </button>
-            <button class="mini" title={L('Kembalikan ke folder default', 'Back to the default folder')} aria-label={L(`Reset folder ${r.label}`, `Reset ${r.label} folder`)} disabled={o.mode === 'default'} onclick={() => setOutput(r.kind, { mode: 'default', dir: '' })}>
+            <button class="mini" title={L('Kembalikan ke folder default', 'Back to the default folder')} aria-label={L(`Reset folder ${r.label}`, `Reset ${r.label} folder`)} disabled={o.mode === defaultMode(r.kind)} onclick={() => setOutput(r.kind, { mode: defaultMode(r.kind), dir: '' })}>
               <Icon name="refresh" size={16} />
             </button>
           </div>

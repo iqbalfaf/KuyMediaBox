@@ -37,7 +37,8 @@ func (a *App) installImageHooks() {
 	imageconv.Hooks.OptimizePNG = a.optimizePNG
 }
 
-// maxUpscalePixels keeps AI upscaling within memory (the result, in pixels).
+// maxUpscalePixels keeps AI upscaling within memory: the size, in pixels, of the 4× picture
+// Real-ESRGAN always makes (2× and 3× are scaled down from it afterwards).
 const maxUpscalePixels = 120_000_000
 
 func (a *App) aiUpscale(ctx context.Context, img image.Image, scale int, model string) (image.Image, error) {
@@ -46,8 +47,9 @@ func (a *App) aiUpscale(ctx context.Context, img image.Image, scale int, model s
 		return nil, errors.New(i18n.L("Real-ESRGAN belum terpasang (Pengaturan › Tools pendukung)", "Real-ESRGAN isn't installed (Settings › Supporting tools)"))
 	}
 	b := img.Bounds()
-	if b.Dx()*b.Dy()*scale*scale > maxUpscalePixels {
-		return nil, fmt.Errorf(i18n.L("Gambar terlalu besar untuk diperbesar %d× (hasilnya lebih dari 120 megapiksel). Perkecil dulu atau pilih 2×.", "The picture is too big to enlarge %d× (over 120 megapixels). Make it smaller first or pick 2×."), scale)
+	if b.Dx()*b.Dy()*16 > maxUpscalePixels {
+		mp := float64(b.Dx()*b.Dy()) / 1e6
+		return nil, fmt.Errorf(i18n.L("Gambar terlalu besar untuk Perbesar AI (%.1f megapiksel, maks. %.1f). Perkecil dulu.", "The picture is too big for AI upscaling (%.1f megapixels, max %.1f). Make it smaller first."), mp, float64(maxUpscalePixels)/16/1e6)
 	}
 	work, err := os.MkdirTemp(appdir.TempDir(), "esr-*")
 	if err != nil {

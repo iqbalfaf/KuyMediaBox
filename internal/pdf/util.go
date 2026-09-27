@@ -8,6 +8,7 @@ import (
 	"image/color"
 	"image/draw"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -93,11 +94,14 @@ func errLocked() error {
 	return errors.New(i18n.L("PDF dikunci password — masukkan password yang benar atau buka dulu dengan Buka Kunci PDF", "the PDF is password protected — enter the right password or unlock it first"))
 }
 
+var reDashSpace = regexp.MustCompile(`\s*-\s*`)
+
 // ParsePages turns "1-3, 5, 8-" into sorted unique 1-based page numbers within 1..max.
 // An empty string selects nothing.
 func ParsePages(s string, max int) ([]int, error) {
 	set := map[int]bool{}
 	s = strings.NewReplacer("–", "-", "—", "-", ";", ",").Replace(s)
+	s = reDashSpace.ReplaceAllString(s, "-") // "5 - 7" is one range, not "5", "-", "7"
 	for _, part := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ' ' || r == '\n' || r == '\t' }) {
 		a, b, err := parseSpan(part, max)
 		if err != nil {

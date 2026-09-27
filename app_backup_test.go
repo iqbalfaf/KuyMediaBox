@@ -51,6 +51,13 @@ func TestBackupRoundTrip(t *testing.T) {
 		t.Fatalf("result %+v", res)
 	}
 
+	// A backup saved again in Notepad (UTF-8 with BOM) still restores the settings.
+	a.cfg.Set(s)
+	os.WriteFile(path, append([]byte{0xEF, 0xBB, 0xBF}, b...), 0o644)
+	if _, err := a.importBackup(path); err != nil || a.cfg.Get().Suffix != "_hemat" {
+		t.Fatalf("BOM backup: err %v suffix %q", err, a.cfg.Get().Suffix)
+	}
+
 	os.WriteFile(path, []byte(`{"app":"Lain"}`), 0o644)
 	if _, err := a.importBackup(path); err == nil {
 		t.Fatal("foreign file accepted")

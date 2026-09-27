@@ -19,6 +19,7 @@ const (
 
 var (
 	reBiliVideo   = regexp.MustCompile(`^/(?:[a-z]{2}/)?video/((?:BV|bv)[0-9A-Za-z]{10}|av\d+)`)
+	reBiliIntl    = regexp.MustCompile(`^/(?:[a-z]{2}/)?video/(\d+)`) // bilibili.tv: numeric ids
 	reTwitchVOD   = regexp.MustCompile(`^/(?:[^/]+/)?(?:videos|v)/(\d+)`)
 	reTwitchClip  = regexp.MustCompile(`^/[^/]+/clip/([A-Za-z0-9_-]+)`)
 	reRedditPost  = regexp.MustCompile(`^/(?:r|u|user)/[^/]+/comments/([a-z0-9]+)`)
@@ -100,6 +101,9 @@ func detectMore(host string, u *url.URL) (Link, bool) {
 				v.RawQuery = "p=" + url.QueryEscape(p)
 			}
 			return Link{Source: SourceBilibili, Type: TypeVideo, ID: m[1], URL: v.String()}, true
+		}
+		if m := reBiliIntl.FindStringSubmatch(u.Path); m != nil && host == "bilibili.tv" {
+			return Link{Source: SourceBilibili, Type: TypeVideo, ID: m[1], URL: "https://www.bilibili.tv/video/" + m[1]}, true
 		}
 		return Link{Source: SourceBilibili, Type: TypeUnknown, URL: u.String()}, true
 	case "space.bilibili.com":

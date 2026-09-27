@@ -46,6 +46,7 @@ func TestDetect(t *testing.T) {
 		{"https://www.reddit.com/r/pics", SourceReddit, TypeUnknown, "https://www.reddit.com/r/pics"},
 		{"https://www.bilibili.com/video/BV13x41117TL/?spm_id_from=333", SourceBilibili, TypeVideo, "https://www.bilibili.com/video/BV13x41117TL"},
 		{"https://space.bilibili.com/3706948/", SourceBilibili, TypePlaylist, "https://space.bilibili.com/3706948/video"},
+		{"https://www.bilibili.tv/en/video/4789390594723840?bstar_from=x", SourceBilibili, TypeVideo, "https://www.bilibili.tv/video/4789390594723840"},
 		{"https://www.facebook.com/share/v/1JUTPEWM3e/", SourceFacebook, TypePost, "https://www.facebook.com/share/v/1JUTPEWM3e/"},
 		{"https://m.facebook.com/watch/?v=1081798797911783&_rdr", SourceFacebook, TypePost, "https://www.facebook.com/watch/?v=1081798797911783"},
 		{"https://www.facebook.com/reel/1195289147628387?mibextid=x", SourceFacebook, TypePost, "https://www.facebook.com/reel/1195289147628387"},

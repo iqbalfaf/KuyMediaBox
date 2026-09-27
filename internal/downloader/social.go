@@ -108,6 +108,7 @@ func AnalyzeSocial(ctx context.Context, env Env, link Link) (*Collection, error)
 	if err != nil {
 		return nil, err
 	}
+	uniqueEntryIDs(col.Entries)
 	for i := range col.Entries {
 		e := &col.Entries[i]
 		e.Index = i + 1
@@ -236,7 +237,7 @@ func galleryPost(ctx context.Context, env Env, link Link) (*Collection, error) {
 		return nil, errGalleryMissing()
 	}
 	args := append([]string{"--config-ignore", "-j"}, env.cookieArgs()...)
-	out, err := proc.Output(ctx, env.GalleryDL, append(args, link.URL)...)
+	out, err := proc.OutputKeep(ctx, env.GalleryDL, append(args, link.URL)...)
 	files, perr := parseGalleryJSON(out)
 	if perr != nil {
 		detail := out
@@ -429,6 +430,15 @@ func uniqueID(seen map[string]bool, id string) string {
 	}
 	seen[u] = true
 	return u
+}
+
+// uniqueEntryIDs makes every entry ID of a list unique (a playlist can hold the same video
+// or song twice).
+func uniqueEntryIDs(entries []Entry) {
+	seen := map[string]bool{}
+	for i := range entries {
+		entries[i].ID = uniqueID(seen, entries[i].ID)
+	}
 }
 
 // friendlySocialError maps yt-dlp/gallery-dl output about social posts to a short message.

@@ -120,10 +120,11 @@ func (a *App) InstallModel(kind, id string) error {
 		models.mu.Unlock()
 		a.modelsChanged(kind)
 	})
+	canceled := ctx.Err() != nil // read before cancel() below, which always sets it
 	models.mu.Lock()
 	job.Busy, job.Progress = false, 0
 	delete(models.stop, key)
-	if err != nil && ctx.Err() == nil {
+	if err != nil && !canceled {
 		job.Error = err.Error()
 	} else {
 		delete(models.jobs, key)
@@ -131,7 +132,7 @@ func (a *App) InstallModel(kind, id string) error {
 	models.mu.Unlock()
 	cancel()
 	a.modelsChanged(kind)
-	if ctx.Err() != nil {
+	if canceled {
 		return nil
 	}
 	return err

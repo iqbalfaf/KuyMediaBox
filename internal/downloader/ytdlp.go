@@ -187,6 +187,7 @@ func AnalyzeYouTube(ctx context.Context, env Env, link Link) (*Collection, error
 		col.Entries = []Entry{entry}
 		col.Type = TypeVideo
 	}
+	uniqueEntryIDs(col.Entries)
 	if len(col.Entries) > 0 {
 		col.Thumbnail = col.Entries[0].Thumbnail
 	}

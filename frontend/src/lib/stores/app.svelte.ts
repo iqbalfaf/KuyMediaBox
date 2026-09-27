@@ -103,15 +103,36 @@ export async function initApp() {
   }
 }
 
-export async function saveSettings(patch: Partial<Settings>) {
-  if (!settings.value) return
-  try {
-    settings.value = await api.saveSettings({ ...settings.value, ...patch })
+let saveChain: Promise<void> = Promise.resolve()
+let localVersion = 0
+
+/** Applies a change right away (so quick clicks build on each other) and saves the changes one
+ *  after another; a failed save reloads what the backend has. */
+export function saveSettings(patch: Partial<Settings>): Promise<void> {
+  if (!settings.value) return Promise.resolve()
+  settings.value = { ...settings.value, ...patch }
+  localVersion++
+  const run = async () => {
+    if (!settings.value) return
+    const sent = localVersion
+    try {
+      const saved = await api.saveSettings($state.snapshot(settings.value) as Settings)
+      // A newer change is waiting in the chain: its save sends everything, keep the local copy.
+      if (sent === localVersion) settings.value = saved
+    } catch (e) {
+      toast(errText(e), 'err')
+      try {
+        const current = await api.getSettings()
+        if (sent === localVersion) settings.value = current
+      } catch {
+        /* keep the local copy */
+      }
+    }
     setLang(settings.value.language)
     applyTheme(settings.value.theme)
-  } catch (e) {
-    toast(errText(e), 'err')
   }
+  saveChain = saveChain.then(run, run)
+  return saveChain
 }
 
 // ---- toasts ------------------------------------------------------------------------------

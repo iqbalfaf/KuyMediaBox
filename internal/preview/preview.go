@@ -136,8 +136,10 @@ func serveWave(w http.ResponseWriter, r *http.Request, ff string) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
 	defer cancel()
-	out, err := bytesOut(ctx, ff, "-hide_banner", "-loglevel", "error", "-nostdin", "-i", q.Get("path"), "-map", "0:a:0",
-		"-filter_complex", fmt.Sprintf("aformat=channel_layouts=mono,showwavespic=s=%dx%d:colors=0x%s:scale=sqrt", width, height, color),
+	// The audio goes in through the filter's input label only: mapping it as well would add
+	// an audio stream the image2pipe output can't encode.
+	out, err := bytesOut(ctx, ff, "-hide_banner", "-loglevel", "error", "-nostdin", "-i", q.Get("path"),
+		"-filter_complex", fmt.Sprintf("[0:a:0]aformat=channel_layouts=mono,showwavespic=s=%dx%d:colors=0x%s:scale=sqrt", width, height, color),
 		"-frames:v", "1", "-f", "image2pipe", "-c:v", "png", "-")
 	if err != nil || len(out) == 0 {
 		http.Error(w, "no waveform", http.StatusUnprocessableEntity)

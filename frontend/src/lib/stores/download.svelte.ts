@@ -85,15 +85,23 @@ export function categoryOf(source: string): Category {
   return (categoryOrder as string[]).includes(source) ? (source as Category) : 'other'
 }
 
+/** Other websites share YouTube's download settings (one object, so they stay in step). */
+function optsCat(cat: Category): Category {
+  return cat === 'other' ? 'youtube' : cat
+}
+
 function optsKey(cat: Category) {
-  switch (cat) {
-    case 'youtube':
-    case 'other':
-      return 'kmb.dl.youtube'
-    case 'spotify':
-      return 'kmb.dl.spotify'
+  return `kmb.dl.${optsCat(cat)}`
+}
+
+/** Whether the user ever saved a "skip existing" choice for a category. */
+function savedSkip(cat: Category): boolean {
+  try {
+    const raw = localStorage.getItem(optsKey(cat))
+    return !!raw && typeof JSON.parse(raw)?.skipExisting === 'boolean'
+  } catch {
+    return false
   }
-  return `kmb.dl.${cat}`
 }
 
 function defaultsFor(cat: Category): DownloadOptions {
@@ -120,15 +128,17 @@ let rowSeq = 0
 
 /** Loads a category's saved settings into state. Call outside markup/$derived (it writes state). */
 function ensureOpts(cat: Category) {
+  cat = optsCat(cat)
   if (dl.opts[cat]) return
   const loaded = load(optsKey(cat), defaultsFor(cat))
-  if (settings.value && loaded.skipExisting === undefined) loaded.skipExisting = settings.value.skipDownloaded
+  // Settings › "Skip videos downloaded before" is the default until a category has its own choice.
+  if (settings.value && !savedSkip(cat)) loaded.skipExisting = settings.value.skipDownloaded
   dl.opts[cat] = loaded
 }
 
 /** Download settings of a category (one set for all its links). Read-only, safe in markup. */
 export function optsOf(cat: Category): DownloadOptions {
-  return dl.opts[cat] ?? defaultsFor(cat)
+  return dl.opts[optsCat(cat)] ?? defaultsFor(cat)
 }
 
 export function rowOpts(row: LinkRow): DownloadOptions {

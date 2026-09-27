@@ -88,6 +88,12 @@ func TestSaveLoadRoundTripAndPartialFile(t *testing.T) {
 		t.Fatalf("steps %+v watch %+v", got.Workflows[0].Steps, got.Watch)
 	}
 
+	// A file saved in Notepad (UTF-8 with BOM) is still read.
+	os.WriteFile(p, append([]byte{0xEF, 0xBB, 0xBF}, `{"suffix":"_bom","language":"en"}`...), 0o644)
+	if bom := LoadFrom(p).Get(); bom.Suffix != "_bom" || bom.Language != LangEN {
+		t.Fatalf("BOM file ignored: %+v", bom)
+	}
+
 	// A file from an older version: missing keys keep their defaults, legacy download folder migrates.
 	os.WriteFile(p, []byte(`{"suffix":"_x","downloadDir":"E:\\Unduhan"}`), 0o644)
 	old := LoadFrom(p).Get()

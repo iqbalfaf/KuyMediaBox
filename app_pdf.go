@@ -264,8 +264,7 @@ func (a *App) folderTask(source string, out naming.OutputSpec, suffix string, wo
 			if err := os.Rename(files[0], target); err != nil {
 				return queue.Fail(i18n.L("Tidak bisa menyimpan file hasil", "Can't save the output file"), err.Error())
 			}
-			st, _ := os.Stat(target)
-			r.SetOutput(target, st.Size())
+			r.SetOutput(target, fileSize(target))
 			return nil
 		}
 		folder := filepath.Join(dir, base+suffix)

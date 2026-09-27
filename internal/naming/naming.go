@@ -134,21 +134,29 @@ func SanitizeFileName(s string) string {
 		}
 	}
 	out := strings.TrimSpace(b.String())
-	out = strings.TrimRight(out, ". ")
+	if r := []rune(out); len(r) > 150 {
+		out = string(r[:150])
+	}
+	// Windows drops trailing dots and spaces, so the name on disk would differ from ours.
+	out = strings.TrimSpace(strings.TrimRight(out, ". "))
 	if out == "" {
 		out = "file"
 	}
-	upper := strings.ToUpper(out)
-	for _, bad := range []string{"CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "LPT1", "LPT2", "LPT3"} {
-		if upper == bad {
-			out = "_" + out
-		}
-	}
-	if r := []rune(out); len(r) > 150 {
-		out = strings.TrimSpace(string(r[:150]))
+	if reservedNames[strings.ToUpper(out)] {
+		out = "_" + out
 	}
 	return out
 }
+
+// reservedNames are device names Windows doesn't allow as file names.
+var reservedNames = func() map[string]bool {
+	m := map[string]bool{"CON": true, "PRN": true, "AUX": true, "NUL": true}
+	for i := 1; i <= 9; i++ {
+		m[fmt.Sprintf("COM%d", i)] = true
+		m[fmt.Sprintf("LPT%d", i)] = true
+	}
+	return m
+}()
 
 func exists(p string) bool {
 	_, err := os.Stat(p)

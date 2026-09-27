@@ -57,6 +57,26 @@ func Output(ctx context.Context, name string, args ...string) (string, error) {
 	return strings.TrimSpace(stdout.String()), nil
 }
 
+// OutputKeep is Output, but it returns stdout even when the command fails: gallery-dl prints
+// the files it could read and exits with an error code when one of them failed.
+func OutputKeep(ctx context.Context, name string, args ...string) (string, error) {
+	cmd := Command(ctx, name, args...)
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	out := strings.TrimSpace(stdout.String())
+	if err != nil {
+		if ctx.Err() != nil {
+			return out, ctx.Err()
+		}
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return out, errors.New(LastLines(msg, 6))
+		}
+	}
+	return out, err
+}
+
 // Tail keeps the last N lines written to it.
 type Tail struct {
 	mu    sync.Mutex

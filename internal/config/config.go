@@ -2,6 +2,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -314,6 +315,7 @@ func LoadFrom(path string) *Store {
 
 func parse(data []byte) Settings {
 	s := Defaults()
+	data = bytes.TrimPrefix(data, []byte{0xEF, 0xBB, 0xBF}) // edited by hand in Notepad
 	var raw map[string]json.RawMessage
 	if json.Unmarshal(data, &raw) != nil {
 		return s

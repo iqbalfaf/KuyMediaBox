@@ -104,4 +104,10 @@ func TestPageOperations(t *testing.T) {
 	if p, _ := ParsePages("4-, 1", 5); len(p) != 3 {
 		t.Fatalf("open range: %v", p)
 	}
+	// Spaces around the dash still make one range (not "every page").
+	for _, s := range []string{"2 - 4", "2 -4", "2- 4"} {
+		if p, err := ParsePages(s, 10); err != nil || len(p) != 3 || p[0] != 2 || p[2] != 4 {
+			t.Fatalf("%q: %v %v", s, p, err)
+		}
+	}
 }

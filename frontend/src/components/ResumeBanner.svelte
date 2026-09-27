@@ -14,26 +14,28 @@
 
   let busy = $state(false)
 
-  onMount(async () => {
+  async function refresh() {
     try {
       const s = await api.pendingDownloads()
       resume.info = s.items > 0 ? s : null
     } catch {
-      /* nothing to resume */
+      resume.info = null
     }
-  })
+  }
+
+  onMount(refresh)
 
   async function go() {
     busy = true
     try {
       const n = await api.resumePendingDownloads()
-      resume.info = null
       toast(L(`${n} unduhan dilanjutkan — lihat antrian di kiri bawah`, `${n} download${n === 1 ? '' : 's'} resumed — see the queue at the bottom left`), 'ok')
     } catch (e) {
       toast(errText(e), 'err')
-      resume.info = null
     } finally {
       busy = false
+      // Links that couldn't be read now stay listed, to try again or discard.
+      await refresh()
     }
   }
 

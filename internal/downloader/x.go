@@ -91,7 +91,7 @@ func xCollection(ctx context.Context, env Env, link Link) (*Collection, error) {
 			}
 		}()
 	}
-	out, err := proc.Output(ctx, env.GalleryDL, append(args, link.URL)...)
+	out, err := proc.OutputKeep(ctx, env.GalleryDL, append(args, link.URL)...)
 	wg.Wait()
 	if ctx.Err() != nil {
 		return nil, ctx.Err()

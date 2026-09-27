@@ -41,6 +41,16 @@ type flowState struct {
 	seq   int
 	tasks map[string]*flowRun    // task id → run
 	early map[string]earlyFinish // tasks that finished before their run was registered
+	// moving counts runs between two steps: their last task is gone, the next step's tasks
+	// aren't queued yet. The command line must not think everything is done meanwhile.
+	moving int
+}
+
+// flowsBusy reports whether a workflow still has work queued or about to be queued.
+func (a *App) flowsBusy() bool {
+	a.flows.mu.Lock()
+	defer a.flows.mu.Unlock()
+	return len(a.flows.tasks) > 0 || a.flows.moving > 0
 }
 
 type earlyFinish struct {
@@ -268,9 +278,20 @@ func (a *App) onFlowTask(info queue.Info) {
 	run.next = nil
 	failed := run.failed
 	run.failed = 0
-	a.flows.mu.Unlock()
-
 	last := run.step == len(run.wf.Steps)-1
+	advancing := len(next) > 0 && !last
+	if advancing {
+		a.flows.moving++
+	}
+	a.flows.mu.Unlock()
+	if advancing {
+		defer func() {
+			a.flows.mu.Lock()
+			a.flows.moving--
+			a.flows.mu.Unlock()
+		}()
+	}
+
 	switch {
 	case len(next) == 0:
 		msg := info.Message
