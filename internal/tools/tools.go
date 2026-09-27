@@ -64,13 +64,18 @@ var metas = map[string]meta{
 	GalleryDL:   {"gallery-dl", [2]string{"Membaca foto dari post TikTok & Facebook", "Reads pictures from TikTok & Facebook posts"}, [2]string{"foto TikTok & Facebook", "TikTok & Facebook pictures"}, []string{"gallery-dl.exe"}},
 	LibreOffice: {"LibreOffice", [2]string{"Opsional: konversi Word, Excel & PowerPoint ↔ PDF bila Microsoft Office tidak terpasang (±375 MB)", "Optional: Word, Excel & PowerPoint ↔ PDF when Microsoft Office isn't installed (±375 MB)"}, [2]string{"konversi dokumen Office di menu PDF", "Office document conversion in the PDF tools"}, []string{"soffice.com"}},
 	VeraPDF:     {"veraPDF", [2]string{"Opsional: validasi resmi PDF/A (Java dipasang otomatis bila belum ada, ±130 MB)", "Optional: official PDF/A validation (Java is installed too when missing, ±130 MB)"}, [2]string{"Validasi PDF/A di menu PDF", "PDF/A validation in the PDF tools"}, []string{"verapdf.bat"}},
+	Whisper:     {"Whisper", [2]string{"Opsional: mengubah ucapan jadi subtitle, offline (±9 MB + model)", "Optional: turns speech into subtitles, offline (±9 MB + a model)"}, [2]string{"Subtitle otomatis", "Automatic subtitles"}, []string{"whisper-cli.exe"}},
+	RealESRGAN:  {"Real-ESRGAN", [2]string{"Opsional: memperbesar gambar dengan AI memakai kartu grafis (±45 MB)", "Optional: AI picture upscaling on the graphics card (±45 MB)"}, [2]string{"Perbesar AI di menu Gambar", "AI upscaling in the Image page"}, []string{"realesrgan-ncnn-vulkan.exe"}},
+	OnnxRuntime: {"ONNX Runtime", [2]string{"Opsional: mesin AI untuk hapus latar belakang (±80 MB unduhan, 16 MB terpasang)", "Optional: AI engine for background removal (±80 MB download, 16 MB installed)"}, [2]string{"Hapus latar di menu Gambar", "Background removal in the Image page"}, []string{"onnxruntime.dll"}},
+	Oxipng:      {"oxipng", [2]string{"Opsional: kompres PNG tanpa mengurangi kualitas (±1 MB)", "Optional: lossless PNG compression (±1 MB)"}, [2]string{"Kompres PNG di menu Gambar", "PNG compression in the Image page"}, []string{"oxipng.exe"}},
+	Pngquant:    {"pngquant", [2]string{"Opsional: kompres PNG jauh lebih kecil (palet warna, ±1 MB)", "Optional: much smaller PNGs (colour palette, ±1 MB)"}, [2]string{"Kompres PNG di menu Gambar", "PNG compression in the Image page"}, []string{"pngquant.exe"}},
 }
 
 // Order is the display order.
-var Order = []string{FFmpeg, YtDlp, JSRuntime, SpotDL, GalleryDL, LibreOffice, VeraPDF}
+var Order = []string{FFmpeg, YtDlp, JSRuntime, SpotDL, GalleryDL, Whisper, RealESRGAN, OnnxRuntime, Oxipng, Pngquant, LibreOffice, VeraPDF}
 
 // optional tools are not reported as missing.
-var optional = map[string]bool{LibreOffice: true, VeraPDF: true}
+var optional = map[string]bool{LibreOffice: true, VeraPDF: true, Whisper: true, RealESRGAN: true, OnnxRuntime: true, Oxipng: true, Pngquant: true}
 
 // Manager keeps the current status of every tool.
 type Manager struct {
@@ -194,6 +199,15 @@ func (m *Manager) locate(id string) (path, source string) {
 			}
 		}
 	}
+	if sub := subdirs[id]; sub != "" {
+		// Tools with DLLs or models live in their own folder, never on PATH.
+		for _, exe := range metas[id].exes {
+			if p := filepath.Join(ToolDir(id), exe); fileExists(p) {
+				return p, "downloaded"
+			}
+		}
+		return "", ""
+	}
 	for _, exe := range metas[id].exes {
 		for _, c := range candidateDirs() {
 			p := filepath.Join(c.dir, exe)
@@ -314,6 +328,17 @@ func readVersion(ctx context.Context, id, path string) (string, error) {
 		return firstLine(out), nil
 	case VeraPDF:
 		return veraVersion(path)
+	case Whisper, RealESRGAN, OnnxRuntime:
+		return readVersionFile(id), nil
+	case Oxipng, Pngquant:
+		out, err := proc.Output(ctx, path, "--version")
+		if err != nil {
+			return "", err
+		}
+		if v := reVersion.FindString(out); v != "" {
+			return v, nil
+		}
+		return firstLine(out), nil
 	case SpotDL, GalleryDL:
 		out, err := proc.Output(ctx, path, "--version")
 		if err != nil {

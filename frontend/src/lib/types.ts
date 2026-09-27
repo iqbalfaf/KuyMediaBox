@@ -1,5 +1,5 @@
-export type Kind = 'image' | 'video' | 'audio' | 'download' | 'pdf'
-export type Page = 'image' | 'video' | 'audio' | 'download' | 'pdf' | 'history' | 'settings'
+export type Kind = 'image' | 'video' | 'audio' | 'download' | 'pdf' | 'subtitle'
+export type Page = 'image' | 'video' | 'audio' | 'subtitle' | 'flows' | 'download' | 'pdf' | 'history' | 'settings'
 
 export type TaskStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled' | 'skipped'
 
@@ -45,13 +45,15 @@ export interface FileItem {
   subCodec: string
   subFile: string
   tags: Record<string, string> | null
+  cue: string
+  cueTracks: number
   error: string
 }
 
 export type Lang = "id" | "en"
 
 export type OutputMode = 'default' | 'subfolder' | 'same' | 'custom'
-export type OutputKind = 'image' | 'video' | 'audio' | 'download' | 'pdf'
+export type OutputKind = 'image' | 'video' | 'audio' | 'download' | 'pdf' | 'subtitle'
 
 export interface OutputSpec {
   mode: OutputMode
@@ -75,7 +77,75 @@ export interface ImageOptions {
   flipH: boolean
   flipV: boolean
   crop: string
+  cropBox: CropBox
   watermark: ImageWatermark
+  aiUpscale: 0 | 2 | 3 | 4
+  aiModel: 'photo' | 'anime'
+  removeBg: boolean
+  bgModel: 'general' | 'people' | 'fast'
+  bgMask: boolean
+  pngCompress: '' | 'lossless' | 'small'
+}
+
+export interface SlideOptions {
+  format: 'gif' | 'webp' | 'mp4'
+  seconds: number
+  size: number
+  ratio: '' | '1:1' | '16:9' | '9:16' | '4:5'
+  fit: 'contain' | 'cover' | 'blur'
+  background: string
+  fade: number
+  music: string
+}
+
+export interface CollageJob {
+  layout: { cols: number; width: number; gap: number; cell: string; fit: 'cover' | 'contain'; background: string; radius: number }
+  format: 'jpg' | 'png' | 'webp'
+  quality: number
+}
+
+export interface SubscriptionInfo {
+  id: string
+  url: string
+  title: string
+  source: string
+  type: string
+  thumbnail: string
+  mode: 'video' | 'audio'
+  tabs: string[]
+  everyHours: number
+  enabled: boolean
+  lastCheck: number
+  nextCheck: number
+  lastNew: number
+  totalNew: number
+  lastError: string
+  checking: boolean
+}
+
+export interface PendingSummary {
+  batches: number
+  items: number
+  titles: string[]
+}
+
+export interface ModelStatus {
+  kind: 'whisper' | 'bgremove'
+  id: string
+  sizeMB: number
+  installed: boolean
+  busy: boolean
+  progress: number
+  error: string
+}
+
+export interface SubtitleJob {
+  model: string
+  language: string
+  translate: boolean
+  formats: string[]
+  maxLen: number
+  video: 'none' | 'embed' | 'burn'
 }
 
 export interface ImageWatermark {
@@ -114,6 +184,42 @@ export interface VideoOptions {
   flipH: boolean
   flipV: boolean
   subtitles: 'none' | 'embed' | 'burn'
+  speed: number
+  reverse: boolean
+  crop: CropBox
+  frame: '' | '9:16' | '1:1' | '4:5' | '16:9' | '4:3'
+  frameFit: 'crop' | 'blur' | 'pad'
+  stabilize: boolean
+  denoise: Denoise
+  music: VideoMusic
+  watermark: ImageWatermark
+}
+
+export interface SheetOptions {
+  cols: number
+  rows: number
+  width: number
+  format: 'jpg' | 'png'
+  times: boolean
+}
+
+export type Denoise = 'off' | 'light' | 'medium' | 'strong'
+
+/** Manual crop in fractions (0..1) of the rotated frame; w = 0 means none. */
+export interface CropBox {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface VideoMusic {
+  file: string
+  mode: 'mix' | 'replace'
+  volume: number
+  original: number
+  duck: boolean
+  loop: boolean
 }
 
 export interface AudioOptions {
@@ -133,6 +239,7 @@ export interface AudioOptions {
   removeSilence: boolean
   speed: number
   pitch: number
+  denoise: Denoise
 }
 
 export interface AudioTags {
@@ -164,15 +271,17 @@ export interface Settings {
   spotifyTemplate: string
   spotifyLogin: boolean
   clipboardWatch: boolean
+  tray: boolean
   downloadLimitKB: number
   watch: WatchRule[]
+  workflows: Workflow[]
   toolPaths: Record<string, string>
 }
 
 export interface WatchRule {
   id: string
   dir: string
-  kind: 'image' | 'video' | 'audio'
+  kind: 'image' | 'video' | 'audio' | 'flow'
   options: any
   enabled: boolean
 }
@@ -199,7 +308,7 @@ export interface AfterQueue {
 }
 
 export interface OpenRequest {
-  page: '' | 'image' | 'video' | 'audio' | 'pdf'
+  page: '' | 'image' | 'video' | 'audio' | 'pdf' | 'subtitle'
   paths: string[]
 }
 
@@ -247,11 +356,11 @@ export interface Capabilities {
   encoders: Record<string, boolean>
 }
 
-export type Source = 'youtube' | 'spotify' | 'tiktok' | 'instagram' | 'facebook' | 'x' | 'pinterest' | 'other'
+export type Source = 'youtube' | 'spotify' | 'tiktok' | 'instagram' | 'facebook' | 'x' | 'pinterest' | 'soundcloud' | 'twitch' | 'reddit' | 'bilibili' | 'other'
 
 export interface Link {
   source: Source | ''
-  type: 'video' | 'playlist' | 'channel' | 'track' | 'album' | 'artist' | 'post' | 'profile' | 'board' | 'search' | 'unknown'
+  type: 'video' | 'playlist' | 'channel' | 'track' | 'album' | 'artist' | 'post' | 'profile' | 'board' | 'search' | 'story' | 'unknown'
   url: string
   id: string
   photo: boolean
@@ -303,6 +412,9 @@ export interface DownloadOptions {
   sectionEnd: string
   sponsorBlock: 'off' | 'mark' | 'remove'
   playlist: boolean
+  lyrics: boolean
+  /** Workflow run on every downloaded file ('' = none). */
+  workflow: string
 }
 
 export interface JobRef {
@@ -391,8 +503,61 @@ export interface PdfOptions {
   separate: boolean
   html: { pageSize: string; orientation: string; margin: string; width: number; onePage: boolean; background: boolean }
   images: { pageSize: string; orientation: string; margin: string; quality: number; combine: boolean }
-  digisign: { certFile: string; name: string; reason: string; location: string; contact: string; visible: boolean; position: string; page: string }
+  digisign: { certFile: string; name: string; reason: string; location: string; contact: string; visible: boolean; position: string; page: string; tsa: string }
   pdfaCheck: { flavour: string }
+  headerFooter: {
+    topLeft: string
+    topCenter: string
+    topRight: string
+    bottomLeft: string
+    bottomCenter: string
+    bottomRight: string
+    size: number
+    color: string
+    bold: boolean
+    margin: number
+    line: boolean
+    pages: string
+    skipFirst: boolean
+    mirror: boolean
+  }
+  nup: { mode: 'nup' | 'booklet'; n: number; paper: string; border: boolean; margin: number }
+  semicolon: boolean
+}
+
+export interface PdfMeta {
+  title: string
+  author: string
+  subject: string
+  keywords: string
+  creator: string
+}
+
+export interface PdfBookmark {
+  title: string
+  page: number
+  kids: PdfBookmark[]
+}
+
+export interface PdfDetails {
+  meta: PdfMeta
+  bookmarks: PdfBookmark[]
+  pages: number
+}
+
+export interface PdfFormField {
+  id: string
+  name: string
+  kind: 'text' | 'date' | 'check' | 'radio' | 'combo' | 'list'
+  value: string
+  values: string[] | null
+  checked: boolean
+  options: string[] | null
+  multiline: boolean
+  multi: boolean
+  locked: boolean
+  page: number
+  format: string
 }
 
 /** One page of an organised document. src -1 = blank page. */
@@ -425,4 +590,29 @@ export interface EditItem {
   opacity: number
   angle: number
   imageUrl: string
+}
+
+/** One step of a workflow: a module with the settings it had when the step was saved. */
+export interface FlowStep {
+  kind: 'image' | 'video' | 'audio' | 'subtitle' | 'pdf'
+  /** PDF tool id. */
+  tool: string
+  /** Preset id the step was made from ('current' = the page settings). */
+  preset: string
+  label: string
+  job: any
+}
+
+export interface Workflow {
+  id: string
+  name: string
+  steps: FlowStep[]
+}
+
+/** A file that went through a workflow. */
+export interface FlowResult {
+  workflow: string
+  input: string
+  output: string
+  error: string
 }

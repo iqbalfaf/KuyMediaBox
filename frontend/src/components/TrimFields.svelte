@@ -25,13 +25,27 @@
 
 <script lang="ts">
   import { L } from '../lib/i18n.svelte'
+  import Icon from './Icon.svelte'
 
-  let { start = $bindable(), end = $bindable(), label = '' }: { start: string; end: string; label?: string } = $props()
+  let {
+    start = $bindable(),
+    end = $bindable(),
+    label = '',
+    onpick,
+    pickHint = '',
+  }: { start: string; end: string; label?: string; onpick?: () => void; pickHint?: string } = $props()
   const err = $derived(trimError(start, end))
 </script>
 
 <div class="trim">
-  {#if label}<span class="label">{label}</span>{/if}
+  {#if label || onpick}
+    <div class="top">
+      {#if label}<span class="label">{label}</span>{/if}
+      {#if onpick}
+        <button class="pick" onclick={onpick} title={pickHint}><Icon name="scissors" size={13} />{L('Pilih di pratinjau', 'Pick in preview')}</button>
+      {/if}
+    </div>
+  {/if}
   <div class="fields">
     <label>
       <span>{L('Mulai', 'Start')}</span>
@@ -58,6 +72,26 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+  .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-text-2);
+  }
+  .pick:hover {
+    text-decoration: underline;
   }
   .fields {
     display: flex;

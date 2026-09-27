@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -21,13 +22,25 @@ import (
 
 // ---- History (G-11) --------------------------------------------------------------------
 
+// markProduced remembers a file the app wrote besides a task's main output.
+func (a *App) markProduced(path string) {
+	a.producedMu.Lock()
+	a.produced[strings.ToLower(filepath.Clean(path))] = true
+	a.producedMu.Unlock()
+}
+
 // recordFinished stores a finished task in the history and remembers its output (so a
 // watched folder never picks up the app's own results).
 func (a *App) recordFinished(info queue.Info) {
+	a.pending.finished(info)
 	if info.Output != "" {
 		a.producedMu.Lock()
 		a.produced[strings.ToLower(filepath.Clean(info.Output))] = true
 		a.producedMu.Unlock()
+	}
+	a.onFlowTask(info)
+	if info.Output != "" && inFlowTemp(info.Output) {
+		return // an in-between workflow result, removed when the workflow is done
 	}
 	e := history.Entry{
 		ID: info.ID + "-" + time.Now().Format("150405.000"), Time: info.Finished, Started: info.Started, Kind: info.Kind,
@@ -220,6 +233,7 @@ type OpenRequest struct {
 type launchArgs struct {
 	mu    sync.Mutex
 	paths []string
+	links []string // kuymediabox:// links
 }
 
 func existingPaths(args []string) []string {
@@ -279,6 +293,9 @@ func collectLimited(kind string, paths []string, limit int) []string {
 
 // openFromExplorer handles files sent to an already running window.
 func (a *App) openFromExplorer(args []string) {
+	if links := linksFromArgs(args); len(links) > 0 && a.ctx != nil {
+		a.emit("links:open", links)
+	}
 	paths := existingPaths(args)
 	if len(paths) == 0 || a.ctx == nil {
 		return
@@ -373,6 +390,10 @@ func (a *App) watchList(r config.WatchRule) []string {
 		return nil
 	}
 	suffix := strings.ToLower(a.cfg.Get().Suffix)
+	kind := r.Kind
+	if kind == "flow" {
+		kind = a.flowInputKind(r)
+	}
 	var out []string
 	for _, e := range entries {
 		if e.IsDir() {
@@ -384,7 +405,7 @@ func (a *App) watchList(r config.WatchRule) []string {
 		if strings.HasPrefix(name, ".") || strings.Contains(low, ".kmb-part") || (suffix != "" && strings.HasSuffix(base, suffix)) {
 			continue
 		}
-		if !acceptWatch(r.Kind, filepath.Ext(name)) {
+		if !acceptWatch(kind, filepath.Ext(name)) {
 			continue
 		}
 		out = append(out, filepath.Join(r.Dir, name))
@@ -401,8 +422,27 @@ func acceptWatch(kind, ext string) bool {
 		return videoExts[ext]
 	case queue.KindAudio:
 		return audioExts[ext]
+	case queue.KindSubtitle:
+		return videoExts[ext] || audioExts[ext]
+	case kindPDF:
+		return ext == ".pdf"
 	}
 	return false
+}
+
+// flowWatch is the options of a watched folder that feeds a workflow.
+type flowWatch struct {
+	Workflow string `json:"workflow"`
+}
+
+// flowInputKind is the module of the first step of a watched folder's workflow.
+func (a *App) flowInputKind(r config.WatchRule) string {
+	var o flowWatch
+	_ = json.Unmarshal(r.Options, &o)
+	if wf, err := a.workflow(o.Workflow); err == nil {
+		return wf.Steps[0].Kind
+	}
+	return ""
 }
 
 func (a *App) pollWatch() {

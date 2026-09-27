@@ -33,10 +33,11 @@ func winAnsiOK(s string) bool {
 
 // uniFont is one embedded font on a page: its resource name and subset.
 type uniFont struct {
-	res  string
-	face *fonts.Face
-	text strings.Builder
-	sub  *fonts.Subset
+	res    string
+	face   *fonts.Face
+	text   strings.Builder
+	sub    *fonts.Subset
+	shaped map[string]fonts.Shaped // lines of complex scripts (Arabic, Indic, …)
 }
 
 // collectUnicode picks fonts for the texts that need one and builds their subsets.
@@ -48,13 +49,27 @@ func (b *overlayBuilder) collectUnicode(items []Item) error {
 		face := fonts.For(it.Text, it.Bold)
 		uf := b.ufonts[face.Name]
 		if uf == nil {
-			uf = &uniFont{res: fmt.Sprintf("KmbU%d", len(b.ufonts)), face: face}
+			uf = &uniFont{res: fmt.Sprintf("KmbU%d", len(b.ufonts)), face: face, shaped: map[string]fonts.Shaped{}}
 			b.ufonts[face.Name] = uf
 		}
 		uf.text.WriteString(it.Text)
+		for _, line := range strings.Split(strings.ReplaceAll(it.Text, "\r\n", "\n"), "\n") {
+			if _, done := uf.shaped[line]; done || !fonts.NeedsShaping(line) {
+				continue
+			}
+			if sh, err := fonts.Shape(face, line); err == nil {
+				uf.shaped[line] = sh
+			}
+		}
 	}
 	for _, uf := range b.ufonts {
-		sub, err := fonts.MakeSubset(uf.face, uf.text.String())
+		var extra []uint16
+		for _, sh := range uf.shaped {
+			for _, g := range sh.Glyphs {
+				extra = append(extra, g.GID)
+			}
+		}
+		sub, err := fonts.MakeSubsetWith(uf.face, uf.text.String(), extra)
 		if err != nil {
 			return err
 		}
@@ -142,7 +157,7 @@ func (uf *uniFont) fontDict(ctx *model.Context) (*types.IndirectRef, error) {
 		return nil, err
 	}
 
-	cmap, err := ctx.XRefTable.NewStreamDictForBuf([]byte(toUnicode(sub)))
+	cmap, err := ctx.XRefTable.NewStreamDictForBuf([]byte(toUnicode(sub, uf.shapedText())))
 	if err != nil {
 		return nil, err
 	}
@@ -164,18 +179,54 @@ func (uf *uniFont) fontDict(ctx *model.Context) (*types.IndirectRef, error) {
 	return ctx.XRefTable.IndRefForNewObject(f)
 }
 
+// shapedText maps the subset glyphs of shaped lines to the characters they stand for.
+func (uf *uniFont) shapedText() map[uint16]string {
+	out := map[uint16]string{}
+	for _, sh := range uf.shaped {
+		for _, g := range sh.Glyphs {
+			if nw, ok := uf.sub.Remap[g.GID]; ok && g.Text != "" && out[nw] == "" {
+				out[nw] = g.Text
+			}
+		}
+	}
+	return out
+}
+
+// shapedLine draws a shaped line glyph by glyph (each has its own offset) starting at x, y.
+// ActualText gives readers the text in logical order for copying and searching (the glyphs
+// of right-to-left and Indic text are stored in visual order).
+func (uf *uniFont) shapedLine(sh fonts.Shaped, line string, x, y, size float64) string {
+	var sb strings.Builder
+	sb.WriteString("/Span <</ActualText <FEFF")
+	for _, r := range line {
+		sb.WriteString(utf16Hex(r))
+	}
+	sb.WriteString(">>> BDC\n")
+	for _, g := range sh.Glyphs {
+		fmt.Fprintf(&sb, "1 0 0 1 %s %s Tm <%04X> Tj\n", num(x+g.X*size/1000), num(y+g.Y*size/1000), uf.sub.Remap[g.GID])
+	}
+	sb.WriteString("EMC\n")
+	return sb.String()
+}
+
 // toUnicode maps glyph ids back to text so the result can be searched and copied.
-func toUnicode(sub *fonts.Subset) string {
+func toUnicode(sub *fonts.Subset, shaped map[uint16]string) string {
 	type pair struct {
 		gid uint16
-		r   rune
+		s   string
 	}
 	var pairs []pair
 	seen := map[uint16]bool{}
 	for r, g := range sub.GID {
 		if g != 0 && !seen[g] {
 			seen[g] = true
-			pairs = append(pairs, pair{g, r})
+			pairs = append(pairs, pair{g, string(r)})
+		}
+	}
+	for g, s := range shaped {
+		if g != 0 && !seen[g] {
+			seen[g] = true
+			pairs = append(pairs, pair{g, s})
 		}
 	}
 	sort.Slice(pairs, func(i, j int) bool { return pairs[i].gid < pairs[j].gid })
@@ -188,8 +239,11 @@ func toUnicode(sub *fonts.Subset) string {
 		chunk := pairs[i:min(i+100, len(pairs))]
 		fmt.Fprintf(&sb, "%d beginbfchar\n", len(chunk))
 		for _, p := range chunk {
-			u := utf16Hex(p.r)
-			fmt.Fprintf(&sb, "<%04X> <%s>\n", p.gid, u)
+			var u strings.Builder
+			for _, r := range p.s {
+				u.WriteString(utf16Hex(r))
+			}
+			fmt.Fprintf(&sb, "<%04X> <%s>\n", p.gid, u.String())
 		}
 		sb.WriteString("endbfchar\n")
 	}

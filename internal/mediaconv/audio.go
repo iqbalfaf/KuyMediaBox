@@ -57,11 +57,12 @@ func (o *AudioOptions) Normalize() {
 	o.Pitch = math.Max(-12, math.Min(12, math.Round(o.Pitch)))
 	o.FadeIn = math.Max(0, math.Min(o.FadeIn, 60))
 	o.FadeOut = math.Max(0, math.Min(o.FadeOut, 60))
+	o.Denoise = normalizeDenoise(o.Denoise)
 }
 
 // needsEncode reports whether the options change the sound (so it can't be copied).
 func (o AudioOptions) needsEncode() bool {
-	return o.NormVolume || o.FadeIn > 0 || o.FadeOut > 0 || o.Speed != 1 || o.Pitch != 0 || o.Channels != "source" || o.SampleRate != "source"
+	return o.NormVolume || o.FadeIn > 0 || o.FadeOut > 0 || o.Speed != 1 || o.Pitch != 0 || o.Channels != "source" || o.SampleRate != "source" || o.Denoise != "off"
 }
 
 // AudioArgs builds ffmpeg arguments to convert the first audio stream of in → out.
@@ -103,6 +104,10 @@ func soundFilters(o AudioOptions, srcRate, rate int, dur float64) []string {
 		f = append(f, tempoChain(o.Speed/p)...)
 	} else {
 		f = append(f, tempoChain(o.Speed)...)
+	}
+	// Noise reduction before loudness: loudnorm would otherwise raise the hiss too.
+	if d := DenoiseFilter(o.Denoise); d != "" {
+		f = append(f, d)
 	}
 	if o.NormVolume {
 		f = append(f, fmt.Sprintf("loudnorm=I=%s:TP=-1.5:LRA=11", strconv.FormatFloat(o.Loudness, 'f', -1, 64)))

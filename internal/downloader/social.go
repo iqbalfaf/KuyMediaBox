@@ -57,6 +57,30 @@ func AnalyzeSocial(ctx context.Context, env Env, link Link) (*Collection, error)
 	var col *Collection
 	var err error
 	switch {
+	case link.Type == TypeStory:
+		// Stories and highlights are only shown to logged-in users.
+		if env.CookiesBrowser == "" && env.CookiesFile == "" {
+			return nil, needLogin("Instagram", env, "")
+		}
+		col, err = ytPost(ctx, env, link)
+		if err == nil {
+			col.Title = firstNonEmpty(col.uploader, col.Title)
+			if strings.Contains(link.URL, "/highlights/") {
+				col.Title = i18n.F("Sorotan %s", "Highlight %s", col.Title)
+			} else {
+				col.Title = i18n.F("Story %s", "Story %s", col.Title)
+			}
+		}
+	case link.Source == SourceReddit:
+		// A Reddit post is a video (yt-dlp) or pictures/a gallery (gallery-dl).
+		col, err = ytPost(ctx, env, link)
+		if err != nil || !hasVideo(col) {
+			if c, rerr := redditPictures(ctx, link); rerr == nil {
+				col, err = c, nil
+			} else if err == nil {
+				err = rerr
+			}
+		}
 	case link.Source == SourcePinterest:
 		col, err = pinterestCollection(ctx, env, link)
 	case link.Source == SourceX:
@@ -93,6 +117,18 @@ func AnalyzeSocial(ctx context.Context, env Env, link Link) (*Collection, error)
 		col.Thumbnail = col.Entries[0].Thumbnail
 	}
 	return col, nil
+}
+
+func hasVideo(col *Collection) bool {
+	if col == nil {
+		return false
+	}
+	for _, e := range col.Entries {
+		if e.Kind != KindImage {
+			return true
+		}
+	}
+	return false
 }
 
 // ytPost reads a single post (or an Instagram carousel) with yt-dlp.
@@ -353,7 +389,9 @@ func errGalleryMissing() error {
 func unsupportedSocial(source string) error {
 	switch source {
 	case SourceInstagram:
-		return queue.Fail(i18n.L("Link Instagram ini belum didukung. Gunakan link post atau reel (story & profil butuh login).", "This Instagram link isn't supported yet. Use a post or reel link (stories & profiles need a login)."), "")
+		return queue.Fail(i18n.L("Link Instagram ini belum didukung. Gunakan link post, reel, story, atau sorotan (story & sorotan butuh login).", "This Instagram link isn't supported yet. Use a post, reel, story or highlight link (stories & highlights need a login)."), "")
+	case SourceReddit:
+		return queue.Fail(i18n.L("Link Reddit ini belum didukung. Gunakan link post (…/comments/…) atau galeri.", "This Reddit link isn't supported yet. Use a post (…/comments/…) or gallery link."), "")
 	case SourceFacebook:
 		return queue.Fail(i18n.L("Link Facebook ini belum didukung. Gunakan link video, reel, atau foto.", "This Facebook link isn't supported yet. Use a video, reel or photo link."), "")
 	case SourcePinterest:

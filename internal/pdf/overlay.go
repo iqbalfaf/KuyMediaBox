@@ -150,7 +150,13 @@ func pdfString(b []byte) string {
 // otherwise the Windows font that will be embedded for it.
 func TextWidth(text string, size float64, bold bool) float64 {
 	if !winAnsiOK(text) {
-		return fonts.For(text, bold).TextWidth(text, size)
+		face := fonts.For(text, bold)
+		if fonts.NeedsShaping(text) {
+			if sh, err := fonts.Shape(face, text); err == nil {
+				return sh.Width * size / 1000
+			}
+		}
+		return face.TextWidth(text, size)
 	}
 	name := "Helvetica"
 	if bold {
@@ -321,7 +327,13 @@ func (b *overlayBuilder) text(it Item) error {
 	}
 	for i, line := range lines {
 		var w float64
+		sh, shaped := fonts.Shaped{}, false
 		if uf != nil {
+			sh, shaped = uf.shaped[line]
+		}
+		if shaped {
+			w = sh.Width * size / 1000
+		} else if uf != nil {
 			w = uf.sub.Width(line, size)
 		} else {
 			w = TextWidth(line, size, it.Bold)
@@ -338,6 +350,10 @@ func (b *overlayBuilder) text(it Item) error {
 			scale = it.FitW / w * 100
 		}
 		fmt.Fprintf(&b.buf, "%s Tz\n", num(scale))
+		if shaped {
+			b.buf.WriteString(uf.shapedLine(sh, line, x, -float64(i)*size*1.2, size))
+			continue
+		}
 		fmt.Fprintf(&b.buf, "1 0 0 1 %s %s Tm\n", num(x), num(-float64(i)*size*1.2))
 		if uf != nil {
 			fmt.Fprintf(&b.buf, "%s Tj\n", uf.hexGlyphs(line))

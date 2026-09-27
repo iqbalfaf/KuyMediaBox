@@ -127,25 +127,29 @@ type PdfJob struct {
 	ID       string `json:"id"`
 	Path     string `json:"path"` // file path, or a web address for the HTML tool
 	Password string `json:"password"`
+	OutDir   string `json:"outDir,omitempty"` // result folder for this file (workflows, command line)
 }
 
 // PdfOptions carries the settings of every PDF tool; each tool reads its own part.
 type PdfOptions struct {
-	Compress  pdf.CompressOptions    `json:"compress"`
-	Rotate    int                    `json:"rotate"`
-	Protect   pdf.ProtectOptions     `json:"protect"`
-	Watermark pdf.WatermarkOptions   `json:"watermark"`
-	Numbers   pdf.NumberOptions      `json:"numbers"`
-	Export    pdf.ImageExportOptions `json:"export"`
-	OCR       pdf.OCROptions         `json:"ocr"`
-	Crop      pdf.CropOptions        `json:"crop"`
-	Split     pdf.SplitOptions       `json:"split"`
-	Pages     string                 `json:"pages"`    // remove / extract selection
-	Separate  bool                   `json:"separate"` // extract: one file per page
-	HTML      pdf.HTMLOptions        `json:"html"`
-	Images    pdf.ImagesOptions      `json:"images"`
-	DigiSign  pdf.DigitalSignOptions `json:"digisign"`
-	PdfaCheck PdfaCheckOptions       `json:"pdfaCheck"`
+	Compress  pdf.CompressOptions     `json:"compress"`
+	Rotate    int                     `json:"rotate"`
+	Protect   pdf.ProtectOptions      `json:"protect"`
+	Watermark pdf.WatermarkOptions    `json:"watermark"`
+	Numbers   pdf.NumberOptions       `json:"numbers"`
+	Export    pdf.ImageExportOptions  `json:"export"`
+	OCR       pdf.OCROptions          `json:"ocr"`
+	Crop      pdf.CropOptions         `json:"crop"`
+	Split     pdf.SplitOptions        `json:"split"`
+	Pages     string                  `json:"pages"`    // remove / extract selection
+	Separate  bool                    `json:"separate"` // extract: one file per page
+	HTML      pdf.HTMLOptions         `json:"html"`
+	Images    pdf.ImagesOptions       `json:"images"`
+	DigiSign  pdf.DigitalSignOptions  `json:"digisign"`
+	PdfaCheck PdfaCheckOptions        `json:"pdfaCheck"`
+	Header    pdf.HeaderFooterOptions `json:"headerFooter"`
+	NUp       pdf.NUpOptions          `json:"nup"`
+	Semicolon bool                    `json:"semicolon"` // CSV export: ; instead of ,
 }
 
 // PdfaCheckOptions are the settings of the PDF/A validation tool.
@@ -161,8 +165,9 @@ var pdfSuffix = map[string][2]string{
 	"crop": {"_dipotong", "_cropped"}, "remove": {"_dikurangi", "_pages-removed"}, "extract": {"_ekstrak", "_extracted"},
 	"organize": {"_disusun", "_organized"}, "edit": {"_diedit", "_edited"}, "sign": {"_ttd", "_signed"},
 	"redact": {"_disensor", "_redacted"}, "merge": {"_gabungan", "_merged"}, "split": {"_pisah", "_split"},
-	"digisign": {"_ttd-digital", "_digitally-signed"},
-	"pdf2img":  {"_gambar", "_images"},
+	"digisign":     {"_ttd-digital", "_digitally-signed"},
+	"headerfooter": {"_header", "_header"}, "nup": {"_nup", "_n-up"}, "booklet": {"_buklet", "_booklet"}, "flatten": {"_datar", "_flattened"},
+	"pdf2img": {"_gambar", "_images"},
 }
 
 func (a *App) suffixFor(tool string) string {
@@ -313,6 +318,10 @@ var pdfVerb = map[string][2]string{
 	"protect": {"Mengunci…", "Locking…"}, "unlock": {"Membuka kunci…", "Unlocking…"}, "split": {"Memisahkan…", "Splitting…"},
 	"merge": {"Menggabungkan…", "Merging…"}, "html": {"Membuka halaman…", "Loading the page…"}, "redact": {"Menyensor…", "Redacting…"},
 	"digisign": {"Menandatangani…", "Signing…"}, "pdfacheck": {"Memvalidasi dengan veraPDF…", "Validating with veraPDF…"},
+	"headerfooter": {"Menambah header & footer…", "Adding header & footer…"}, "nup": {"Menyusun halaman…", "Arranging pages…"},
+	"booklet": {"Menyusun buklet…", "Arranging the booklet…"}, "flatten": {"Meratakan…", "Flattening…"},
+	"pdf2txt": {"Mengambil teks…", "Extracting text…"}, "pdf2md": {"Mengambil teks…", "Extracting text…"}, "pdf2csv": {"Membaca tabel…", "Reading tables…"},
+	"meta": {"Menyimpan properti…", "Saving properties…"}, "form": {"Mengisi formulir…", "Filling the form…"},
 }
 
 func verb(tool string) string {
@@ -325,6 +334,7 @@ func verb(tool string) string {
 // StartPdf queues a per-file PDF tool. secret is the certificate password of the digital
 // signature tool (never stored).
 func (a *App) StartPdf(tool string, items []PdfJob, o PdfOptions, secret string) ([]JobRef, error) {
+	a.waitTools()
 	if len(items) == 0 {
 		return nil, errors.New(i18n.L("Tambahkan file dulu", "Add files first"))
 	}
@@ -372,6 +382,7 @@ func (a *App) StartPdf(tool string, items []PdfJob, o PdfOptions, secret string)
 		if err != nil {
 			return nil, err
 		}
+		out = itemOut(out, it.OutDir)
 		if source == "" {
 			source = filepath.Join(out.Dir, pdf.URLName(it.Path)+".html")
 		}
@@ -441,6 +452,25 @@ func (a *App) pdfRun(tool string, in pdf.Input, source string, out naming.Output
 	case "watermark":
 		return same(func(ctx context.Context, tmp string, r queue.Reporter) error {
 			return pdf.Watermark(in, o.Watermark, tmp)
+		}), nil
+	case "headerfooter":
+		return same(func(ctx context.Context, tmp string, r queue.Reporter) error {
+			return pdf.AddHeaderFooter(in, o.Header, tmp)
+		}), nil
+	case "nup", "booklet":
+		n := o.NUp
+		n.Mode = map[bool]string{true: "booklet", false: "nup"}[tool == "booklet"]
+		return same(func(ctx context.Context, tmp string, r queue.Reporter) error { return pdf.NUp(in, n, tmp) }), nil
+	case "flatten":
+		return same(func(ctx context.Context, tmp string, r queue.Reporter) error { return pdf.Flatten(ctx, in, tmp) }), nil
+	case "pdf2txt", "pdf2md":
+		ext := map[bool]string{true: "md", false: "txt"}[tool == "pdf2md"]
+		return a.fileTask(source, out, suffix, ext, func(ctx context.Context, tmp string, r queue.Reporter) error {
+			return pdf.PDFToText(ctx, in, tool == "pdf2md", tmp, progress(r))
+		}), nil
+	case "pdf2csv":
+		return a.fileTask(source, out, suffix, "csv", func(ctx context.Context, tmp string, r queue.Reporter) error {
+			return pdf.PDFToCSV(ctx, in, o.Semicolon, tmp, progress(r))
 		}), nil
 	case "numbers":
 		return same(func(ctx context.Context, tmp string, r queue.Reporter) error {

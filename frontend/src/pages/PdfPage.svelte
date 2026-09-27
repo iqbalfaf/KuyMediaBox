@@ -8,6 +8,8 @@
   import PagesTool from './pdf/PagesTool.svelte'
   import EditorTool from './pdf/EditorTool.svelte'
   import CompareTool from './pdf/CompareTool.svelte'
+  import MetaTool from './pdf/MetaTool.svelte'
+  import FormTool from './pdf/FormTool.svelte'
   import { categories, pdfTools, toolById } from '../lib/pdfTools'
   import { initPdf, pdfNav } from '../lib/stores/pdf.svelte'
 
@@ -39,6 +41,10 @@
       <PagesTool {tool} />
     {:else if tool.pattern === 'editor'}
       <EditorTool {tool} />
+    {:else if tool.pattern === 'meta'}
+      <MetaTool {tool} />
+    {:else if tool.pattern === 'form'}
+      <FormTool {tool} />
     {:else}
       <CompareTool {tool} />
     {/if}

@@ -1,7 +1,7 @@
 import { L } from './i18n.svelte'
 
 /** How a tool's workspace looks. */
-export type ToolPattern = 'batch' | 'combine' | 'pages' | 'editor' | 'compare' | 'web'
+export type ToolPattern = 'batch' | 'combine' | 'pages' | 'editor' | 'compare' | 'web' | 'meta' | 'form'
 
 /** File filter sent to the backend (see app_pdf.go). */
 export type ToolInput = 'pdf' | 'pdfimage' | 'word' | 'excel' | 'ppt' | 'html'
@@ -52,6 +52,8 @@ export const pdfTools: PdfTool[] = [
   t('organize', 'organize', 'grid', 'pages', 'pdf', PDF, () => L('Susun halaman', 'Organize PDF'), () => L('Geser, putar, hapus, gandakan halaman, atau tambah halaman kosong.', 'Drag, rotate, delete or duplicate pages and add blank ones.')),
   t('scan', 'organize', 'scan', 'combine', 'pdfimage', IMG, () => L('Scan ke PDF', 'Scan to PDF'), () => L('Ambil dari scanner atau kamera, lalu jadikan PDF.', 'Capture from a scanner or camera and save as PDF.')),
 
+  t('nup', 'organize', 'grid', 'batch', 'pdf', PDF, () => L('N-up (beberapa per lembar)', 'N-up (several per sheet)'), () => L('Cetak 2, 4, atau lebih halaman di satu lembar kertas.', 'Print 2, 4 or more pages on one sheet of paper.')),
+  t('booklet', 'organize', 'layers', 'batch', 'pdf', PDF, () => L('Buklet', 'Booklet'), () => L('Susun halaman untuk dicetak bolak-balik lalu dilipat jadi buku kecil.', 'Arrange pages to print double-sided and fold into a booklet.')),
   t('compress', 'optimize', 'shrink', 'batch', 'pdf', PDF, () => L('Kompres PDF', 'Compress PDF'), () => L('Perkecil ukuran file dengan tiga tingkat kompresi.', 'Make files smaller with three compression levels.')),
   t('repair', 'optimize', 'wrench', 'batch', 'pdf', PDF, () => L('Perbaiki PDF', 'Repair PDF'), () => L('Selamatkan PDF rusak yang tidak bisa dibuka.', 'Recover damaged PDFs that won\'t open.')),
   t('ocr', 'optimize', 'textScan', 'batch', 'pdf', PDF, () => L('OCR PDF', 'OCR PDF'), () => L('Jadikan PDF hasil scan bisa dicari dan disalin teksnya.', 'Make scanned PDFs searchable and selectable.')),
@@ -62,6 +64,9 @@ export const pdfTools: PdfTool[] = [
   t('excel2pdf', 'to', 'table', 'batch', 'excel', ['XLS', 'XLSX', 'ODS', 'CSV'], () => L('Excel ke PDF', 'Excel to PDF'), () => L('Lembar kerja Excel jadi PDF.', 'Excel spreadsheets to PDF.')),
   t('html', 'to', 'globe', 'web', 'html', ['URL', 'HTML'], () => L('HTML ke PDF', 'HTML to PDF'), () => L('Simpan halaman web atau file HTML sebagai PDF.', 'Save web pages or HTML files as PDF.')),
 
+  t('pdf2txt', 'from', 'fileText', 'batch', 'pdf', PDF, () => L('PDF ke teks', 'PDF to text'), () => L('Ambil semua teks ke file .txt biasa.', 'Pull all the text into a plain .txt file.')),
+  t('pdf2md', 'from', 'code', 'batch', 'pdf', PDF, () => L('PDF ke Markdown', 'PDF to Markdown'), () => L('Teks dengan judul & daftar, siap untuk catatan atau AI.', 'Text with headings & lists, ready for notes or AI.')),
+  t('pdf2csv', 'from', 'table', 'batch', 'pdf', PDF, () => L('Tabel PDF ke CSV', 'PDF tables to CSV'), () => L('Tabel jadi baris & kolom CSV untuk Excel atau Sheets.', 'Tables become CSV rows & columns for Excel or Sheets.')),
   t('pdf2img', 'from', 'image', 'batch', 'pdf', PDF, () => L('PDF ke gambar', 'PDF to images'), () => L('Ubah tiap halaman jadi JPG/PNG, atau ambil gambar di dalamnya.', 'Turn pages into JPG/PNG, or pull out the pictures inside.')),
   t('pdf2word', 'from', 'fileText', 'batch', 'pdf', PDF, () => L('PDF ke Word', 'PDF to Word'), () => L('Ubah PDF jadi dokumen Word yang bisa diedit.', 'Turn PDFs into editable Word documents.')),
   t('pdf2ppt', 'from', 'presentation', 'batch', 'pdf', PDF, () => L('PDF ke PowerPoint', 'PDF to PowerPoint'), () => L('Setiap halaman jadi satu slide.', 'Every page becomes a slide.')),
@@ -69,6 +74,10 @@ export const pdfTools: PdfTool[] = [
   t('pdfa', 'from', 'archive', 'batch', 'pdf', PDF, () => L('PDF ke PDF/A', 'PDF to PDF/A'), () => L('Format arsip jangka panjang (PDF/A-2b).', 'Long-term archive format (PDF/A-2b).')),
   t('pdfacheck', 'from', 'shieldCheck', 'batch', 'pdf', PDF, () => L('Validasi PDF/A', 'Validate PDF/A'), () => L('Periksa kepatuhan PDF/A dengan veraPDF, validator resmi.', 'Check PDF/A compliance with veraPDF, the reference validator.')),
 
+  t('form', 'edit', 'pencil', 'form', 'pdf', PDF, () => L('Isi formulir PDF', 'Fill PDF form'), () => L('Isi kolom formulir, centang kotak, lalu simpan atau ratakan.', 'Fill form fields, tick boxes, then save or flatten.')),
+  t('headerfooter', 'edit', 'type', 'batch', 'pdf', PDF, () => L('Header & footer', 'Header & footer'), () => L('Teks di atas & bawah tiap halaman: judul, tanggal, nomor.', 'Text at the top & bottom of every page: title, date, number.')),
+  t('meta', 'edit', 'bookmark', 'meta', 'pdf', PDF, () => L('Properti & bookmark', 'Properties & bookmarks'), () => L('Ubah judul, penulis, kata kunci, dan daftar isi (bookmark).', 'Edit the title, author, keywords and table of contents (bookmarks).')),
+  t('flatten', 'edit', 'shrink', 'batch', 'pdf', PDF, () => L('Ratakan PDF', 'Flatten PDF'), () => L('Isian formulir & komentar jadi bagian halaman, tidak bisa diubah lagi.', 'Form entries & comments become part of the page and can\'t be changed.')),
   t('rotate', 'edit', 'rotateCw', 'batch', 'pdf', PDF, () => L('Putar PDF', 'Rotate PDF'), () => L('Putar semua atau sebagian halaman 90°, 180°, 270°.', 'Rotate all or some pages by 90°, 180° or 270°.')),
   t('numbers', 'edit', 'hash', 'batch', 'pdf', PDF, () => L('Nomor halaman', 'Page numbers'), () => L('Tambah nomor halaman dengan posisi dan format pilihan.', 'Add page numbers in the position and format you want.')),
   t('watermark', 'edit', 'stamp', 'batch', 'pdf', PDF, () => L('Tambah watermark', 'Add watermark'), () => L('Cap teks atau logo, transparan dan bisa diputar.', 'Stamp text or a logo, transparent and rotatable.')),

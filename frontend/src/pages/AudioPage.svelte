@@ -14,37 +14,30 @@
   import TrimFields, { trimError } from '../components/TrimFields.svelte'
   import { editTags, tagsFromFile } from '../components/TagDialog.svelte'
   import Icon from '../components/Icon.svelte'
+  import DenoiseSelect from '../components/DenoiseSelect.svelte'
+  import { pickTrim } from '../components/TrimDialog.svelte'
   import { api } from '../lib/api'
   import { hasTool } from '../lib/stores/app.svelte'
   import { audioConv as conv } from '../lib/stores/converter.svelte'
   import { load, save } from '../lib/stores/persist'
+  import { audioDefaults, audioBuiltins } from '../lib/modules'
   import { bytes, codec, duration, khz, tile } from '../lib/format'
   import { lossyAudio } from '../lib/media'
   import type { AudioOptions, AudioTags, FileItem } from '../lib/types'
 
-  const defaults: { mode: 'convert' | 'merge'; a: AudioOptions } = {
-    mode: 'convert',
-    a: {
-      format: 'mp3', bitrate: 320, vbr: false, vbrLevel: 'high', channels: 'source', sampleRate: 'source', keepMetadata: true,
-      trimStart: '', trimEnd: '', fadeIn: 0, fadeOut: 0, normalize: false, loudness: -16, removeSilence: false, speed: 1, pitch: 0,
-    },
-  }
+  const defaults = audioDefaults
   const st = $state(load('kmb.audio', defaults))
   $effect(() => save('kmb.audio', $state.snapshot(st)))
 
   /** Tags edited in this session, by item id (not saved: they belong to specific files). */
   let tagsOf = $state<Record<string, AudioTags>>({})
 
-  const builtins = $derived([
-    { id: 'b-mp3', name: 'MP3 320 kbps', value: { mode: 'convert', a: { format: 'mp3', bitrate: 320, normalize: false, speed: 1, pitch: 0, fadeIn: 0, fadeOut: 0, removeSilence: false } } },
-    { id: 'b-pod', name: L('Podcast (MP3 128 mono, suara rata)', 'Podcast (MP3 128 mono, even volume)'), value: { mode: 'convert', a: { format: 'mp3', bitrate: 128, channels: 'mono', normalize: true, loudness: -16, removeSilence: true } } },
-    { id: 'b-ring', name: L('Nada dering (M4A 30 dtk + fade)', 'Ringtone (M4A 30 s + fade)'), value: { mode: 'convert', a: { format: 'm4a', bitrate: 192, trimStart: '0:00', trimEnd: '0:30', fadeIn: 1, fadeOut: 3 } } },
-    { id: 'b-flac', name: L('Arsip lossless (FLAC)', 'Lossless archive (FLAC)'), value: { mode: 'convert', a: { format: 'flac', normalize: false, speed: 1, pitch: 0 } } },
-    { id: 'b-opus', name: L('Hemat kuota (Opus 96)', 'Data saver (Opus 96)'), value: { mode: 'convert', a: { format: 'opus', bitrate: 96 } } },
-  ])
+  const builtins = $derived(audioBuiltins())
 
   const isOriginal = $derived(st.a.format === 'original')
   const merge = $derived(st.mode === 'merge')
+  const cueMode = $derived(st.mode === 'cue')
+  const cueItems = $derived(conv.pending().filter((it) => it.cue))
 
   function meta(it: FileItem): string {
     const p: string[] = []
@@ -59,11 +52,13 @@
     if (it.duration) p.push(duration(it.duration))
     p.push(bytes(it.size))
     if (it.hasCover) p.push(L('ada cover', 'has cover'))
+    if (it.cue) p.push(`CUE · ${it.cueTracks} ${L('lagu', 'tracks')}`)
     return p.join(' · ')
   }
 
   function outLabel(it: FileItem): string {
     const f = isOriginal ? it.ext.toUpperCase() : st.a.format.toUpperCase()
+    if (cueMode) return it.cue ? `${f} · ${it.cueTracks} ${L('lagu', 'tracks')}` : L('Tidak ada file CUE', 'No CUE file')
     if (isOriginal) return `${f} · ${L('salin', 'copy')}`
     if (!lossyAudio[st.a.format]) return `${f} · lossless`
     return st.a.vbr && st.a.format !== 'm4a' ? `${f} · VBR` : `${f} · ${st.a.bitrate} kbps`
@@ -75,6 +70,7 @@
     if (st.a.fadeIn || st.a.fadeOut) e.push('fade')
     if (st.a.normalize) e.push(`${st.a.loudness} LUFS`)
     if (st.a.removeSilence) e.push(L('tanpa hening', 'no silence'))
+    if (st.a.denoise !== 'off') e.push(L('tanpa noise', 'denoised'))
     if (st.a.speed !== 1) e.push(`${st.a.speed}×`)
     if (st.a.pitch) e.push(`${st.a.pitch > 0 ? '+' : ''}${st.a.pitch} ${L('nada', 'st')}`)
     return e.join(' · ')
@@ -97,10 +93,19 @@
     })
   }
 
-  const hasEffects = $derived(st.a.normalize || st.a.fadeIn > 0 || st.a.fadeOut > 0 || st.a.speed !== 1 || st.a.pitch !== 0 || st.a.channels !== 'source' || st.a.sampleRate !== 'source')
+  const hasEffects = $derived(st.a.denoise !== 'off' || st.a.normalize || st.a.fadeIn > 0 || st.a.fadeOut > 0 || st.a.speed !== 1 || st.a.pitch !== 0 || st.a.channels !== 'source' || st.a.sampleRate !== 'source')
+  const previewItem = $derived(conv.items.find((it) => !it.error && it.duration > 0))
+  function openTrim() {
+    const it = previewItem
+    if (!it) return
+    pickTrim({ title: it.name, path: it.path, duration: it.duration, hasVideo: false, start: st.a.trimStart, end: st.a.trimEnd }, (s, e) => {
+      st.a.trimStart = s
+      st.a.trimEnd = e
+    })
+  }
   const pending = $derived(conv.pending())
   const noFFmpeg = $derived(!hasTool('ffmpeg'))
-  const trimBad = $derived(!merge && trimError(st.a.trimStart, st.a.trimEnd) !== '')
+  const trimBad = $derived(!merge && !cueMode && trimError(st.a.trimStart, st.a.trimEnd) !== '')
   const mergeFew = $derived(merge && conv.items.filter((it) => !it.error).length < 2)
   const originalFx = $derived(isOriginal && hasEffects)
 
@@ -109,6 +114,10 @@
     if (merge) {
       const all = conv.items.filter((it) => !it.error)
       conv.start(all, (items) => api.startAudio(items, { mode: 'merge', options: a }))
+      return
+    }
+    if (cueMode) {
+      conv.start(cueItems, (items) => api.startAudio(items, { mode: 'cue', options: a }))
       return
     }
     conv.start(pending, (items) =>
@@ -120,7 +129,7 @@
   }
 
   $effect(() => {
-    if (merge && isOriginal) st.a.format = 'mp3'
+    if ((merge || cueMode) && isOriginal) st.a.format = cueMode ? 'flac' : 'mp3'
   })
 </script>
 
@@ -188,16 +197,29 @@
         bind:value={st.mode}
         options={[
           { value: 'convert', label: L('Konversi', 'Convert') },
-          { value: 'merge', label: L('Gabung jadi satu', 'Join into one') },
+          { value: 'merge', label: L('Gabung', 'Join') },
+          { value: 'cue', label: L('Pisah CUE', 'Split CUE') },
         ]}
       />
       {#if merge}<p class="hint">{L('Semua file digabung sesuai urutan daftar (atur dengan ↑↓).', 'All files are joined in list order (use ↑↓).')}</p>{/if}
+      {#if cueMode}
+        <p class="hint">
+          {L('Album satu file (FLAC/APE/WAV) dipisah per lagu sesuai file .cue di sampingnya. Judul, artis, album, nomor lagu, dan cover (cover.jpg/folder.jpg) diisi otomatis. Hasilnya satu folder per album.', 'A one-file album (FLAC/APE/WAV) is split into songs using the .cue file next to it. Title, artist, album, track number and cover (cover.jpg/folder.jpg) are filled in. One folder per album.')}
+          {conv.items.length && !cueItems.length ? L(' Belum ada file dengan CUE di daftar.', ' No file in the list has a CUE sheet yet.') : ''}
+        </p>
+      {/if}
 
-      <AudioFormatPanel bind:o={st.a} allowOriginal={!merge} />
+      <AudioFormatPanel bind:o={st.a} allowOriginal={!merge && !cueMode} />
 
-      {#if !merge}
+      {#if !merge && !cueMode}
         <div class="sec">
-          <TrimFields bind:start={st.a.trimStart} bind:end={st.a.trimEnd} label={L('Potong', 'Trim')} />
+          <TrimFields
+            bind:start={st.a.trimStart}
+            bind:end={st.a.trimEnd}
+            label={L('Potong', 'Trim')}
+            onpick={previewItem ? openTrim : undefined}
+            pickHint={previewItem ? `${L('Pratinjau', 'Preview')}: ${previewItem.name}` : ''}
+          />
         </div>
       {/if}
 
@@ -225,6 +247,8 @@
             />
           {/if}
         </div>
+
+        <DenoiseSelect bind:value={st.a.denoise} />
 
         <Switch bind:checked={st.a.removeSilence} label={L('Hapus hening awal & akhir', 'Remove silence at start & end')} hint={L('Bagian sunyi di ujung file dibuang', 'Quiet parts at the ends are cut off')} />
 
@@ -288,10 +312,12 @@
       busy={conv.starting}
       startLabel={merge
         ? `${L('Gabungkan', 'Join')} ${conv.items.filter((it) => !it.error).length} file`
+        : cueMode
+          ? `${L('Pisah per lagu', 'Split into songs')}${cueItems.length ? ` (${cueItems.length})` : ''}`
         : conv.hasUnprocessed() || pending.length === 0
           ? `${L('Mulai konversi', 'Start converting')}${pending.length ? ` (${pending.length})` : ''}`
           : `${L('Konversi ulang', 'Convert again')} (${pending.length})`}
-      disabled={(merge ? mergeFew : pending.length === 0) || noFFmpeg || trimBad || originalFx}
+      disabled={(merge ? mergeFew : cueMode ? cueItems.length === 0 : pending.length === 0) || noFFmpeg || trimBad || originalFx}
       disabledHint={noFFmpeg
         ? L('Pasang FFmpeg dulu (lihat banner di atas).', 'Install FFmpeg first (see the banner above).')
         : conv.items.length === 0

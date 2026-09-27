@@ -11,12 +11,16 @@ export function load<T extends object>(key: string, defaults: T): T {
   return structuredClone(defaults)
 }
 
+/** Called after every save with the key (e.g. to mirror presets to the backend). */
+export const saveHooks: ((key: string) => void)[] = []
+
 export function save(key: string, value: unknown) {
   try {
     localStorage.setItem(key, JSON.stringify(value))
   } catch {
     /* storage full or unavailable: settings just won't persist */
   }
+  for (const h of saveHooks) h(key)
 }
 
 function isPlain(v: unknown): v is Record<string, unknown> {

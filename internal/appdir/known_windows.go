@@ -10,7 +10,7 @@ func knownFolder(kind string) string {
 	switch kind {
 	case "image":
 		id = windows.FOLDERID_Pictures
-	case "video":
+	case "video", "subtitle":
 		id = windows.FOLDERID_Videos
 	case "audio":
 		id = windows.FOLDERID_Music

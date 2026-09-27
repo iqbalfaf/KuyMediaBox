@@ -323,42 +323,89 @@ type cell struct {
 
 var reNumber = regexp.MustCompile(`^-?\d{1,15}$`)
 
+// lineCells splits a line into cells at big horizontal gaps.
+func lineCells(l Line) []cell {
+	h := l.Y1 - l.Y0
+	var cells []cell
+	for _, w := range l.Words {
+		if n := len(cells); n > 0 && w.X0-cells[n-1].x1 < h*0.9 {
+			cells[n-1].text += " " + w.Text
+			cells[n-1].x1 = w.X1
+			continue
+		}
+		cells = append(cells, cell{w.X0, w.X1, w.Text})
+	}
+	return cells
+}
+
 // tableRows splits the lines of a page into cells and aligns them to shared columns.
 func tableRows(lines []Line) [][]string {
-	var rows [][]cell
-	var anchors []float64
-	for _, l := range lines {
-		h := l.Y1 - l.Y0
-		var cells []cell
-		for _, w := range l.Words {
-			if n := len(cells); n > 0 && w.X0-cells[n-1].x1 < h*0.9 {
-				cells[n-1].text += " " + w.Text
-				cells[n-1].x1 = w.X1
-				continue
+	rows := make([][]cell, len(lines))
+	for i, l := range lines {
+		rows[i] = lineCells(l)
+	}
+	return alignCells(rows)
+}
+
+// alignCells puts cells that sit above each other into the same column. Columns are the
+// x ranges the cells cover, so centred or right-aligned cells line up with left-aligned ones.
+// Rows with the most cells mark the columns first; a wide cell (a title spanning the table)
+// goes to the column it overlaps most instead of merging columns.
+func alignCells(rows [][]cell) [][]string {
+	type span struct{ x0, x1 float64 }
+	const pad = 3 // points of slack between neighbouring cells
+	order := make([]int, len(rows))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(a, b int) bool { return len(rows[order[a]]) > len(rows[order[b]]) })
+	var cols []span
+	overlap := func(c cell, s span) float64 { return min(c.x1, s.x1+pad) - max(c.x0, s.x0-pad) }
+	for _, i := range order {
+		for _, c := range rows[i] {
+			hits := 0
+			hit := -1
+			for k, s := range cols {
+				if overlap(c, s) > 0 {
+					hits++
+					hit = k
+				}
 			}
-			cells = append(cells, cell{w.X0, w.X1, w.Text})
-		}
-		rows = append(rows, cells)
-		for _, c := range cells {
-			anchors = append(anchors, c.x0)
+			switch {
+			case hits == 0:
+				cols = append(cols, span{c.x0, c.x1})
+			case hits == 1:
+				// Grow the column unless that would run into a neighbour.
+				grown := span{min(cols[hit].x0, c.x0), max(cols[hit].x1, c.x1)}
+				clash := false
+				for k, s := range cols {
+					if k != hit && min(grown.x1, s.x1) > max(grown.x0, s.x0) {
+						clash = true
+					}
+				}
+				if !clash {
+					cols[hit] = grown
+				}
+			}
 		}
 	}
-	sort.Float64s(anchors)
-	var cols []float64
-	for _, a := range anchors {
-		if len(cols) == 0 || a-cols[len(cols)-1] > 10 {
-			cols = append(cols, a)
-		}
-	}
+	sort.Slice(cols, func(a, b int) bool { return cols[a].x0 < cols[b].x0 })
 	out := make([][]string, len(rows))
 	for i, cells := range rows {
 		row := make([]string, len(cols))
 		for _, c := range cells {
-			// Column whose start is closest to the left of the cell.
-			best := 0
-			for k, a := range cols {
-				if a <= c.x0+10 {
-					best = k
+			// The column the cell overlaps most, else the nearest one to its left.
+			best, most := 0, 0.0
+			for k, s := range cols {
+				if o := overlap(c, s); o > most {
+					best, most = k, o
+				}
+			}
+			if most == 0 {
+				for k, s := range cols {
+					if s.x0 <= c.x0 {
+						best = k
+					}
 				}
 			}
 			if row[best] != "" {
@@ -387,6 +434,63 @@ func tableRows(lines []Line) [][]string {
 		out[i] = nr
 	}
 	return out
+}
+
+// segment is a run of lines of a page: running text, or a table (Table != nil).
+type segment struct {
+	Lines []Line
+	Table [][]string
+}
+
+// segments splits a page into running text and tables. A table is two or more lines in a
+// row that each have several cells; long cells (two text columns) do not count.
+func segments(lines []Line) []segment {
+	cells := make([][]cell, len(lines))
+	for i, l := range lines {
+		cells[i] = lineCells(l)
+	}
+	var out []segment
+	text := func(ls []Line) {
+		if len(ls) == 0 {
+			return
+		}
+		if n := len(out); n > 0 && out[n-1].Table == nil {
+			out[n-1].Lines = append(out[n-1].Lines, ls...)
+			return
+		}
+		out = append(out, segment{Lines: ls})
+	}
+	for i := 0; i < len(lines); {
+		j := i
+		for j < len(lines) && len(cells[j]) >= 2 {
+			j++
+		}
+		if j-i >= 2 && tableLike(cells[i:j]) {
+			out = append(out, segment{Lines: lines[i:j], Table: alignCells(cells[i:j])})
+			i = j
+			continue
+		}
+		if j == i {
+			j++
+		}
+		text(lines[i:j])
+		i = j
+	}
+	return out
+}
+
+func tableLike(rows [][]cell) bool {
+	var lens []float64
+	wide := 0
+	for _, r := range rows {
+		if len(r) >= 3 {
+			wide++
+		}
+		for _, c := range r {
+			lens = append(lens, float64(len([]rune(c.text))))
+		}
+	}
+	return median(lens) <= 30 || wide*2 >= len(rows)
 }
 
 func colName(i int) string {

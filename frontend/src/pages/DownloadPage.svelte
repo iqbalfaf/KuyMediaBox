@@ -8,10 +8,15 @@
   import AudioDownloadOptions from '../components/AudioDownloadOptions.svelte'
   import ToolBanner from '../components/ToolBanner.svelte'
   import Icon from '../components/Icon.svelte'
+  import { pickTrim } from '../components/TrimDialog.svelte'
   import OutputPicker from '../components/OutputPicker.svelte'
+  import Select from '../components/Select.svelte'
   import PresetBar from '../components/PresetBar.svelte'
+  import ResumeBanner from '../components/ResumeBanner.svelte'
+  import SubsDialog, { askFollow } from '../components/SubsDialog.svelte'
+  import { subs } from '../lib/stores/subs.svelte'
   import { askText } from '../lib/stores/prompt.svelte'
-  import { sendToConverter } from '../lib/stores/open.svelte'
+  import { openRequest, sendToConverter } from '../lib/stores/open.svelte'
   import { api, errText, runtime } from '../lib/api'
   import { hasTool, settings, showDetail, toast } from '../lib/stores/app.svelte'
   import {
@@ -62,6 +67,15 @@
   )
 
   async function setCut(r: LinkRow) {
+    // One video with a known length: pick the part on a timeline.
+    const one = r.col?.entries.length === 1 ? r.col.entries[0] : null
+    if (one && one.duration > 0) {
+      const [a = '', b = ''] = r.cut ? r.cut.split('-').map((x) => x.trim()) : []
+      pickTrim({ title: one.title || r.col!.title, duration: one.duration, thumb: one.thumbnail || r.col!.thumbnail, start: a, end: b }, (s, e) => {
+        r.cut = s || e ? `${s || '0:00'}-${e}` : ''
+      })
+      return
+    }
     const v = await askText(
       L('Unduh sebagian', 'Download a part'),
       L('Rentang waktu (mulai-selesai). Kosongkan selesai untuk sampai akhir.', 'Time range (start-end). Leave the end empty for "to the end".'),
@@ -290,6 +304,7 @@
         {:else if t.status === 'done'}
           <button class="pill ok as-btn" title={L('Tampilkan file', 'Show file')} onclick={() => api.revealFile(t.output)}><Icon name="check" size={12} stroke={3} />{L('Selesai', 'Done')}</button>
           {#if t.output}<button class="mini" title={L('Kirim ke konversi', 'Send to a converter')} aria-label={L('Kirim ke konversi', 'Send to a converter')} onclick={() => sendToConverter([t.output])}><Icon name="send" size={14} /></button>{/if}
+          {#if t.output && /\.(mp4|mkv|webm|mov|m4a|mp3|opus|flac|wav)$/i.test(t.output)}<button class="mini" title={L('Buat subtitle otomatis', 'Make automatic subtitles')} aria-label={L('Buat subtitle otomatis', 'Make automatic subtitles')} onclick={() => openRequest({ page: 'subtitle', paths: [t.output] })}><Icon name="subtitles" size={14} /></button>{/if}
         {:else if t.status === 'failed'}
           <button class="pill err as-btn" title={t.message} onclick={() => showDetail(e.title, t.message, t.detail)}>{L('Gagal · detail', 'Failed · details')}</button>
           {#if col.source === 'spotify'}<button class="mini" title={L('Ganti dengan link YouTube', 'Replace with a YouTube link')} aria-label={L('Ganti dengan link YouTube', 'Replace with a YouTube link')} onclick={() => setSource(r, e)}><Icon name="link" size={14} /></button>{/if}
@@ -318,7 +333,9 @@
   </div>
 {/snippet}
 
-<PageHeader title="Download" subtitle={L('YouTube, TikTok, Instagram, Facebook, X, Pinterest & Spotify — tempel link-nya, otomatis masuk ke kategorinya.', 'YouTube, TikTok, Instagram, Facebook, X, Pinterest & Spotify — paste the link and it lands in its category automatically.')} />
+<PageHeader title="Download" subtitle={L('YouTube, TikTok, Instagram, Facebook, X, Pinterest, Reddit, Spotify, SoundCloud, Twitch & Bilibili — tempel link-nya, otomatis masuk ke kategorinya.', 'YouTube, TikTok, Instagram, Facebook, X, Pinterest, Reddit, Spotify, SoundCloud, Twitch & Bilibili — paste the link and it lands in its category automatically.')} />
+<ResumeBanner />
+<SubsDialog />
 <ToolBanner ids={toolIds} why={L('Dibutuhkan untuk membaca link dan mengunduh. Sekali pasang, dipakai seterusnya.', 'Needed to read links and download. Install once, use forever.')} />
 
 <div class="body">
@@ -327,10 +344,11 @@
       <form class="input-row" onsubmit={(e) => { e.preventDefault(); submit() }}>
         <div class="input-wrap">
           <span class="lic"><Icon name="link" /></span>
-          <input class="url" aria-label={L('Link yang akan diunduh', 'Link to download')} placeholder={L('Tempel link YouTube, TikTok, Instagram, Facebook, X, Pinterest, atau Spotify…', 'Paste a YouTube, TikTok, Instagram, Facebook, X, Pinterest or Spotify link…')} bind:value={dl.input} />
+          <input class="url" aria-label={L('Link yang akan diunduh', 'Link to download')} placeholder={L('Tempel link YouTube, TikTok, Instagram, SoundCloud, Spotify, dll…', 'Paste a YouTube, TikTok, Instagram, SoundCloud, Spotify, … link')} bind:value={dl.input} />
         </div>
         <button type="button" class="btn tall" onclick={paste}><Icon name="clipboard" size={16} />{L('Tempel', 'Paste')}</button>
         <button type="submit" class="btn-accent tall" disabled={!dl.input.trim()}>{L('Periksa link', 'Check link')}</button>
+        <button type="button" class="btn tall" title={L('Channel, playlist & profil yang diikuti', 'Followed channels, playlists & profiles')} onclick={() => (subs.open = true)}><Icon name="bell" size={16} />{subs.list.length || ''}</button>
       </form>
     </section>
 
@@ -347,7 +365,11 @@
             <div><span class="badge fb"><Icon name="play" size={10} stroke={3} />Facebook</span> {L('video · reel · foto', 'videos · reels · photos')}</div>
             <div><span class="badge x"><Icon name="at" size={10} stroke={3} />X</span> {L('post foto & video · profil (perlu login)', 'photo & video posts · profiles (login needed)')}</div>
             <div><span class="badge pi"><Icon name="pin" size={10} stroke={3} />Pinterest</span> {L('pin foto & video · board · profil · pencarian', 'photo & video pins · boards · profiles · search')}</div>
+            <div><span class="badge rd"><Icon name="image" size={10} stroke={3} />Reddit</span> {L('post video · foto · galeri', 'video posts · pictures · galleries')}</div>
             <div><span class="badge sp"><Icon name="music" size={10} stroke={3} />Spotify</span> {L('lagu · album · playlist · artis', 'tracks · albums · playlists · artists')}</div>
+            <div><span class="badge sc"><Icon name="wave" size={10} stroke={3} />SoundCloud</span> {L('lagu · set/album · profil', 'tracks · sets/albums · profiles')}</div>
+            <div><span class="badge tw"><Icon name="video" size={10} stroke={3} />Twitch</span> {L('VOD · klip · channel', 'VODs · clips · channels')}</div>
+            <div><span class="badge bl"><Icon name="play" size={10} stroke={3} />Bilibili</span> {L('video · ruang pengguna', 'videos · user spaces')}</div>
           </div>
         </div>
       {:else}
@@ -449,6 +471,15 @@
                     {#if col.source !== 'spotify'}
                       <button class="mini" class:on={!!r.cut} title={r.cut ? L(`Semua video: hanya ${r.cut}`, `Every video: only ${r.cut}`) : L('Unduh sebagian (potong waktu)', 'Download a part (cut)')} aria-label={L('Potong waktu', 'Cut')} onclick={() => setCut(r)}><Icon name="scissors" size={14} /></button>
                     {/if}
+                    {#if ['channel', 'playlist', 'profile', 'board', 'artist', 'album'].includes(col.type)}
+                      <button
+                        class="mini"
+                        class:on={subs.list.some((s) => s.url === col.url)}
+                        title={subs.list.some((s) => s.url === col.url) ? L('Sudah diikuti', 'Already followed') : L('Ikuti: unduh otomatis item baru', 'Follow: download new items automatically')}
+                        aria-label={L('Ikuti', 'Follow')}
+                        onclick={() => (subs.list.some((s) => s.url === col.url) ? (subs.open = true) : askFollow(col, $state.snapshot(optsOf(categoryOf(col.source))), col.type === 'channel' ? Object.keys(r.types).filter((k) => r.types[k]) : []))}
+                      ><Icon name="bell" size={14} /></button>
+                    {/if}
                     <button class="mini" aria-label={L('Hapus link', 'Remove link')} title={L('Hapus link', 'Remove link')} onclick={() => removeRow(r.id)}><Icon name="trash" size={14} /></button>
                   </div>
                   {#if col.type === 'channel'}
@@ -500,6 +531,7 @@
             <span>{L('Spotify selalu diunduh sebagai audio. Lagunya dicocokkan dari YouTube, lalu diberi judul, artis, album & cover dari Spotify.', 'Spotify is always downloaded as audio. Songs are matched on YouTube, then tagged with the title, artist, album & cover from Spotify.')}</span>
           </div>
           <AudioDownloadOptions {opts} spotify label={L('Format audio', 'Audio format')} onchange={optsChanged} />
+          <Switch bind:checked={opts.lyrics} onchange={optsChanged} label={L('Unduh lirik (.lrc)', 'Download lyrics (.lrc)')} hint={L('Lirik bertimestamp dari LRCLIB di samping lagu — tampil di pemutar musik yang mendukung', 'Time-synced lyrics from LRCLIB next to each song — shown by music players that support them')} />
           {#if hasList}
             <Switch bind:checked={opts.numbering} onchange={optsChanged} label={L('Nomor urut di nama file', 'Track numbers in file names')} hint={L('Urutan sama seperti di Spotify', 'Same order as on Spotify')} />
             <Switch bind:checked={opts.playlist} onchange={optsChanged} label={L('Buat file playlist (.m3u8)', 'Create a playlist file (.m3u8)')} hint={L('Untuk album & playlist, bisa dibuka di VLC, foobar, dll.', 'For albums & playlists, opens in VLC, foobar, etc.')} />
@@ -579,6 +611,19 @@
           <p class="hint">{L('Unduh sebagian: klik ikon gunting di tiap link.', 'Download a part: click the scissors icon on a link.')}</p>
         {/if}
         <Switch bind:checked={opts.skipExisting} onchange={skipChanged} label={L('Lewati yang sudah ada', 'Skip existing')} hint={L('Unduh ulang hanya ambil yang baru', 'Downloading again only fetches new items')} />
+
+        {#if (settings.value?.workflows ?? []).length}
+          <div class="sec">
+            <span class="label">{L('Setelah download', 'After downloading')}</span>
+            <Select
+              label={L('Alur kerja setelah download', 'Workflow after downloading')}
+              bind:value={opts.workflow}
+              onchange={optsChanged}
+              options={[{ value: '', label: L('Tidak ada — simpan saja', 'Nothing — just save') }, ...(settings.value?.workflows ?? []).map((w) => ({ value: w.id, label: `${L('Jalankan', 'Run')}: ${w.name}` }))]}
+            />
+            {#if opts.workflow}<p class="hint">{L('Tiap file yang selesai diunduh langsung masuk ke alur kerja ini. File unduhan aslinya tetap disimpan.', 'Every downloaded file goes straight into this workflow. The downloaded file itself is kept.')}</p>{/if}
+          </div>
+        {/if}
 
         <div class="sec">
           <span class="label">{L('Simpan ke', 'Save to')}</span>
@@ -716,6 +761,22 @@
     background: var(--pi-bg);
     color: var(--pi-fg);
   }
+  .badge.sc {
+    background: var(--sc-bg);
+    color: var(--sc-fg);
+  }
+  .badge.tw {
+    background: var(--tw-bg);
+    color: var(--tw-fg);
+  }
+  .badge.rd {
+    background: var(--rd-bg);
+    color: var(--rd-fg);
+  }
+  .badge.bl {
+    background: var(--bl-bg);
+    color: var(--bl-fg);
+  }
   .mini {
     width: 32px;
     height: 32px;
@@ -834,6 +895,18 @@
   }
   .tabs .dot.pi {
     background: #e60023;
+  }
+  .tabs .dot.sc {
+    background: #ff5500;
+  }
+  .tabs .dot.tw {
+    background: #9146ff;
+  }
+  .tabs .dot.rd {
+    background: #ff4500;
+  }
+  .tabs .dot.bl {
+    background: #00a1d6;
   }
   .tabs .dot.ot {
     background: var(--text-3);
@@ -1085,6 +1158,18 @@
   }
   .ph-v .dot.pi {
     background: #e60023;
+  }
+  .ph-v .dot.sc {
+    background: #ff5500;
+  }
+  .ph-v .dot.tw {
+    background: #9146ff;
+  }
+  .ph-v .dot.rd {
+    background: #ff4500;
+  }
+  .ph-v .dot.bl {
+    background: #00a1d6;
   }
   .ph-v .dot.ot {
     background: var(--text-3);

@@ -3,10 +3,12 @@ module kuymediabox
 go 1.27.1
 
 require (
+	fyne.io/systray v1.12.2
 	github.com/disintegration/imaging v1.6.2
 	github.com/gen2brain/avif v0.6.0
 	github.com/gen2brain/heic v0.7.2
 	github.com/gen2brain/webp v0.6.4
+	github.com/go-text/typesetting v0.3.5
 	github.com/gorilla/websocket v1.5.3
 	github.com/klippa-app/go-pdfium v1.21.0
 	github.com/pdfcpu/pdfcpu v0.15.0

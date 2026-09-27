@@ -2,6 +2,7 @@ package pdf
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rand"
@@ -39,6 +40,7 @@ type DigitalSignOptions struct {
 	Visible      bool   `json:"visible"`  // draw a small stamp on the page
 	Position     string `json:"position"` // bl br tl tr
 	Page         string `json:"page"`     // first | last
+	TSA          string `json:"tsa"`      // time-stamp server ("" = none)
 }
 
 // Signer is a loaded certificate with its private key.
@@ -397,7 +399,7 @@ func SignDigital(in Input, o DigitalSignOptions, s *Signer, out string) error {
 	h := sha256.New()
 	h.Write(file[:contentsAt])
 	h.Write(file[contentsEnd:])
-	blob, err := s.pkcs7(h.Sum(nil), now)
+	blob, err := s.pkcs7(h.Sum(nil), now, normalizeTSA(o.TSA))
 	if err != nil {
 		return err
 	}
@@ -530,7 +532,7 @@ func mustMarshal(v any) []byte {
 	return b
 }
 
-func (s *Signer) pkcs7(digest []byte, at time.Time) ([]byte, error) {
+func (s *Signer) pkcs7(digest []byte, at time.Time, tsa string) ([]byte, error) {
 	certHash := sha256.Sum256(s.Cert.Raw)
 	attrs := [][]byte{
 		seq(mustMarshal(oidContentType), set(mustMarshal(oidData))),
@@ -550,14 +552,25 @@ func (s *Signer) pkcs7(digest []byte, at time.Time) ([]byte, error) {
 	}
 	digestAlg := seq(mustMarshal(oidSHA256))
 	serial := mustMarshal(s.Cert.SerialNumber)
-	signerInfo := seq(
+	parts := [][]byte{
 		mustMarshal(1),
 		seq(s.Cert.RawIssuer, serial),
 		digestAlg,
 		der(0xA0, signedAttrs[headerLen(signedAttrs):]), // [0] IMPLICIT
 		sigAlg,
 		der(0x04, signature),
-	)
+	}
+	if tsa != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+		token, err := timestampToken(ctx, tsa, signature)
+		cancel()
+		if err != nil {
+			return nil, err
+		}
+		// unsignedAttrs [1] IMPLICIT SET OF Attribute: the signature time-stamp token.
+		parts = append(parts, der(0xA1, seq(mustMarshal(oidTimeStampToken), set(token))))
+	}
+	signerInfo := seq(parts...)
 	certs := [][]byte{s.Cert.Raw}
 	for _, c := range s.Chain {
 		certs = append(certs, c.Raw)

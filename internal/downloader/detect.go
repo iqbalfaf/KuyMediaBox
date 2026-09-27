@@ -30,6 +30,7 @@ const (
 	TypeProfile  = "profile" // TikTok, X or Pinterest user (list of posts)
 	TypeBoard    = "board"   // Pinterest board
 	TypeSearch   = "search"  // Pinterest search results
+	TypeStory    = "story"   // Instagram stories or a highlight (needs a login)
 	TypeUnknown  = "unknown"
 )
 
@@ -43,9 +44,10 @@ type Link struct {
 	Short  bool   `json:"short"` // short share link, resolved before reading
 }
 
-// IsSocial reports whether a source is TikTok, Instagram, Facebook, X or Pinterest.
+// IsSocial reports whether a source is TikTok, Instagram, Facebook, X, Pinterest or Reddit
+// (posts with pictures and videos).
 func IsSocial(source string) bool {
-	return source == SourceTikTok || source == SourceInstagram || source == SourceFacebook || source == SourcePinterest || source == SourceX
+	return source == SourceTikTok || source == SourceInstagram || source == SourceFacebook || source == SourcePinterest || source == SourceX || source == SourceReddit
 }
 
 var (
@@ -56,6 +58,7 @@ var (
 	reTikTokUser  = regexp.MustCompile(`^/(@[^/]+)/?$`)
 	reTikTokShare = regexp.MustCompile(`^/share/video/(\d+)`)
 	reIGPost      = regexp.MustCompile(`^/(?:[^/]+/)?(p|reel|reels|tv)/([A-Za-z0-9_-]+)`)
+	reIGStory     = regexp.MustCompile(`^/stories/([^/]+)(?:/(\d+))?`)
 	reFBVideo     = regexp.MustCompile(`^/(?:reel/\d+|watch/?$|[^/]+/videos/|video\.php|share/[vr]/)`)
 	reFBPhoto     = regexp.MustCompile(`^/(?:photo/?$|photo\.php|[^/]+/photos/|share/p/|[^/]+/posts/|permalink\.php)`)
 )
@@ -82,6 +85,9 @@ func Detect(raw string) Link {
 		return l
 	}
 	if l, ok := detectX(host, u); ok {
+		return l
+	}
+	if l, ok := detectMore(host, u); ok {
 		return l
 	}
 

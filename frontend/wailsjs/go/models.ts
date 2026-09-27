@@ -1,5 +1,25 @@
 export namespace config {
 	
+	export class FlowStep {
+	    kind: string;
+	    tool: string;
+	    preset: string;
+	    label: string;
+	    job: number[];
+	
+	    static createFrom(source: any = {}) {
+	        return new FlowStep(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.tool = source["tool"];
+	        this.preset = source["preset"];
+	        this.label = source["label"];
+	        this.job = source["job"];
+	    }
+	}
 	export class Output {
 	    mode: string;
 	    dir: string;
@@ -13,6 +33,40 @@ export namespace config {
 	        this.mode = source["mode"];
 	        this.dir = source["dir"];
 	    }
+	}
+	export class Workflow {
+	    id: string;
+	    name: string;
+	    steps: FlowStep[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Workflow(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.steps = this.convertValues(source["steps"], FlowStep);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class WatchRule {
 	    id: string;
@@ -51,8 +105,10 @@ export namespace config {
 	    spotifyTemplate: string;
 	    spotifyLogin: boolean;
 	    clipboardWatch: boolean;
+	    tray: boolean;
 	    downloadLimitKB: number;
 	    watch: WatchRule[];
+	    workflows: Workflow[];
 	    toolPaths: Record<string, string>;
 	
 	    static createFrom(source: any = {}) {
@@ -77,8 +133,10 @@ export namespace config {
 	        this.spotifyTemplate = source["spotifyTemplate"];
 	        this.spotifyLogin = source["spotifyLogin"];
 	        this.clipboardWatch = source["clipboardWatch"];
+	        this.tray = source["tray"];
 	        this.downloadLimitKB = source["downloadLimitKB"];
 	        this.watch = this.convertValues(source["watch"], WatchRule);
+	        this.workflows = this.convertValues(source["workflows"], Workflow);
 	        this.toolPaths = source["toolPaths"];
 	    }
 	
@@ -100,6 +158,7 @@ export namespace config {
 		    return a;
 		}
 	}
+	
 
 }
 
@@ -228,6 +287,9 @@ export namespace downloader {
 	    sectionEnd: string;
 	    sponsorBlock: string;
 	    playlist: boolean;
+	    lyrics: boolean;
+	    workflow: string;
+	    outDir: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Options(source);
@@ -250,6 +312,9 @@ export namespace downloader {
 	        this.sectionEnd = source["sectionEnd"];
 	        this.sponsorBlock = source["sponsorBlock"];
 	        this.playlist = source["playlist"];
+	        this.lyrics = source["lyrics"];
+	        this.workflow = source["workflow"];
+	        this.outDir = source["outDir"];
 	    }
 	}
 
@@ -296,6 +361,48 @@ export namespace history {
 
 export namespace imageconv {
 	
+	export class Box {
+	    x: number;
+	    y: number;
+	    w: number;
+	    h: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Box(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.x = source["x"];
+	        this.y = source["y"];
+	        this.w = source["w"];
+	        this.h = source["h"];
+	    }
+	}
+	export class CollageOptions {
+	    cols: number;
+	    width: number;
+	    gap: number;
+	    cell: string;
+	    fit: string;
+	    background: string;
+	    radius: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollageOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cols = source["cols"];
+	        this.width = source["width"];
+	        this.gap = source["gap"];
+	        this.cell = source["cell"];
+	        this.fit = source["fit"];
+	        this.background = source["background"];
+	        this.radius = source["radius"];
+	    }
+	}
 	export class Watermark {
 	    enabled: boolean;
 	    type: string;
@@ -345,7 +452,14 @@ export namespace imageconv {
 	    flipH: boolean;
 	    flipV: boolean;
 	    crop: string;
+	    cropBox: Box;
 	    watermark: Watermark;
+	    aiUpscale: number;
+	    aiModel: string;
+	    removeBg: boolean;
+	    bgModel: string;
+	    bgMask: boolean;
+	    pngCompress: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Options(source);
@@ -369,7 +483,14 @@ export namespace imageconv {
 	        this.flipH = source["flipH"];
 	        this.flipV = source["flipV"];
 	        this.crop = source["crop"];
+	        this.cropBox = this.convertValues(source["cropBox"], Box);
 	        this.watermark = this.convertValues(source["watermark"], Watermark);
+	        this.aiUpscale = source["aiUpscale"];
+	        this.aiModel = source["aiModel"];
+	        this.removeBg = source["removeBg"];
+	        this.bgModel = source["bgModel"];
+	        this.bgMask = source["bgMask"];
+	        this.pngCompress = source["pngCompress"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -443,6 +564,22 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class CLICommand {
+	    installed: boolean;
+	    path: string;
+	    onPath: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CLICommand(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.installed = source["installed"];
+	        this.path = source["path"];
+	        this.onPath = source["onPath"];
+	    }
+	}
 	export class Capabilities {
 	    ffmpeg: boolean;
 	    encoders: Record<string, boolean>;
@@ -456,6 +593,40 @@ export namespace main {
 	        this.ffmpeg = source["ffmpeg"];
 	        this.encoders = source["encoders"];
 	    }
+	}
+	export class CollageJob {
+	    layout: imageconv.CollageOptions;
+	    format: string;
+	    quality: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollageJob(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.layout = this.convertValues(source["layout"], imageconv.CollageOptions);
+	        this.format = source["format"];
+	        this.quality = source["quality"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class EditItem {
 	    kind: string;
@@ -530,6 +701,8 @@ export namespace main {
 	    subCodec: string;
 	    subFile: string;
 	    tags: Record<string, string>;
+	    cue: string;
+	    cueTracks: number;
 	    error: string;
 	
 	    static createFrom(source: any = {}) {
@@ -562,13 +735,35 @@ export namespace main {
 	        this.subCodec = source["subCodec"];
 	        this.subFile = source["subFile"];
 	        this.tags = source["tags"];
+	        this.cue = source["cue"];
+	        this.cueTracks = source["cueTracks"];
 	        this.error = source["error"];
+	    }
+	}
+	export class ImportResult {
+	    ui: Record<string, string>;
+	    presets: number;
+	    workflows: number;
+	    version: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ui = source["ui"];
+	        this.presets = source["presets"];
+	        this.workflows = source["workflows"];
+	        this.version = source["version"];
 	    }
 	}
 	export class JobItem {
 	    id: string;
 	    path: string;
 	    tags?: mediaconv.Tags;
+	    outDir?: string;
+	    plain?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new JobItem(source);
@@ -579,6 +774,8 @@ export namespace main {
 	        this.id = source["id"];
 	        this.path = source["path"];
 	        this.tags = this.convertValues(source["tags"], mediaconv.Tags);
+	        this.outDir = source["outDir"];
+	        this.plain = source["plain"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -611,6 +808,30 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.itemId = source["itemId"];
 	        this.taskId = source["taskId"];
+	    }
+	}
+	export class ModelStatus {
+	    kind: string;
+	    id: string;
+	    sizeMB: number;
+	    installed: boolean;
+	    busy: boolean;
+	    progress: number;
+	    error: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.id = source["id"];
+	        this.sizeMB = source["sizeMB"];
+	        this.installed = source["installed"];
+	        this.busy = source["busy"];
+	        this.progress = source["progress"];
+	        this.error = source["error"];
 	    }
 	}
 	export class OpenRequest {
@@ -703,6 +924,7 @@ export namespace main {
 	    id: string;
 	    path: string;
 	    password: string;
+	    outDir?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new PdfJob(source);
@@ -713,6 +935,7 @@ export namespace main {
 	        this.id = source["id"];
 	        this.path = source["path"];
 	        this.password = source["password"];
+	        this.outDir = source["outDir"];
 	    }
 	}
 	export class PdfaCheckOptions {
@@ -743,6 +966,9 @@ export namespace main {
 	    images: pdf.ImagesOptions;
 	    digisign: pdf.DigitalSignOptions;
 	    pdfaCheck: PdfaCheckOptions;
+	    headerFooter: pdf.HeaderFooterOptions;
+	    nup: pdf.NUpOptions;
+	    semicolon: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new PdfOptions(source);
@@ -765,6 +991,9 @@ export namespace main {
 	        this.images = this.convertValues(source["images"], pdf.ImagesOptions);
 	        this.digisign = this.convertValues(source["digisign"], pdf.DigitalSignOptions);
 	        this.pdfaCheck = this.convertValues(source["pdfaCheck"], PdfaCheckOptions);
+	        this.headerFooter = this.convertValues(source["headerFooter"], pdf.HeaderFooterOptions);
+	        this.nup = this.convertValues(source["nup"], pdf.NUpOptions);
+	        this.semicolon = source["semicolon"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -786,12 +1015,133 @@ export namespace main {
 		}
 	}
 	
+	export class PendingSummary {
+	    batches: number;
+	    items: number;
+	    titles: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PendingSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.batches = source["batches"];
+	        this.items = source["items"];
+	        this.titles = source["titles"];
+	    }
+	}
+	export class Recipe {
+	    kind: string;
+	    id: string;
+	    name: string;
+	    builtin: boolean;
+	    job: number[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Recipe(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.builtin = source["builtin"];
+	        this.job = source["job"];
+	    }
+	}
+	export class SheetOptions {
+	    cols: number;
+	    rows: number;
+	    width: number;
+	    format: string;
+	    times: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SheetOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cols = source["cols"];
+	        this.rows = source["rows"];
+	        this.width = source["width"];
+	        this.format = source["format"];
+	        this.times = source["times"];
+	    }
+	}
+	export class SubscriptionInfo {
+	    id: string;
+	    url: string;
+	    title: string;
+	    source: string;
+	    type: string;
+	    thumbnail: string;
+	    mode: string;
+	    tabs: string[];
+	    everyHours: number;
+	    enabled: boolean;
+	    lastCheck: number;
+	    nextCheck: number;
+	    lastNew: number;
+	    totalNew: number;
+	    lastError: string;
+	    checking: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SubscriptionInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.url = source["url"];
+	        this.title = source["title"];
+	        this.source = source["source"];
+	        this.type = source["type"];
+	        this.thumbnail = source["thumbnail"];
+	        this.mode = source["mode"];
+	        this.tabs = source["tabs"];
+	        this.everyHours = source["everyHours"];
+	        this.enabled = source["enabled"];
+	        this.lastCheck = source["lastCheck"];
+	        this.nextCheck = source["nextCheck"];
+	        this.lastNew = source["lastNew"];
+	        this.totalNew = source["totalNew"];
+	        this.lastError = source["lastError"];
+	        this.checking = source["checking"];
+	    }
+	}
+	export class SubtitleJob {
+	    model: string;
+	    language: string;
+	    translate: boolean;
+	    formats: string[];
+	    maxLen: number;
+	    video: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SubtitleJob(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.model = source["model"];
+	        this.language = source["language"];
+	        this.translate = source["translate"];
+	        this.formats = source["formats"];
+	        this.maxLen = source["maxLen"];
+	        this.video = source["video"];
+	    }
+	}
 	export class VideoJob {
 	    mode: string;
 	    video: mediaconv.VideoOptions;
 	    audio: mediaconv.AudioOptions;
 	    frameEvery: number;
 	    frameFormat: string;
+	    sheet: SheetOptions;
 	
 	    static createFrom(source: any = {}) {
 	        return new VideoJob(source);
@@ -804,6 +1154,7 @@ export namespace main {
 	        this.audio = this.convertValues(source["audio"], mediaconv.AudioOptions);
 	        this.frameEvery = source["frameEvery"];
 	        this.frameFormat = source["frameFormat"];
+	        this.sheet = this.convertValues(source["sheet"], SheetOptions);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -846,6 +1197,7 @@ export namespace mediaconv {
 	    removeSilence: boolean;
 	    speed: number;
 	    pitch: number;
+	    denoise: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AudioOptions(source);
@@ -869,6 +1221,73 @@ export namespace mediaconv {
 	        this.removeSilence = source["removeSilence"];
 	        this.speed = source["speed"];
 	        this.pitch = source["pitch"];
+	        this.denoise = source["denoise"];
+	    }
+	}
+	export class CropBox {
+	    x: number;
+	    y: number;
+	    w: number;
+	    h: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CropBox(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.x = source["x"];
+	        this.y = source["y"];
+	        this.w = source["w"];
+	        this.h = source["h"];
+	    }
+	}
+	export class Music {
+	    file: string;
+	    mode: string;
+	    volume: number;
+	    original: number;
+	    duck: boolean;
+	    loop: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Music(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.file = source["file"];
+	        this.mode = source["mode"];
+	        this.volume = source["volume"];
+	        this.original = source["original"];
+	        this.duck = source["duck"];
+	        this.loop = source["loop"];
+	    }
+	}
+	export class SlideOptions {
+	    format: string;
+	    seconds: number;
+	    size: number;
+	    ratio: string;
+	    fit: string;
+	    background: string;
+	    fade: number;
+	    music: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SlideOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.format = source["format"];
+	        this.seconds = source["seconds"];
+	        this.size = source["size"];
+	        this.ratio = source["ratio"];
+	        this.fit = source["fit"];
+	        this.background = source["background"];
+	        this.fade = source["fade"];
+	        this.music = source["music"];
 	    }
 	}
 	export class Tags {
@@ -921,6 +1340,15 @@ export namespace mediaconv {
 	    flipH: boolean;
 	    flipV: boolean;
 	    subtitles: string;
+	    speed: number;
+	    reverse: boolean;
+	    crop: CropBox;
+	    frame: string;
+	    frameFit: string;
+	    stabilize: boolean;
+	    denoise: string;
+	    music: Music;
+	    watermark: imageconv.Watermark;
 	
 	    static createFrom(source: any = {}) {
 	        return new VideoOptions(source);
@@ -949,13 +1377,74 @@ export namespace mediaconv {
 	        this.flipH = source["flipH"];
 	        this.flipV = source["flipV"];
 	        this.subtitles = source["subtitles"];
+	        this.speed = source["speed"];
+	        this.reverse = source["reverse"];
+	        this.crop = this.convertValues(source["crop"], CropBox);
+	        this.frame = source["frame"];
+	        this.frameFit = source["frameFit"];
+	        this.stabilize = source["stabilize"];
+	        this.denoise = source["denoise"];
+	        this.music = this.convertValues(source["music"], Music);
+	        this.watermark = this.convertValues(source["watermark"], imageconv.Watermark);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }
 
 export namespace pdf {
 	
+	export class Bookmark {
+	    title: string;
+	    page: number;
+	    kids: Bookmark[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Bookmark(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.title = source["title"];
+	        this.page = source["page"];
+	        this.kids = this.convertValues(source["kids"], Bookmark);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class CertInfo {
 	    name: string;
 	    email: string;
@@ -1140,6 +1629,7 @@ export namespace pdf {
 	    visible: boolean;
 	    position: string;
 	    page: string;
+	    tsa: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new DigitalSignOptions(source);
@@ -1156,7 +1646,62 @@ export namespace pdf {
 	        this.visible = source["visible"];
 	        this.position = source["position"];
 	        this.page = source["page"];
+	        this.tsa = source["tsa"];
 	    }
+	}
+	export class Meta {
+	    title: string;
+	    author: string;
+	    subject: string;
+	    keywords: string;
+	    creator: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Meta(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.title = source["title"];
+	        this.author = source["author"];
+	        this.subject = source["subject"];
+	        this.keywords = source["keywords"];
+	        this.creator = source["creator"];
+	    }
+	}
+	export class DocDetails {
+	    meta: Meta;
+	    bookmarks: Bookmark[];
+	    pages: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DocDetails(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.meta = this.convertValues(source["meta"], Meta);
+	        this.bookmarks = this.convertValues(source["bookmarks"], Bookmark);
+	        this.pages = source["pages"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class PageSize {
 	    w: number;
@@ -1226,6 +1771,40 @@ export namespace pdf {
 	        this.libreoffice = source["libreoffice"];
 	    }
 	}
+	export class FormField {
+	    id: string;
+	    name: string;
+	    kind: string;
+	    value: string;
+	    values: string[];
+	    checked: boolean;
+	    options: string[];
+	    multiline: boolean;
+	    multi: boolean;
+	    locked: boolean;
+	    page: number;
+	    format: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FormField(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.value = source["value"];
+	        this.values = source["values"];
+	        this.checked = source["checked"];
+	        this.options = source["options"];
+	        this.multiline = source["multiline"];
+	        this.multi = source["multi"];
+	        this.locked = source["locked"];
+	        this.page = source["page"];
+	        this.format = source["format"];
+	    }
+	}
 	export class HTMLOptions {
 	    pageSize: string;
 	    orientation: string;
@@ -1246,6 +1825,44 @@ export namespace pdf {
 	        this.width = source["width"];
 	        this.onePage = source["onePage"];
 	        this.background = source["background"];
+	    }
+	}
+	export class HeaderFooterOptions {
+	    topLeft: string;
+	    topCenter: string;
+	    topRight: string;
+	    bottomLeft: string;
+	    bottomCenter: string;
+	    bottomRight: string;
+	    size: number;
+	    color: string;
+	    bold: boolean;
+	    margin: number;
+	    line: boolean;
+	    pages: string;
+	    skipFirst: boolean;
+	    mirror: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new HeaderFooterOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.topLeft = source["topLeft"];
+	        this.topCenter = source["topCenter"];
+	        this.topRight = source["topRight"];
+	        this.bottomLeft = source["bottomLeft"];
+	        this.bottomCenter = source["bottomCenter"];
+	        this.bottomRight = source["bottomRight"];
+	        this.size = source["size"];
+	        this.color = source["color"];
+	        this.bold = source["bold"];
+	        this.margin = source["margin"];
+	        this.line = source["line"];
+	        this.pages = source["pages"];
+	        this.skipFirst = source["skipFirst"];
+	        this.mirror = source["mirror"];
 	    }
 	}
 	export class ImageExportOptions {
@@ -1300,6 +1917,27 @@ export namespace pdf {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
 	        this.password = source["password"];
+	    }
+	}
+	
+	export class NUpOptions {
+	    mode: string;
+	    n: number;
+	    paper: string;
+	    border: boolean;
+	    margin: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new NUpOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mode = source["mode"];
+	        this.n = source["n"];
+	        this.paper = source["paper"];
+	        this.border = source["border"];
+	        this.margin = source["margin"];
 	    }
 	}
 	export class NumberOptions {

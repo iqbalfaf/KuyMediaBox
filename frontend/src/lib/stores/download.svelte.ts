@@ -8,10 +8,10 @@ import { isActive, tasks, trackBatch } from './tasks.svelte'
 export type Scope = 'all' | 'latest' | 'since'
 
 /** A download category: one per platform. */
-export type Category = 'youtube' | 'tiktok' | 'instagram' | 'facebook' | 'x' | 'pinterest' | 'spotify' | 'other'
+export type Category = 'youtube' | 'tiktok' | 'instagram' | 'facebook' | 'x' | 'pinterest' | 'reddit' | 'spotify' | 'soundcloud' | 'twitch' | 'bilibili' | 'other'
 
 /** Display order of the category tabs. */
-export const categoryOrder: Category[] = ['youtube', 'tiktok', 'instagram', 'facebook', 'x', 'pinterest', 'spotify', 'other']
+export const categoryOrder: Category[] = ['youtube', 'tiktok', 'instagram', 'facebook', 'x', 'pinterest', 'reddit', 'spotify', 'soundcloud', 'twitch', 'bilibili', 'other']
 
 export interface LinkRow {
   id: string
@@ -33,36 +33,40 @@ export interface LinkRow {
 const youtubeDefaults: DownloadOptions = {
   mode: 'video', quality: '1080', container: 'mp4', audioFormat: 'mp3', audioQuality: 'auto',
   embed: true, skipExisting: true, numbering: true, imageFormat: 'original',
-  subtitles: 'none', subLangs: 'id,en', sectionStart: '', sectionEnd: '', sponsorBlock: 'off', playlist: false,
+  subtitles: 'none', subLangs: 'id,en', sectionStart: '', sectionEnd: '', sponsorBlock: 'off', playlist: false, lyrics: false, workflow: '',
 }
 const spotifyDefaults: DownloadOptions = {
   mode: 'audio', quality: '1080', container: 'mp4', audioFormat: 'mp3', audioQuality: 'auto',
   embed: true, skipExisting: true, numbering: true, imageFormat: 'original',
-  subtitles: 'none', subLangs: 'id,en', sectionStart: '', sectionEnd: '', sponsorBlock: 'off', playlist: true,
+  subtitles: 'none', subLangs: 'id,en', sectionStart: '', sectionEnd: '', sponsorBlock: 'off', playlist: true, lyrics: true, workflow: '',
 }
 const socialDefaults: DownloadOptions = {
   mode: 'video', quality: 'best', container: 'mp4', audioFormat: 'mp3', audioQuality: 'auto',
   embed: true, skipExisting: true, numbering: false, imageFormat: 'original',
-  subtitles: 'none', subLangs: 'id,en', sectionStart: '', sectionEnd: '', sponsorBlock: 'off', playlist: false,
+  subtitles: 'none', subLangs: 'id,en', sectionStart: '', sectionEnd: '', sponsorBlock: 'off', playlist: false, lyrics: false, workflow: '',
 }
 
-/** TikTok, Instagram, Facebook, X and Pinterest. */
+/** TikTok, Instagram, Facebook, X, Pinterest and Reddit: posts with videos and pictures. */
 export function isSocial(source: string): boolean {
-  return source === 'tiktok' || source === 'instagram' || source === 'facebook' || source === 'x' || source === 'pinterest'
+  return source === 'tiktok' || source === 'instagram' || source === 'facebook' || source === 'x' || source === 'pinterest' || source === 'reddit'
 }
+
+/** SoundCloud is music: downloads default to audio. */
+const soundcloudDefaults: DownloadOptions = { ...youtubeDefaults, mode: 'audio', audioFormat: 'mp3', numbering: true, playlist: true }
 
 export const sourceName: Record<string, string> = {
-  youtube: 'YouTube', spotify: 'Spotify', tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook', x: 'X', pinterest: 'Pinterest', other: 'Web',
+  youtube: 'YouTube', spotify: 'Spotify', tiktok: 'TikTok', instagram: 'Instagram', facebook: 'Facebook', x: 'X', pinterest: 'Pinterest',
+  soundcloud: 'SoundCloud', twitch: 'Twitch', reddit: 'Reddit', bilibili: 'Bilibili', other: 'Web',
 }
 
 /** Short badge class per source. */
 export const sourceClass: Record<string, string> = {
-  youtube: 'yt', spotify: 'sp', tiktok: 'tt', instagram: 'ig', facebook: 'fb', x: 'x', pinterest: 'pi', other: 'ot',
+  youtube: 'yt', spotify: 'sp', tiktok: 'tt', instagram: 'ig', facebook: 'fb', x: 'x', pinterest: 'pi', soundcloud: 'sc', twitch: 'tw', reddit: 'rd', bilibili: 'bl', other: 'ot',
 }
 
 /** Icon shown in a category badge. */
 export const sourceIcon: Record<string, string> = {
-  youtube: 'play', spotify: 'music', tiktok: 'play', instagram: 'image', facebook: 'play', x: 'at', pinterest: 'pin', other: 'link',
+  youtube: 'play', spotify: 'music', tiktok: 'play', instagram: 'image', facebook: 'play', x: 'at', pinterest: 'pin', soundcloud: 'wave', twitch: 'video', reddit: 'image', bilibili: 'play', other: 'link',
 }
 
 /** "3 foto · 1 video · musik" for a social post. */
@@ -94,6 +98,7 @@ function optsKey(cat: Category) {
 
 function defaultsFor(cat: Category): DownloadOptions {
   if (isSocial(cat)) return socialDefaults
+  if (cat === 'soundcloud') return soundcloudDefaults
   return cat === 'spotify' ? spotifyDefaults : youtubeDefaults
 }
 
@@ -226,6 +231,14 @@ function unknownLinkText(source: string): string {
       return L('Gunakan link post X (…/status/…) atau profil', 'Use an X post (…/status/…) or profile link')
     case 'pinterest':
       return L('Gunakan link pin, board, profil, atau pencarian Pinterest', 'Use a Pinterest pin, board, profile or search link')
+    case 'soundcloud':
+      return L('Gunakan link lagu, set/album, atau profil SoundCloud', 'Use a SoundCloud track, set/album or profile link')
+    case 'twitch':
+      return L('Gunakan link VOD (…/videos/…), klip, atau channel Twitch', 'Use a Twitch VOD (…/videos/…), clip or channel link')
+    case 'reddit':
+      return L('Gunakan link post Reddit (…/comments/…) atau galeri', 'Use a Reddit post (…/comments/…) or gallery link')
+    case 'bilibili':
+      return L('Gunakan link video (…/video/BV…) atau ruang pengguna Bilibili', 'Use a Bilibili video (…/video/BV…) or user space link')
   }
   return L('Link tidak dikenali', 'Link not recognized')
 }

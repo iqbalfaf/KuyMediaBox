@@ -21,6 +21,9 @@
   let nPw = $state('')
   let nPw2 = $state('')
   let busy = $state(false)
+  let tsaServers = $state<string[]>([])
+  api.pdfTSAServers().then((v) => (tsaServers = v)).catch(() => {})
+  const tsaName = (u: string) => u.replace(/^https?:\/\//, '').split('/')[0]
 
   async function pickCert() {
     try {
@@ -145,6 +148,16 @@
       />
     </div>
   {/if}
+</div>
+
+<div class="sec">
+  <span class="label">{L('Stempel waktu (TSA)', 'Time stamp (TSA)')}</span>
+  <Select
+    label={L('Stempel waktu (TSA)', 'Time stamp (TSA)')}
+    bind:value={o.digisign.tsa}
+    options={[{ value: '', label: L('Tanpa (jam komputer)', 'None (computer clock)') }, ...tsaServers.map((u) => ({ value: u, label: tsaName(u) }))]}
+  />
+  <p class="hint">{L('Stempel waktu dari server tepercaya membuktikan kapan dokumen ditandatangani, bahkan setelah sertifikat kedaluwarsa. Perlu internet.', 'A time stamp from a trusted server proves when the document was signed, even after the certificate expires. Needs internet.')}</p>
   <p class="hint">{L('Tanda tangan digital lama di PDF sumber tidak ikut terbawa. Untuk tanda tangan gambar/tulisan tangan, pakai alat "Tanda tangan PDF" dulu lalu tandatangani secara digital.', 'Earlier digital signatures of the source are not kept. For a drawn signature, use "Sign PDF" first, then sign digitally.')}</p>
 </div>
 

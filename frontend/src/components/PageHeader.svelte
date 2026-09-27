@@ -1,7 +1,7 @@
 <script lang="ts">
   import { L } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
-  import { runtime } from '../lib/api'
+  import { api, runtime } from '../lib/api'
 
   let { title, subtitle, back, backLabel = '' }: { title: string; subtitle: string; back?: () => void; backLabel?: string } = $props()
 </script>
@@ -17,7 +17,7 @@
   <div class="controls no-drag">
     <button aria-label={L('Perkecil jendela', 'Minimize window')} onclick={() => runtime.minimise()}><Icon name="minus" size={16} /></button>
     <button aria-label={L('Perbesar jendela', 'Maximize window')} onclick={() => runtime.toggleMaximise()}><Icon name="square" size={14} /></button>
-    <button class="close" aria-label={L('Tutup aplikasi', 'Close app')} onclick={() => runtime.quit()}><Icon name="x" size={16} /></button>
+    <button class="close" aria-label={L('Tutup aplikasi', 'Close app')} onclick={() => api.closeWindow()}><Icon name="x" size={16} /></button>
   </div>
 </header>
 

@@ -59,3 +59,18 @@ func SendToDir() string { return "" }
 
 // CreateShortcut is not supported outside Windows.
 func CreateShortcut(lnk, target, desc string) error { return errors.New("not supported") }
+
+// SetURLProtocol is only supported on Windows.
+func SetURLProtocol(scheme, exe, desc string, on bool) error { return errors.New("not supported") }
+
+// URLProtocolCommand is only supported on Windows.
+func URLProtocolCommand(string) string { return "" }
+
+// SetAutostart is only supported on Windows.
+func SetAutostart(name, command string, on bool) error { return errors.New("not supported") }
+
+// AutostartCommand is only supported on Windows.
+func AutostartCommand(string) string { return "" }
+
+// AttachParentConsole is a no-op: other systems always have their standard streams.
+func AttachParentConsole() {}

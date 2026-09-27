@@ -3,6 +3,7 @@
   import PageHeader from '../components/PageHeader.svelte'
   import Select from '../components/Select.svelte'
   import Icon from '../components/Icon.svelte'
+  import HistoryStats from '../components/HistoryStats.svelte'
   import { api } from '../lib/api'
   import { showDetail } from '../lib/stores/app.svelte'
   import { clearHistory, history, reloadHistory, removeHistory } from '../lib/stores/history.svelte'
@@ -14,9 +15,10 @@
   let query = $state('')
   let shown = $state(200)
   let confirmClear = $state(false)
+  let view = $state<'list' | 'stats'>('list')
 
-  const kindIcon: Record<string, string> = { image: 'image', video: 'video', audio: 'music', download: 'download', pdf: 'fileText' }
-  const kindName = $derived<Record<string, string>>({ image: L('Gambar', 'Image'), video: 'Video', audio: 'Audio', download: 'Download', pdf: 'PDF' })
+  const kindIcon: Record<string, string> = { image: 'image', video: 'video', audio: 'music', download: 'download', pdf: 'fileText', subtitle: 'subtitles' }
+  const kindName = $derived<Record<string, string>>({ image: L('Gambar', 'Image'), video: 'Video', audio: 'Audio', download: 'Download', pdf: 'PDF', subtitle: 'Subtitle' })
 
   const filtered = $derived.by(() => {
     const q = query.trim().toLowerCase()
@@ -80,6 +82,9 @@
 <PageHeader title={L('Riwayat', 'History')} subtitle={L('Semua tugas yang pernah selesai: tanggal, file, ukuran sebelum/sesudah, dan status.', 'Every finished task: date, files, size before/after and status.')} />
 
 <div class="body">
+  {#if view === 'stats'}
+    <HistoryStats list={history.list} onclose={() => (view = 'list')} />
+  {:else}
   <section class="card list" aria-label={L('Riwayat tugas', 'Task history')}>
     <div class="toolbar">
       <div class="search">
@@ -92,7 +97,7 @@
           bind:value={kind}
           options={[
             { value: 'all', label: L('Semua jenis', 'All types') }, { value: 'image', label: L('Gambar', 'Images') }, { value: 'video', label: 'Video' },
-            { value: 'audio', label: 'Audio' }, { value: 'download', label: 'Download' }, { value: 'pdf', label: 'PDF' },
+            { value: 'audio', label: 'Audio' }, { value: 'subtitle', label: 'Subtitle' }, { value: 'download', label: 'Download' }, { value: 'pdf', label: 'PDF' },
           ]}
         />
       </div>
@@ -107,6 +112,7 @@
           ]}
         />
       </div>
+      <button class="btn" onclick={() => (view = 'stats')} disabled={history.list.length === 0}><Icon name="award" size={16} />{L('Statistik', 'Statistics')}</button>
       <button class="btn icon" title={L('Muat ulang', 'Reload')} aria-label={L('Muat ulang', 'Reload')} onclick={reloadHistory}><Icon name="refresh" size={16} /></button>
       <button class="btn" class:danger={confirmClear} onclick={doClear} disabled={history.list.length === 0}>
         <Icon name="trash" size={16} />{confirmClear ? L('Yakin hapus semua?', 'Delete everything?') : L('Hapus riwayat', 'Clear history')}
@@ -179,6 +185,7 @@
       {/if}
     </div>
   </section>
+  {/if}
 </div>
 
 <style>

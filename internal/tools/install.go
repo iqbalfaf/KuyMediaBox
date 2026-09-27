@@ -127,6 +127,7 @@ func (m *Manager) CheckUpdates(ctx context.Context) {
 			s.UpdateAvailable = s.Found && s.Source == "downloaded" && newer(latest, s.Version)
 		})
 	}
+	m.checkExtraUpdates(ctx)
 	// LibreOffice: only a copy we extracted ourselves is offered for updating.
 	if latest, err := latestLibreOffice(ctx); err == nil {
 		m.update(LibreOffice, func(s *Status) {
@@ -178,6 +179,9 @@ func (m *Manager) Install(ctx context.Context, id string) error {
 func (m *Manager) install(ctx context.Context, id string) error {
 	dir := appdir.ToolsDir()
 	progress := func(p float64) { m.update(id, func(s *Status) { s.Progress = p }) }
+	if ok, err := m.installExtra(ctx, id, progress); ok {
+		return err
+	}
 	switch id {
 	case FFmpeg:
 		sources := []string{

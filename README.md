@@ -4,7 +4,7 @@
 
 # KuyMediaBox
 
-**Satu aplikasi desktop untuk konversi gambar, video, audio, 31 alat PDF, dan download dari YouTube, TikTok, Instagram, Facebook, X, Pinterest & Spotify.**
+**Satu aplikasi desktop untuk konversi gambar, video, audio, subtitle otomatis, 40 alat PDF, alur kerja otomatis, dan download dari YouTube, TikTok, Instagram, Facebook, X, Pinterest, Reddit, SoundCloud, Twitch, Bilibili & Spotify.**
 Ringan, offline, tanpa iklan, dan tanpa batas ukuran file. Tersedia dalam **Bahasa Indonesia** dan **English**.
 
 [![Release](https://img.shields.io/github/v/release/iqbalfaf/KuyMediaBox?label=download&color=ff7a45)](https://github.com/iqbalfaf/KuyMediaBox/releases/latest)
@@ -67,6 +67,12 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Metadata EXIF** | Dihapus secara bawaan (lokasi GPS, kamera ikut hilang); bisa dipertahankan untuk hasil JPG/PNG |
 | **ICO** | Satu file berisi beberapa ukuran sekaligus (16, 24, 32, 48, 64, 128, 256) |
 | **Info hasil** | Thumbnail tiap file, ukuran hasil & persentase penghematan (mis. `−82%`), dan **Bandingkan** sebelum/sesudah dengan slider |
+| **Crop manual** | Tarik kotak di atas gambar (bisa dikunci ke rasio tertentu) |
+| **Perbesar dengan AI** | 2× atau 4× dengan Real-ESRGAN (model foto atau anime/ilustrasi), jalan di GPU apa pun lewat Vulkan |
+| **Hapus latar** | Latar belakang jadi transparan (model umum, orang, atau cepat) — offline dengan ONNX Runtime, atau simpan masker hitam-putihnya saja |
+| **Kompres PNG** | pngquant (lossy, jauh lebih kecil) dan/atau oxipng (lossless) |
+| **Animasi & slideshow** | Banyak gambar jadi **GIF**, **WEBP animasi**, atau **MP4** (durasi per gambar, transisi pudar, bingkai 1:1/16:9/9:16/4:5 dengan latar blur, musik latar untuk MP4) |
+| **Kolase** | Grid otomatis atau jumlah kolom pilihan, rasio sel, jarak, sudut membulat, warna latar |
 
 ### 🎬 Konversi Video
 
@@ -79,7 +85,14 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Ukuran target** | Mis. **16 MB untuk WhatsApp**: bitrate dihitung dari durasi, encode 2 tahap agar ukurannya pas |
 | **Akselerasi GPU** | NVIDIA NVENC, Intel Quick Sync, AMD AMF — hanya yang benar-benar berfungsi di PC Anda yang bisa dipilih |
 | **Resolusi & fps** | Asli, 4K, 1440p, 1080p, 720p, 480p, atau custom (tidak pernah diperbesar) · fps asli / 60 / 30 / 24 / custom |
-| **Potong** | Waktu mulai–selesai (mis. `1:30` – `2:45`) |
+| **Potong** | Waktu mulai–selesai (mis. `1:30` – `2:45`), atau **pilih di timeline** dengan pratinjau video & gelombang suara |
+| **Crop & bingkai** | Crop manual dengan menarik kotak, atau bingkai **9:16 / 1:1 / 4:5 / 16:9** dengan latar blur, bar hitam, atau dipotong penuh (preset **Reels/TikTok/Shorts**) |
+| **Kecepatan & putar balik** | 0,25×–4× (suara ikut tanpa berubah nada), atau video diputar mundur |
+| **Stabilisasi** | Mengurangi goyangan video dari HP (vidstab, 2 tahap) |
+| **Kurangi noise** | Dengung & desis di suara video dikurangi (ringan / sedang / kuat) |
+| **Musik latar** | Campur atau ganti suara asli, volume masing-masing, diulang sepanjang video, dan **ducking** (musik mengecil saat ada suara orang) |
+| **Watermark** | Teks atau logo di video, sama seperti di gambar |
+| **Lembar kontak** | Satu gambar berisi grid cuplikan video beserta waktunya |
 | **Putar & balik** | 90°/180°/270°, cermin horizontal/vertikal |
 | **Suara** | Otomatis, salin asli, AAC/MP3/Opus dengan bitrate pilihan, atau tanpa suara |
 | **Subtitle** | File `.srt/.ass/.vtt` di samping video (atau subtitle di dalam file) **disematkan** atau **dibakar** ke video |
@@ -105,8 +118,21 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Hapus hening** | Bagian sunyi di awal & akhir dibuang otomatis |
 | **Kecepatan & nada** | Kecepatan 0,5×–2× tanpa mengubah nada, nada −12…+12 semitone tanpa mengubah kecepatan |
 | **Gabung audio** | Beberapa file jadi satu, sesuai urutan daftar |
+| **Kurangi noise** | Dengung, desis, dan suara kipas dikurangi (cocok untuk rekaman suara & podcast) |
+| **Pisah CUE** | File album + `.cue` dipecah jadi satu file per lagu lengkap dengan judul, artis & nomor track |
+| **Potong visual** | Pilih bagian lagu di gelombang suara sambil mendengarkan |
 
-### ⬇ Download YouTube, TikTok, Instagram, Facebook, X, Pinterest & Spotify
+### 💬 Subtitle otomatis
+
+| | |
+|---|---|
+| **Dari suara ke teks** | Video atau audio jadi subtitle dengan **Whisper** (whisper.cpp), sepenuhnya offline |
+| **Model** | Tiny, Base, Small, Turbo, Medium — diunduh sekali dari menu yang sama; makin besar makin akurat |
+| **Bahasa** | Deteksi otomatis atau pilih (Indonesia, Inggris, Jawa, Sunda, Arab, Jepang, …), plus **terjemahkan ke Inggris** |
+| **Hasil** | SRT, VTT, dan/atau TXT; baris dipotong rapi (maks. N karakter, 2 baris per tampilan) |
+| **Video** | Opsional: subtitle **disematkan** ke video atau **dibakar** ke gambar |
+
+### ⬇ Download YouTube, TikTok, Instagram, Facebook, X, Pinterest, Reddit, SoundCloud, Twitch, Bilibili & Spotify
 
 | | |
 |---|---|
@@ -117,7 +143,17 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Link Facebook** | **Video**, **reel**, link `fb.watch` / `/share/v/`, dan **foto** |
 | **Link X (Twitter)** | **Post** berisi foto, video, atau GIF (termasuk post dengan beberapa foto/video) dari `x.com`, `twitter.com`, dan `fxtwitter`/`vxtwitter`. **Profil** (tab Media, 500 item terbaru) butuh login lewat cookies browser. |
 | **Link Pinterest** | **Pin** foto & video (termasuk link pendek `pin.it`), **board**, **profil** (semua pin atau `_created`), dan **hasil pencarian** (200 pin pertama). Domain negara seperti `id.pinterest.com` juga dikenali. |
+| **Link Instagram: story & highlight** | Story dan highlight (butuh login lewat cookies browser) |
+| **Link Reddit** | Post video, foto, dan **galeri**, termasuk crosspost dan link pendek `redd.it` |
+| **Link SoundCloud** | Lagu, **playlist/set**, dan profil — langsung jadi audio |
+| **Link Twitch** | VOD, klip, dan highlight |
+| **Link Bilibili** | Video (termasuk link pendek `b23.tv`) |
 | **Situs lain** | Link video lain yang didukung yt-dlp juga bisa dicoba |
+| **Lirik (.lrc)** | Lirik bertimestamp dari LRCLIB disimpan di samping lagu Spotify |
+| **Langganan** | Ikuti channel/playlist/profil: video baru diunduh otomatis tiap N jam (juga saat aplikasi di tray) |
+| **Lanjutkan setelah ditutup** | Unduhan yang terputus karena aplikasi ditutup ditawarkan untuk dilanjutkan saat dibuka lagi |
+| **Dari browser, satu klik** | Daftarkan link `kuymediabox://` lalu pakai bookmarklet: halaman yang sedang dibuka langsung masuk ke halaman Download |
+| **Setelah download** | Tiap file hasil unduhan bisa langsung masuk ke **alur kerja** (mis. MP3 → volume rata) |
 | **Banyak link sekaligus** | Tempel beberapa link (satu per baris), tombol **Tempel**, atau Ctrl+V di halaman Download. Jenis link terdeteksi otomatis. |
 | **Kategori per platform** | Link otomatis masuk ke tab **YouTube, TikTok, Instagram, Facebook, X, Pinterest, atau Spotify**. Menempel link Instagram lagi menambahkannya ke daftar Instagram yang sama (tidak membuat tab baru). Tiap tab menampilkan jumlah item terpilih. |
 | **Pratinjau isi** | Judul, thumbnail, durasi, dan daftar video/lagu sebelum mengunduh. Di dalam kategori, playlist/channel/album/carousel tampil sebagai grup (bisa dicentang sekaligus), link berisi satu item tampil sebagai satu baris. |
@@ -141,21 +177,21 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **Nomor urut** | `01 - judul`, `02 - judul`, … sesuai urutan playlist/album |
 | **Progress** | Persen, kecepatan, dan sisa waktu per item; bisa dibatalkan per item atau semua |
 
-### 📄 Alat PDF (31 alat, semuanya offline)
+### 📄 Alat PDF (40 alat, semuanya offline)
 
 Semua file PDF diproses **di komputer Anda**, tidak ada yang diunggah ke internet. Buka **Alat PDF** di sidebar, lalu pilih alatnya (bisa dicari).
 
 | Kategori | Alat |
 |---|---|
-| **Atur halaman** | **Gabungkan PDF** (urutan bisa digeser) · **Pisahkan PDF** (per rentang, tiap N halaman, atau per halaman — klik gunting di antara halaman) · **Hapus halaman** · **Ekstrak halaman** (satu file atau per halaman) · **Susun halaman** (geser, putar, gandakan, hapus, sisipkan halaman kosong, gabung halaman dari beberapa PDF) · **Scan ke PDF** (scanner via dialog Windows atau kamera) |
+| **Atur halaman** | **Gabungkan PDF** (urutan bisa digeser) · **Pisahkan PDF** (per rentang, tiap N halaman, atau per halaman — klik gunting di antara halaman) · **Hapus halaman** · **Ekstrak halaman** (satu file atau per halaman) · **Susun halaman** (geser, putar, gandakan, hapus, sisipkan halaman kosong, gabung halaman dari beberapa PDF) · **Scan ke PDF** (scanner via dialog Windows atau kamera) · **N-up** (2–16 halaman per lembar) · **Buklet** (disusun untuk dicetak bolak-balik lalu dilipat) |
 | **Optimasi** | **Kompres PDF** (Ekstrem / Disarankan / Ringan, opsional hitam-putih) · **Perbaiki PDF** (bangun ulang struktur, selamatkan halaman dari file rusak) · **OCR PDF** (teks hasil scan jadi bisa dicari & disalin, memakai OCR bawaan Windows) |
 | **Ubah ke PDF** | **Gambar ke PDF** (JPG, PNG, HEIC, WEBP, … dengan ukuran kertas A4/F4/Letter/…, arah, margin) · **Word, PowerPoint, Excel ke PDF** (lewat Microsoft Office bila terpasang, atau LibreOffice) · **HTML ke PDF** (alamat web atau file HTML, lebar layar HP/tablet/laptop/desktop, bisa satu halaman panjang) |
-| **Ubah dari PDF** | **PDF ke gambar** (JPG/PNG 72–300 DPI, atau ambil gambar asli di dalam PDF) · **PDF ke Word** (Microsoft Word bila ada; tanpa Word teks & paragraf tetap diambil) · **PDF ke PowerPoint** (satu halaman = satu slide) · **PDF ke Excel** (tabel disusun ke baris & kolom) · **PDF ke PDF/A** (PDF/A-2b untuk arsip, divalidasi otomatis bila veraPDF terpasang) · **Validasi PDF/A** (pemeriksaan resmi dengan veraPDF) |
-| **Edit & tandai** | **Putar PDF** · **Nomor halaman** (6 posisi, format "Halaman 1 dari N", mulai dari nomor tertentu, lewati sampul, mode buku) · **Watermark** teks atau logo (transparansi, kemiringan, 9 posisi atau berulang, di atas/di bawah isi) · **Edit PDF** (teks, kotak, lingkaran, garis, coretan bebas, gambar, tutup putih; bisa digeser, diubah ukuran, urungkan) · **Potong PDF** (pilih area atau margin mm) |
-| **Keamanan** | **Kunci PDF** (AES-256, izin cetak/salin/ubah) · **Buka kunci PDF** · **Tanda tangan PDF** (gambar dengan mouse/pena, ketik nama dengan huruf tulisan tangan, atau unggah gambar; plus tanggal) · **Sensor PDF** (tarik kotak atau cari teks, mis. nomor rekening; teks di bawahnya benar-benar dihapus dari file) · **Bandingkan PDF** (dua versi berdampingan, kata yang dihapus merah dan yang ditambah hijau) · **Tanda tangan digital** (sertifikat `.pfx/.p12` PKCS#7, atau buat sertifikat pribadi; bisa diverifikasi di pembaca PDF) |
+| **Ubah dari PDF** | **PDF ke gambar** (JPG/PNG 72–300 DPI, atau ambil gambar asli di dalam PDF) · **PDF ke Word** (Microsoft Word bila ada; tanpa Word teks & paragraf tetap diambil) · **PDF ke PowerPoint** (satu halaman = satu slide) · **PDF ke Excel** (tabel disusun ke baris & kolom) · **PDF ke PDF/A** (PDF/A-2b untuk arsip, divalidasi otomatis bila veraPDF terpasang) · **Validasi PDF/A** (pemeriksaan resmi dengan veraPDF) · **PDF ke teks** · **PDF ke Markdown** (judul & daftar dikenali) · **Tabel PDF ke CSV** (siap dibuka Excel) |
+| **Edit & tandai** | **Putar PDF** · **Nomor halaman** (6 posisi, format "Halaman 1 dari N", mulai dari nomor tertentu, lewati sampul, mode buku) · **Watermark** teks atau logo (transparansi, kemiringan, 9 posisi atau berulang, di atas/di bawah isi) · **Edit PDF** (teks, kotak, lingkaran, garis, coretan bebas, gambar, tutup putih; bisa digeser, diubah ukuran, urungkan) · **Potong PDF** (pilih area atau margin mm) · **Isi formulir PDF** (kolom teks, centang, pilihan; bisa langsung diratakan) · **Header & footer** (6 posisi, `{n}` `{total}` `{date}` `{file}`, garis pemisah, bolak-balik untuk buku) · **Properti & bookmark** (judul, penulis, kata kunci, daftar isi bertingkat) · **Ratakan PDF** (isian formulir & anotasi jadi bagian halaman) |
+| **Keamanan** | **Kunci PDF** (AES-256, izin cetak/salin/ubah) · **Buka kunci PDF** · **Tanda tangan PDF** (gambar dengan mouse/pena, ketik nama dengan huruf tulisan tangan, atau unggah gambar; plus tanggal) · **Sensor PDF** (tarik kotak atau cari teks, mis. nomor rekening; teks di bawahnya benar-benar dihapus dari file) · **Bandingkan PDF** (dua versi berdampingan, kata yang dihapus merah dan yang ditambah hijau) · **Tanda tangan digital** (sertifikat `.pfx/.p12` PKCS#7, atau buat sertifikat pribadi; bisa diverifikasi di pembaca PDF; opsional **stempel waktu TSA** RFC 3161) |
 
 - PDF yang dikunci password bisa dipakai di semua alat: password ditanyakan saat mulai dan **tidak disimpan**.
-- Teks watermark, nomor halaman, dan Edit PDF mendukung **huruf non-Latin** (Cyrillic, Yunani, Jepang, Mandarin, Korea, Devanagari, …) dengan font Windows yang disematkan.
+- Teks watermark, nomor halaman, dan Edit PDF mendukung **huruf non-Latin** (Cyrillic, Yunani, Jepang, Mandarin, Korea, Devanagari, …) dengan font Windows yang disematkan. Huruf **Arab, Ibrani, dan India** disusun dengan benar (huruf bersambung, kanan-ke-kiri, konjungsi) dan tetap bisa disalin/dicari.
 - Hasil tersimpan di `Documents › KuyMediaBox` (bisa diubah ke folder dinamis atau folder pilihan). Nama file diberi akhiran sesuai alatnya, mis. `laporan_kecil.pdf`, `laporan_ttd.pdf`, `laporan_disensor.pdf`.
 - Konversi Word/Excel/PowerPoint memakai **Microsoft Office** yang sudah terpasang. Tanpa Office, unduh **LibreOffice** (opsional, ±375 MB) di **Pengaturan › Tools pendukung**.
 
@@ -189,12 +225,16 @@ Semua file PDF diproses **di komputer Anda**, tidak ada yang diunggah ke interne
 - **Tools Manager**: deteksi, unduh, update, atau pilih manual FFmpeg, yt-dlp, JS runtime (memakai Node.js/Deno yang sudah terpasang bila ada), spotDL, gallery-dl, LibreOffice (opsional), dan veraPDF (opsional, Java ikut dipasang bila belum ada). Update yt-dlp/spotDL/gallery-dl/LibreOffice dicek otomatis. Unduhan tools yang terputus **dilanjutkan otomatis** dari titik terakhir.
 - **Pengaturan terakhir diingat** per halaman (format, kualitas, resolusi, dll.).
 - **Preset** per halaman: simpan/muat/hapus kumpulan pengaturan (mis. "WA Video 16MB", "MP3 320"), plus preset bawaan.
-- **Riwayat tugas**: tanggal, file asal & hasil, ukuran sebelum/sesudah, status; bisa dicari & difilter.
+- **Alur kerja**: rangkai beberapa langkah jadi satu (mis. *video → MP3 → volume rata* atau *foto produk → hapus latar → WEBP ringan*). Hasil tiap langkah otomatis lanjut ke langkah berikutnya; hasil antara dihapus. Bisa dijalankan dengan menarik file, dari halaman Download (setelah unduh), atau dari folder pantauan.
+- **Riwayat tugas**: tanggal, file asal & hasil, ukuran sebelum/sesudah, status; bisa dicari & difilter. **Statistik**: total ruang yang dihemat, tugas selesai, jumlah unduhan, waktu proses, grafik aktivitas, dan penghematan terbesar (7 hari / 30 hari / 1 tahun / semua).
 - **Jumlah proses paralel** per menu bisa diatur (1–8).
 - **Tema gelap, terang, atau ikut Windows.**
 - **Setelah antrian selesai**: tidak ada / sleep / matikan PC (dengan hitung mundur 60 detik yang bisa dibatalkan).
 - **Kirim ke › KuyMediaBox** di menu klik kanan Explorer (aktifkan di Pengaturan); file langsung masuk ke halaman yang cocok.
-- **Folder pantauan**: file baru yang masuk ke folder tertentu otomatis dikonversi.
+- **Folder pantauan**: file baru yang masuk ke folder tertentu otomatis dikonversi (atau dijalankan lewat alur kerja).
+- **System tray**: jendela ditutup tapi aplikasi tetap jalan di tray (unduhan, langganan, folder pantauan, pantau clipboard tetap bekerja), dan opsional **mulai bersama Windows**.
+- **Perintah `kmb`** di Command Prompt/PowerShell untuk konversi, alur kerja, alat PDF, dan download tanpa membuka jendela (lihat [Cara penggunaan](#-cara-penggunaan)).
+- **Cadangan pengaturan**: ekspor/impor semua pengaturan, preset, alur kerja, dan folder pantauan ke satu file `.json`.
 - **Satu jendela saja**: membuka aplikasi lagi akan memunculkan jendela yang sudah terbuka.
 - **Update otomatis dari GitHub Releases**: saat dibuka, aplikasi mengecek versi terbaru. Kalau ada, muncul dialog berisi catatan rilis dan tombol **Update sekarang**. Aplikasi lalu mengunduh versi baru, memverifikasi checksum SHA-256, memasangnya, dan membuka ulang dirinya sendiri, tanpa perlu download manual.
   - Versi **portable**: file `.exe` diganti langsung di tempatnya.
@@ -256,6 +296,29 @@ Tips:
 4. PDF yang dikunci password akan ditanyakan passwordnya saat mulai.
 
 ![Kompres PDF](docs/screenshots/pdf-kompres.png)
+
+### Alur kerja
+
+1. Buka **Alur kerja** di sidebar, pilih contoh siap pakai atau **Buat alur kerja**.
+2. Tiap langkah memakai modul (Video, Audio, Gambar, Subtitle, PDF) dengan preset atau pengaturan halamannya; atur urutannya dengan ↑↓.
+3. **Simpan**, lalu tarik file ke jendela (atau klik **Jalankan…**). Hasil akhir masuk ke folder hasil modul langkah terakhir.
+4. Di halaman Download, pilih **Setelah download › Jalankan: …** supaya tiap file hasil unduhan langsung diproses.
+
+### Perintah `kmb` (tanpa jendela)
+
+Aktifkan di **Pengaturan › Proses & otomatisasi › Perintah "kmb"**, lalu buka Command Prompt atau PowerShell baru:
+
+```bat
+kmb convert rekaman.mkv --preset "WhatsApp"          :: preset dari halaman Video
+kmb convert D:\Foto --preset "Web ringan" --out D:\Web
+kmb flow "Video → lagu MP3 → volume rata" D:\Video
+kmb pdf compress laporan.pdf
+kmb download https://youtu.be/xxxx --audio --format mp3
+kmb presets     :: daftar preset
+kmb help
+```
+
+Nama preset boleh ditulis sebagian (mis. `whatsapp`). Tanpa `kmb`, jalankan `start /wait KuyMediaBox.exe convert …`. Kode keluar: `0` berhasil, `1` ada yang gagal, `2` salah pakai.
 
 ### Update aplikasi
 
@@ -385,7 +448,11 @@ Setiap push biasa ke branch `main` juga menjalankan build dan test yang sama (ta
 | LibreOffice (opsional) | `%LOCALAPPDATA%\KuyMediaBox\bin\libreoffice\` |
 | Cache mesin PDF | `%LOCALAPPDATA%\KuyMediaBox\cache\` |
 | Riwayat tugas | `%LOCALAPPDATA%\KuyMediaBox\history.jsonl` |
-| veraPDF & Java (opsional) | `%LOCALAPPDATA%\KuyMediaBoxinerapdf\` dan `bin\jre\` |
+| veraPDF & Java (opsional) | `%LOCALAPPDATA%\KuyMediaBox\bin\verapdf\` dan `bin\jre\` |
+| Whisper, Real-ESRGAN, ONNX Runtime & modelnya (opsional) | `%LOCALAPPDATA%\KuyMediaBox\bin\` (subfolder per tool) |
+| Langganan & unduhan yang belum selesai | `%LOCALAPPDATA%\KuyMediaBox\subscriptions.json`, `pending-downloads.json` |
+| Salinan preset untuk perintah `kmb` | `%LOCALAPPDATA%\KuyMediaBox\presets.json` |
+| Perintah `kmb` | `%LOCALAPPDATA%\Microsoft\WindowsApps\kmb.cmd` (bila diaktifkan) |
 | Sertifikat pribadi (tanda tangan digital) | `Documents › KuyMediaBox › Sertifikat` (lokasi dipilih saat membuat) |
 
 Untuk reset total, tutup aplikasi lalu hapus folder `%APPDATA%\KuyMediaBox` dan `%LOCALAPPDATA%\KuyMediaBox`.
@@ -398,7 +465,7 @@ Untuk reset total, tutup aplikasi lalu hapus folder `%APPDATA%\KuyMediaBox` dan 
 |---|---|
 | Banner "FFmpeg belum terpasang" | Klik **Unduh sekarang** pada banner, atau buka **Pengaturan › Tools pendukung** |
 | Download YouTube gagal / "minta verifikasi bukan bot" | Update **yt-dlp** di Pengaturan, tunggu beberapa saat, lalu coba lagi |
-| Post Instagram/Facebook "privat, dibatasi, atau butuh login" | Aplikasi hanya mengunduh konten **publik**. Story, profil Instagram, dan post privat butuh login sehingga belum didukung. Kalau post publik tiba-tiba ditolak, tunggu beberapa saat lalu coba lagi. |
+| Post Instagram/Facebook "privat, dibatasi, atau butuh login" | Tanpa login hanya konten **publik** yang bisa diunduh. Story & highlight Instagram bisa diunduh setelah login lewat cookies browser (**Pengaturan › Download**); profil Instagram dan post privat belum didukung. Kalau post publik tiba-tiba ditolak, tunggu beberapa saat lalu coba lagi. |
 | "Post ini berisi foto. Pasang gallery-dl…" | Klik **Unduh sekarang** pada banner atau **Pengaturan › Tools pendukung › gallery-dl** |
 | TikTok/Instagram/Facebook/X/Pinterest berhenti bisa dibaca | Situs ini sering berubah; klik **Update** pada yt-dlp dan gallery-dl di Pengaturan |
 | "Link foto sudah kedaluwarsa" | Link gambar dari TikTok/Instagram hanya berlaku beberapa jam. Hapus link, tempel ulang, lalu unduh lagi. |
@@ -411,6 +478,9 @@ Untuk reset total, tutup aplikasi lalu hapus folder `%APPDATA%\KuyMediaBox` dan 
 | "Butuh Microsoft Office atau LibreOffice" | Konversi Word/Excel/PowerPoint butuh salah satunya. Unduh LibreOffice di **Pengaturan › Tools pendukung**. |
 | OCR: "bahasa OCR belum terpasang" | Tambahkan bahasa di **Pengaturan Windows › Waktu & Bahasa › Bahasa**, lalu pilih bahasa itu di alat OCR. Teks huruf Latin terbaca dengan bahasa apa pun. |
 | PDF ke Word/Excel kosong | PDF hasil scan belum punya teks; jalankan **OCR PDF** dulu. |
+| "kmb" tidak dikenal | Buka Command Prompt/PowerShell **baru** setelah mengaktifkan perintahnya. Bila masih tidak dikenal, folder `%LOCALAPPDATA%\Microsoft\WindowsApps` tidak ada di PATH: jalankan dengan alamat lengkap yang tertulis di Pengaturan. |
+| `kmb`: "Belum ada preset" | Buka KuyMediaBox sekali; preset disalin untuk perintah `kmb` saat aplikasi berjalan. |
+| Aplikasi tidak benar-benar tertutup | Pilihan **Tetap jalan di tray** aktif: klik kanan ikon di tray › **Keluar**, atau matikan pilihan itu di Pengaturan. |
 | Detail error | Klik **Lihat detail** pada baris yang gagal, lalu **Salin detail** |
 
 ---
@@ -424,6 +494,10 @@ KuyMediaBox/
 ├── app_files.go            # binding: tambah file & mulai konversi
 ├── app_download.go         # binding: baca link & mulai download
 ├── app_pdf.go              # binding: alat PDF
+├── app_flow.go             # alur kerja (langkah berantai)
+├── app_cli.go              # perintah kmb (tanpa jendela)
+├── app_tray.go             # system tray & mulai bersama Windows
+├── app_subtitle.go         # subtitle otomatis (Whisper)
 ├── internal/
 │   ├── appdir/             # folder aplikasi & folder default (Known Folder Windows)
 │   ├── config/             # settings.json
@@ -437,6 +511,10 @@ KuyMediaBox/
 │   ├── tools/              # Tools Manager: cari, unduh, update
 │   ├── updater/            # update aplikasi dari GitHub Releases
 │   ├── i18n/               # teks Indonesia/English untuk pesan dari backend
+│   ├── whisper/            # whisper.cpp & perapian baris subtitle
+│   ├── onnx/ bgremove/     # ONNX Runtime (tanpa cgo) & hapus latar
+│   ├── fonts/              # font Windows, subset TrueType, shaping (HarfBuzz)
+│   ├── preview/            # pratinjau media untuk dialog potong & crop
 │   ├── proc/ platform/     # proses tersembunyi & utilitas Windows
 │   └── integration/        # test nyata dengan tools asli
 ├── frontend/src/
@@ -470,6 +548,14 @@ Dibuat oleh **[iqbalfaf](https://github.com/iqbalfaf)**. KuyMediaBox dibangun di
 | webp · avif · heic | [gen2brain/webp](https://github.com/gen2brain/webp) · [gen2brain/avif](https://github.com/gen2brain/avif) · [gen2brain/heic](https://github.com/gen2brain/heic) | Format WEBP, AVIF & HEIC |
 | Gorilla WebSocket | [gorilla/websocket](https://github.com/gorilla/websocket) | HTML ke PDF lewat browser |
 | Fontsource | [fontsource/fontsource](https://github.com/fontsource/fontsource) | Font Plus Jakarta Sans & JetBrains Mono |
+| whisper.cpp | [ggml-org/whisper.cpp](https://github.com/ggml-org/whisper.cpp) | Subtitle otomatis |
+| Real-ESRGAN | [xinntao/Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) | Perbesar gambar dengan AI |
+| ONNX Runtime | [microsoft/onnxruntime](https://github.com/microsoft/onnxruntime) | Menjalankan model hapus latar |
+| rembg (model U²-Net / IS-Net) | [danielgatis/rembg](https://github.com/danielgatis/rembg) | Model hapus latar |
+| oxipng · pngquant | [shssoichiro/oxipng](https://github.com/shssoichiro/oxipng) · [kornelski/pngquant](https://github.com/kornelski/pngquant) | Kompres PNG |
+| go-text/typesetting | [go-text/typesetting](https://github.com/go-text/typesetting) | Penyusunan huruf Arab & India |
+| systray | [fyne-io/systray](https://github.com/fyne-io/systray) | Ikon di system tray |
+| LRCLIB | [tranxuanthang/lrclib](https://github.com/tranxuanthang/lrclib) | Lirik lagu |
 
 ![Pengaturan dan kredit](docs/screenshots/pengaturan-kredit.png)
 

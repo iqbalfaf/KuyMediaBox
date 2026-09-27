@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { L } from '../lib/i18n.svelte'
+  import { L, locale } from '../lib/i18n.svelte'
   import PageHeader from '../components/PageHeader.svelte'
   import FileList from '../components/FileList.svelte'
   import EmptyDrop from '../components/EmptyDrop.svelte'
@@ -7,36 +7,29 @@
   import Select from '../components/Select.svelte'
   import Switch from '../components/Switch.svelte'
   import Segmented from '../components/Segmented.svelte'
-  import PositionGrid from '../components/PositionGrid.svelte'
+  import WatermarkFields from '../components/WatermarkFields.svelte'
+  import ModelPicker from '../components/ModelPicker.svelte'
+  import ToolBanner from '../components/ToolBanner.svelte'
+  import { pickCrop } from '../components/CropDialog.svelte'
+  import { modelReady } from '../lib/stores/models.svelte'
   import OutputPicker from '../components/OutputPicker.svelte'
   import RunFooter from '../components/RunFooter.svelte'
   import PresetBar from '../components/PresetBar.svelte'
   import Icon from '../components/Icon.svelte'
   import { showCompare } from '../components/CompareDialog.svelte'
   import { api, errText, imageUrl } from '../lib/api'
-  import { toast } from '../lib/stores/app.svelte'
+  import { hasTool, toast } from '../lib/stores/app.svelte'
   import { imageConv as conv } from '../lib/stores/converter.svelte'
   import { load, save } from '../lib/stores/persist'
+  import { imageDefaults, imageBuiltins } from '../lib/modules'
   import { bytes, tile } from '../lib/format'
-  import type { FileItem, ImageOptions } from '../lib/types'
+  import type { CollageJob, FileItem, ImageOptions, SlideOptions } from '../lib/types'
 
-  const defaults: { o: ImageOptions } = {
-    o: {
-      format: 'jpg', quality: 85, resizeMode: 'longest', longest: 1920, percent: 50, width: 1920, height: 1080, background: '#ffffff', autoRotate: true,
-      keepMetadata: false, targetKB: 0, icoSizes: [16, 32, 48, 256], rotate: 0, flipH: false, flipV: false, crop: '',
-      watermark: { enabled: false, type: 'text', text: '© ', bold: true, color: '#ffffff', image: '', size: 5, opacity: 0.6, angle: 0, position: 'br', margin: 3 },
-    },
-  }
+  const defaults = imageDefaults
   const st = $state(load('kmb.image', defaults))
   $effect(() => save('kmb.image', $state.snapshot(st)))
 
-  const builtins = $derived([
-    { id: 'b-web', name: L('Web ringan (WEBP, maks. 200 KB)', 'Light web (WEBP, max 200 KB)'), value: { format: 'webp', quality: 80, resizeMode: 'longest', longest: 1600, targetKB: 200, keepMetadata: false } },
-    { id: 'b-wa', name: L('Foto WhatsApp (JPG 1600 px)', 'WhatsApp photo (JPG 1600 px)'), value: { format: 'jpg', quality: 82, resizeMode: 'longest', longest: 1600, targetKB: 0 } },
-    { id: 'b-ig', name: L('Instagram 4:5 (1080 px)', 'Instagram 4:5 (1080 px)'), value: { format: 'jpg', quality: 90, crop: '4:5', resizeMode: 'box', width: 1080, height: 1350, targetKB: 0 } },
-    { id: 'b-ico', name: L('Ikon aplikasi (ICO semua ukuran)', 'App icon (ICO, all sizes)'), value: { format: 'ico', icoSizes: [16, 24, 32, 48, 64, 128, 256], crop: '1:1', targetKB: 0 } },
-    { id: 'b-500', name: L('Dokumen / formulir (≤ 500 KB)', 'Documents / forms (≤ 500 KB)'), value: { format: 'jpg', quality: 90, resizeMode: 'original', targetKB: 500 } },
-  ])
+  const builtins = $derived(imageBuiltins())
 
   const formatHints = $derived<Record<string, string>>({
     jpg: L('JPG: paling kompatibel, cocok untuk foto.', 'JPG: most compatible, great for photos.'),
@@ -67,11 +60,13 @@
     if (!w || !h) return st.o.format.toUpperCase()
     const o = st.o
     if (o.rotate === 90 || o.rotate === 270) [w, h] = [h, w]
+    if (o.cropBox?.w > 0) [w, h] = [Math.max(1, Math.round(w * o.cropBox.w)), Math.max(1, Math.round(h * o.cropBox.h))]
     const r = ratio(o.crop)
     if (r) {
       if (w / h > r) w = Math.max(1, Math.round(h * r))
       else h = Math.max(1, Math.round(w / r))
     }
+    if (o.aiUpscale > 0) [w, h] = [w * o.aiUpscale, h * o.aiUpscale]
     let nw = w
     let nh = h
     if (o.resizeMode === 'longest' && o.longest > 0 && Math.max(w, h) > o.longest) {
@@ -91,6 +86,35 @@
     return `${st.o.format.toUpperCase()} · ${Math.max(1, nw)}×${Math.max(1, nh)}${canTarget && o.targetKB > 0 ? ` · ≤ ${o.targetKB} KB` : ''}`
   }
 
+  const previewItem = $derived(conv.items.find((it) => !it.error))
+  function openCrop() {
+    const it = previewItem
+    if (!it) return
+    const q = encodeURIComponent(it.path)
+    pickCrop(
+      { title: it.name, image: `/kmb/imgx?path=${q}&w=1400&rot=${st.o.rotate}&fh=${st.o.flipH ? 1 : 0}&fv=${st.o.flipV ? 1 : 0}`, box: $state.snapshot(st.o.cropBox) },
+      (b) => {
+        st.o.cropBox = b
+        if (b.w > 0) st.o.crop = ''
+      },
+    )
+  }
+
+  // Tools the chosen options need (shown in the banner when missing).
+  const needed = $derived(st.mode !== 'convert' ? [] : [
+    ...(st.o.aiUpscale > 0 ? ['realesrgan'] : []),
+    ...(st.o.removeBg ? ['onnxruntime'] : []),
+    ...(st.o.format === 'png' && st.o.pngCompress === 'lossless' ? ['oxipng'] : []),
+    ...(st.o.format === 'png' && st.o.pngCompress === 'small' ? ['pngquant', 'oxipng'] : []),
+  ])
+  const bgModels: Record<string, [string, string]> = $derived({
+    general: [L('Umum (terbaik)', 'General (best)'), L('produk, hewan, benda, orang', 'products, animals, objects, people')],
+    people: [L('Orang', 'People'), L('foto potret & seluruh badan', 'portraits & full body')],
+    fast: [L('Cepat', 'Fast'), L('model kecil, tepi kurang halus', 'small model, rougher edges')],
+  })
+  const bgNotReady = $derived(st.o.removeBg && !modelReady('bgremove', st.o.bgModel))
+  const toolsMissing = $derived(needed.some((id: string) => !hasTool(id)))
+
   function meta(it: FileItem): string {
     const parts = []
     if (it.width) parts.push(`${it.width}×${it.height}`)
@@ -109,15 +133,6 @@
     if (set.has(size)) set.delete(size)
     else set.add(size)
     st.o.icoSizes = [...set].sort((a, b) => a - b)
-  }
-
-  async function pickLogo() {
-    try {
-      const p = await api.pickFile(L('Pilih gambar logo', 'Choose the logo picture'), L('Gambar', 'Images'), '*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif')
-      if (p) st.o.watermark.image = p
-    } catch (e) {
-      toast(errText(e), 'err')
-    }
   }
 
   const previewable = new Set(['jpg', 'png', 'webp', 'avif', 'bmp', 'tiff', 'ico'])
@@ -141,14 +156,47 @@
   const invalidIco = $derived(st.o.format === 'ico' && st.o.icoSizes.length === 0)
   const invalidWm = $derived(st.o.watermark.enabled && (st.o.watermark.type === 'text' ? !st.o.watermark.text.trim() : !st.o.watermark.image))
 
+  const combined = $derived(st.mode !== 'convert')
+  const usable = $derived(conv.items.filter((it) => !it.error))
+  const fewForCombined = $derived(combined && usable.length < 2)
+
   function start() {
+    if (st.mode === 'anim') {
+      const o = $state.snapshot(st.anim)
+      conv.start(usable, (items) => api.startSlideshow(items, o))
+      return
+    }
+    if (st.mode === 'collage') {
+      const job = $state.snapshot(st.collage)
+      conv.start(usable, (items) => api.startCollage(items, job))
+      return
+    }
     const o = $state.snapshot(st.o)
     if (!canTarget) o.targetKB = 0
     conv.start(pending, (items) => api.startImage(items, o))
   }
+
+  async function pickSlideMusic() {
+    try {
+      const p = await api.pickFile(L('Pilih musik', 'Choose music'), L('Audio', 'Audio'), '*.mp3;*.m4a;*.aac;*.wav;*.flac;*.ogg;*.opus')
+      if (p) st.anim.music = p
+    } catch (e) {
+      toast(errText(e), 'err')
+    }
+  }
+
+  function combinedLabel(it: FileItem): [string, string] {
+    const pos = usable.indexOf(it) + 1
+    if (st.mode === 'anim') {
+      const a = st.anim
+      return [`${a.format.toUpperCase()} · ${a.seconds} ${L('dtk', 's')}/${L('gambar', 'picture')}`, pos ? `${L('Urutan', 'Order')} ${pos}` : '']
+    }
+    return [`${L('Kolase', 'Collage')} ${st.collage.format.toUpperCase()}`, pos ? `${L('Urutan', 'Order')} ${pos}` : '']
+  }
 </script>
 
 <PageHeader title={L('Konversi Gambar', 'Image Converter')} subtitle={L('Ubah format, ukuran, dan kualitas banyak gambar sekaligus.', 'Change the format, size and quality of many images at once.')} />
+<ToolBanner ids={needed} why={L('Dibutuhkan untuk pilihan AI / kompres PNG yang Anda nyalakan. Sekali unduh, lalu bekerja offline.', 'Needed for the AI / PNG compression options you turned on. Download once, then it works offline.')} />
 
 <div class="body">
   {#if conv.items.length === 0}
@@ -170,6 +218,7 @@
       noun={L('gambar', 'images')}
       dropText={L('Tarik & lepas gambar atau folder di sini', 'Drag & drop images or folders here')}
       formats="JPG · PNG · WEBP · HEIC · AVIF · BMP · TIFF · GIF"
+      reorder={combined}
       {meta}
     >
       {#snippet thumb(it)}
@@ -184,6 +233,11 @@
       {#snippet result(it)}
         {@const task = conv.task(it)}
         {@const s = conv.state(it)}
+        {#if combined}
+          {@const cl = combinedLabel(it)}
+          <span class="r1">{cl[0]}</span>
+          <span class="r2">{s === 'done' && task ? bytes(task.outSize) : s === 'running' ? L('Sedang diproses…', 'Processing…') : cl[1]}</span>
+        {:else}
         <span class="r1">{target(it)}</span>
         {#if s === 'done' && task}
           {@const diff = it.size ? Math.round(((task.outSize - it.size) / it.size) * 100) : 0}
@@ -196,12 +250,24 @@
         {:else}
           <span class="r2">{bytes(it.size)} → ?</span>
         {/if}
+        {/if}
       {/snippet}
     </FileList>
   {/if}
 
   <aside class="card panel" aria-label={L('Pengaturan output', 'Output settings')}>
     <div class="scroll">
+      <Segmented
+        label={L('Mode', 'Mode')}
+        bind:value={st.mode}
+        options={[
+          { value: 'convert', label: L('Konversi', 'Convert') },
+          { value: 'anim', label: L('Animasi', 'Animation') },
+          { value: 'collage', label: L('Kolase', 'Collage') },
+        ]}
+      />
+
+      {#if st.mode === 'convert'}
       <PresetBar module="image" target={st.o} {builtins} />
 
       <div class="sec">
@@ -312,47 +378,53 @@
           ]}
         />
         {#if st.o.crop}<p class="hint">{L('Dipotong di bagian tengah gambar.', 'Cropped around the centre of the picture.')}</p>{/if}
+        <div class="inline">
+          <button class="btn grow" onclick={openCrop} disabled={!previewItem} title={previewItem ? `${L('Pratinjau', 'Preview')}: ${previewItem.name}` : L('Tambahkan gambar dulu', 'Add a picture first')}>
+            <Icon name="crop" size={16} />{st.o.cropBox.w > 0 ? L('Ubah area crop', 'Change the crop area') : L('Crop manual…', 'Manual crop…')}
+          </button>
+          {#if st.o.cropBox.w > 0}
+            <button class="btn icon" aria-label={L('Hapus crop', 'Remove crop')} title={L('Hapus crop', 'Remove crop')} onclick={() => (st.o.cropBox = { x: 0, y: 0, w: 0, h: 0 })}><Icon name="x" size={16} /></button>
+          {/if}
+        </div>
+        {#if st.o.cropBox.w > 0}<p class="hint">{L('Area yang sama dipakai untuk semua gambar (dalam persen), jadi paling pas untuk foto berukuran sama.', 'The same area (in percent) is used for every picture, so it suits photos of the same size best.')}</p>{/if}
       </div>
 
       <div class="sec">
-        <Switch bind:checked={st.o.watermark.enabled} label="Watermark" hint={L('Teks atau logo di setiap gambar', 'Text or a logo on every picture')} />
-        {#if st.o.watermark.enabled}
+        <span class="label">{L('Perbesar dengan AI', 'Enlarge with AI')}</span>
+        <Chips
+          bind:value={st.o.aiUpscale}
+          columns={4}
+          small
+          options={[
+            { value: 0, label: L('Tidak', 'Off') },
+            { value: 2, label: '2×' },
+            { value: 3, label: '3×' },
+            { value: 4, label: '4×' },
+          ]}
+        />
+        {#if st.o.aiUpscale > 0}
           <Segmented
-            label={L('Jenis watermark', 'Watermark type')}
-            bind:value={st.o.watermark.type}
+            label={L('Jenis gambar', 'Picture type')}
+            bind:value={st.o.aiModel}
             options={[
-              { value: 'text', label: L('Teks', 'Text'), icon: 'type' },
-              { value: 'image', label: 'Logo', icon: 'image' },
+              { value: 'photo', label: L('Foto', 'Photo') },
+              { value: 'anime', label: L('Anime / ilustrasi', 'Anime / art') },
             ]}
           />
-          {#if st.o.watermark.type === 'text'}
-            <div class="inline">
-              <input class="text-input" aria-label={L('Teks watermark', 'Watermark text')} bind:value={st.o.watermark.text} placeholder="© Nama" />
-              <input class="color" type="color" aria-label={L('Warna teks', 'Text colour')} bind:value={st.o.watermark.color} />
-              <button class="tbtn" class:on={st.o.watermark.bold} aria-pressed={st.o.watermark.bold} title={L('Tebal', 'Bold')} onclick={() => (st.o.watermark.bold = !st.o.watermark.bold)}><b>B</b></button>
-            </div>
-          {:else}
-            <div class="inline">
-              <button class="btn grow" onclick={pickLogo}><Icon name="image" size={16} />{st.o.watermark.image ? L('Ganti logo', 'Change logo') : L('Pilih logo…', 'Choose logo…')}</button>
-            </div>
-            {#if st.o.watermark.image}<span class="hint ellipsis" title={st.o.watermark.image}>{st.o.watermark.image.split(/[\\/]/).pop()}</span>{/if}
-          {/if}
-          <div class="wm">
-            <div class="wm-pos">
-              <PositionGrid label={L('Posisi', 'Position')} bind:value={st.o.watermark.position} />
-              <button class="mchip small" class:on={st.o.watermark.position === 'tile'} onclick={() => (st.o.watermark.position = st.o.watermark.position === 'tile' ? 'br' : 'tile')}>{L('Berulang', 'Tiled')}</button>
-            </div>
-            <div class="wm-sliders">
-              <label class="t12" for="wm-size">{st.o.watermark.type === 'text' ? L('Ukuran huruf', 'Text size') : L('Lebar logo', 'Logo width')} · {st.o.watermark.size}%</label>
-              <input id="wm-size" type="range" min="1" max={st.o.watermark.type === 'text' ? 30 : 100} bind:value={st.o.watermark.size} />
-              <label class="t12" for="wm-op">{L('Transparansi', 'Opacity')} · {Math.round(st.o.watermark.opacity * 100)}%</label>
-              <input id="wm-op" type="range" min="0.05" max="1" step="0.05" bind:value={st.o.watermark.opacity} />
-              <label class="t12" for="wm-ang">{L('Kemiringan', 'Angle')} · {st.o.watermark.angle}°</label>
-              <input id="wm-ang" type="range" min="-90" max="90" step="5" bind:value={st.o.watermark.angle} />
-            </div>
-          </div>
+          <p class="hint">{L('Real-ESRGAN menambah detail saat memperbesar (memakai kartu grafis). Cocok untuk foto kecil/buram; hasilnya bisa diperkecil lagi dengan pengaturan Ukuran.', 'Real-ESRGAN adds detail while enlarging (uses the graphics card). Good for small/blurry photos; the Size settings can shrink it again.')}</p>
         {/if}
       </div>
+
+      <div class="sec">
+        <Switch bind:checked={st.o.removeBg} label={L('Hapus latar belakang', 'Remove background')} hint={L('Objek utama dipotong otomatis dengan AI, offline', 'The main subject is cut out automatically with AI, offline')} />
+        {#if st.o.removeBg}
+          <ModelPicker kind="bgremove" bind:value={st.o.bgModel} labels={bgModels} />
+          <Switch bind:checked={st.o.bgMask} label={L('Simpan masker saja', 'Save the mask only')} hint={L('Gambar hitam-putih: putih = objek (untuk editor foto)', 'Black and white: white = subject (for photo editors)')} />
+          {#if needsBg && !st.o.bgMask}<p class="hint">{L(`${st.o.format.toUpperCase()} tidak mendukung transparan: latar diganti warna di bagian Lainnya. Pilih PNG atau WEBP untuk latar transparan.`, `${st.o.format.toUpperCase()} has no transparency: the background becomes the colour under Other. Pick PNG or WEBP for a transparent background.`)}</p>{/if}
+        {/if}
+      </div>
+
+      <WatermarkFields bind:wm={st.o.watermark} hint={L('Teks atau logo di setiap gambar', 'Text or a logo on every picture')} />
 
       <div class="sec">
         <span class="label">{L('Lainnya', 'Other')}</span>
@@ -379,6 +451,18 @@
             </div>
           </div>
         {/if}
+        {#if st.o.format === 'png'}
+          <Select
+            label={L('Kompres PNG', 'PNG compression')}
+            bind:value={st.o.pngCompress}
+            options={[
+              { value: '', label: L('Kompres PNG: standar', 'PNG compression: standard') },
+              { value: 'lossless', label: L('Kompres PNG: maksimal tanpa turun kualitas (oxipng)', 'PNG compression: maximum lossless (oxipng)') },
+              { value: 'small', label: L('Kompres PNG: jauh lebih kecil (pngquant)', 'PNG compression: much smaller (pngquant)') },
+            ]}
+          />
+          {#if st.o.pngCompress === 'small'}<p class="hint">{L('Warna dikurangi ke palet 256 warna — biasanya 60–80% lebih kecil dan hampir tak terlihat bedanya. Kurang cocok untuk foto dengan gradasi halus.', 'Colours are reduced to a 256-colour palette — usually 60–80% smaller and hardly visible. Less suited to photos with smooth gradients.')}</p>{/if}
+        {/if}
         <Switch bind:checked={st.o.autoRotate} label={L('Putar otomatis', 'Auto-rotate')} hint={L('Ikuti orientasi kamera (EXIF)', 'Follow the camera orientation (EXIF)')} />
         <Switch
           checked={!st.o.keepMetadata}
@@ -390,6 +474,104 @@
         />
       </div>
 
+      {:else if st.mode === 'anim'}
+        <p class="hint">{L('Semua gambar di daftar jadi satu animasi atau video slideshow, sesuai urutan (atur dengan ↑↓).', 'Every picture in the list becomes one animation or slideshow video, in list order (use ↑↓).')}</p>
+        <div class="sec">
+          <span class="label">Format</span>
+          <Chips
+            bind:value={st.anim.format}
+            columns={3}
+            options={[
+              { value: 'mp4', label: 'MP4', sub: L('video', 'video') },
+              { value: 'gif', label: 'GIF', sub: L('animasi', 'animation') },
+              { value: 'webp', label: 'WEBP', sub: L('animasi kecil', 'small animation') },
+            ]}
+          />
+        </div>
+        <div class="sec">
+          <span class="label">{L('Durasi tiap gambar (detik)', 'Time per picture (seconds)')}</span>
+          <Chips bind:value={st.anim.seconds} columns={5} small options={[0.3, 0.5, 1, 2, 3].map((v) => ({ value: v, label: v.toLocaleString(locale()) }))} />
+          <span class="label">{L('Transisi', 'Transition')}</span>
+          <Chips
+            bind:value={st.anim.fade}
+            columns={3}
+            small
+            options={[
+              { value: 0, label: L('Langsung', 'Cut') },
+              { value: 0.25, label: L('Pudar cepat', 'Quick fade') },
+              { value: 0.5, label: L('Pudar', 'Fade') },
+            ].map((x) => ({ ...x, disabled: x.value >= st.anim.seconds }))}
+          />
+        </div>
+        <div class="sec">
+          <span class="label">{L('Bingkai', 'Frame')}</span>
+          <Chips
+            bind:value={st.anim.ratio}
+            columns={5}
+            small
+            options={[
+              { value: '', label: L('Asli', 'Original'), title: L('Rasio gambar pertama', 'Ratio of the first picture') }, { value: '1:1', label: '1:1' }, { value: '16:9', label: '16:9' },
+              { value: '9:16', label: '9:16' }, { value: '4:5', label: '4:5' },
+            ]}
+          />
+          <Segmented
+            label={L('Cara mengisi bingkai', 'How to fill the frame')}
+            bind:value={st.anim.fit}
+            options={[
+              { value: 'blur', label: L('Latar blur', 'Blurred') },
+              { value: 'contain', label: L('Bar', 'Bars') },
+              { value: 'cover', label: L('Penuh', 'Fill') },
+            ]}
+          />
+          <span class="label">{L('Sisi terpanjang', 'Longest side')}</span>
+          <Chips bind:value={st.anim.size} columns={4} small options={[480, 720, 1080, 1920].map((v) => ({ value: v, label: `${v} px` }))} />
+          {#if st.anim.format !== 'mp4' && st.anim.size > 720}<p class="hint">{L('GIF besar cepat membengkak ukurannya; 480–720 px biasanya cukup.', 'Big GIFs grow quickly; 480–720 px is usually enough.')}</p>{/if}
+        </div>
+        {#if st.anim.format === 'mp4'}
+          <div class="sec">
+            <span class="label">{L('Musik', 'Music')}</span>
+            <div class="inline">
+              <button class="btn grow" onclick={pickSlideMusic}><Icon name="music" size={16} />{st.anim.music ? L('Ganti musik', 'Change music') : L('Tambah musik…', 'Add music…')}</button>
+              {#if st.anim.music}<button class="btn icon" aria-label={L('Hapus musik', 'Remove music')} onclick={() => (st.anim.music = '')}><Icon name="x" size={16} /></button>{/if}
+            </div>
+            {#if st.anim.music}<span class="hint ellipsis" title={st.anim.music}>{st.anim.music.split(/[\\/]/).pop()}</span>{/if}
+          </div>
+        {/if}
+        {#if usable.length > 1}<p class="hint">{L('Durasi hasil', 'Result length')}: ±{Math.round(usable.length * st.anim.seconds * 10) / 10} {L('dtk', 's')}</p>{/if}
+      {:else}
+        <p class="hint">{L('Semua gambar di daftar disusun jadi satu gambar grid, sesuai urutan (atur dengan ↑↓).', 'Every picture in the list is laid out in one grid picture, in list order (use ↑↓).')}</p>
+        <div class="sec">
+          <span class="label">{L('Kolom', 'Columns')}</span>
+          <Chips bind:value={st.collage.layout.cols} columns={5} small options={[0, 2, 3, 4, 5].map((v) => ({ value: v, label: v ? String(v) : L('Otomatis', 'Auto') }))} />
+          <span class="label">{L('Bentuk kotak', 'Cell shape')}</span>
+          <Chips bind:value={st.collage.layout.cell} columns={5} small options={['1:1', '4:5', '3:4', '16:9', '9:16'].map((v) => ({ value: v, label: v }))} />
+          <Segmented
+            label={L('Isi kotak', 'Cell fill')}
+            bind:value={st.collage.layout.fit}
+            options={[
+              { value: 'cover', label: L('Penuh (dipotong)', 'Fill (cropped)') },
+              { value: 'contain', label: L('Utuh', 'Whole') },
+            ]}
+          />
+        </div>
+        <div class="sec">
+          <span class="label">{L('Jarak & sudut', 'Spacing & corners')}</span>
+          <label class="t12" for="col-gap">{L('Jarak', 'Spacing')} · {st.collage.layout.gap} px</label>
+          <input id="col-gap" type="range" min="0" max="80" step="2" bind:value={st.collage.layout.gap} />
+          <label class="t12" for="col-rad">{L('Sudut membulat', 'Rounded corners')} · {st.collage.layout.radius} px</label>
+          <input id="col-rad" type="range" min="0" max="80" step="2" bind:value={st.collage.layout.radius} />
+          <div class="row-between">
+            <span class="t13">{L('Warna latar', 'Background colour')}</span>
+            <input class="color" type="color" aria-label={L('Warna latar', 'Background colour')} bind:value={st.collage.layout.background} />
+          </div>
+        </div>
+        <div class="sec">
+          <span class="label">{L('Hasil', 'Result')}</span>
+          <Chips bind:value={st.collage.layout.width} columns={4} small options={[1080, 2000, 3000, 4000].map((v) => ({ value: v, label: `${v} px` }))} />
+          <Chips bind:value={st.collage.format} columns={3} small options={[{ value: 'jpg', label: 'JPG' }, { value: 'png', label: 'PNG' }, { value: 'webp', label: 'WEBP' }]} />
+        </div>
+      {/if}
+
       <div class="sec">
         <span class="label">{L('Simpan ke', 'Save to')}</span>
         <OutputPicker kind="image" />
@@ -400,10 +582,20 @@
       kind="image"
       running={conv.running}
       busy={conv.starting}
-      startLabel={conv.hasUnprocessed() || pending.length === 0 ? `${L('Mulai konversi', 'Start converting')}${pending.length ? ` (${pending.length})` : ''}` : `${L('Konversi ulang', 'Convert again')} (${pending.length})`}
-      disabled={pending.length === 0 || invalidResize || invalidIco || invalidWm}
+      startLabel={st.mode === 'anim'
+        ? `${L('Buat animasi', 'Make the animation')} (${usable.length})`
+        : st.mode === 'collage'
+          ? `${L('Buat kolase', 'Make the collage')} (${usable.length})`
+          : conv.hasUnprocessed() || pending.length === 0 ? `${L('Mulai konversi', 'Start converting')}${pending.length ? ` (${pending.length})` : ''}` : `${L('Konversi ulang', 'Convert again')} (${pending.length})`}
+      disabled={combined ? fewForCombined : pending.length === 0 || invalidResize || invalidIco || invalidWm || toolsMissing || bgNotReady}
       disabledHint={conv.items.length === 0
         ? L('Tambahkan gambar dulu untuk memulai.', 'Add images to get started.')
+        : fewForCombined
+          ? L('Tambahkan minimal 2 gambar.', 'Add at least 2 pictures.')
+        : toolsMissing
+          ? L('Pasang tool yang dibutuhkan dulu (lihat banner di atas).', 'Install the needed tools first (see the banner above).')
+        : bgNotReady
+          ? L('Unduh model hapus latar yang dipilih dulu.', 'Download the chosen background model first.')
         : invalidResize
           ? L('Isi ukuran yang valid.', 'Enter a valid size.')
           : invalidIco
@@ -605,34 +797,17 @@
     font-weight: 700;
     color: var(--accent-text-2);
   }
-  .color {
-    width: 40px;
-    height: 40px;
-    padding: 2px;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-    background: var(--surface-2);
-    flex-shrink: 0;
-  }
   .grow {
     flex: 1;
   }
-  .wm {
-    display: flex;
-    gap: 12px;
-  }
-  .wm-pos {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    align-items: stretch;
-  }
-  .wm-sliders {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
+  .color {
+    width: 40px;
+    height: 32px;
+    padding: 2px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    flex-shrink: 0;
   }
   .thumb {
     position: relative;
