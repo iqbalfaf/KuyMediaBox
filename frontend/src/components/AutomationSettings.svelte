@@ -344,7 +344,7 @@
   }
   .par {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
     gap: 8px;
   }
   .pk {

@@ -414,13 +414,18 @@
   }
   .toolbar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     padding: 14px 16px;
     border-bottom: 1px solid var(--border);
   }
+  /* The buttons keep their size; when they don't fit next to the name they move down a row. */
+  .toolbar > :global(.btn) {
+    flex-shrink: 0;
+  }
   .count {
-    flex-grow: 1;
+    flex: 1 1 160px;
     display: flex;
     align-items: baseline;
     gap: 10px;
@@ -435,6 +440,7 @@
     font-size: 13px;
     color: var(--text-3);
     white-space: nowrap;
+    flex-shrink: 0;
   }
   .loading {
     color: var(--accent);

@@ -507,10 +507,10 @@
           <span class="label">{L('Bingkai', 'Frame')}</span>
           <Chips
             bind:value={st.anim.ratio}
-            columns={5}
+            columns={6}
             small
             options={[
-              { value: '', label: L('Asli', 'Original'), title: L('Rasio gambar pertama', 'Ratio of the first picture') }, { value: '1:1', label: '1:1' }, { value: '16:9', label: '16:9' },
+              { value: '', label: L('Asli', 'Original'), title: L('Rasio gambar pertama', 'Ratio of the first picture'), span: 2 }, { value: '1:1', label: '1:1' }, { value: '16:9', label: '16:9' },
               { value: '9:16', label: '9:16' }, { value: '4:5', label: '4:5' },
             ]}
           />
@@ -542,7 +542,7 @@
         <p class="hint">{L('Semua gambar di daftar disusun jadi satu gambar grid, sesuai urutan (atur dengan ↑↓).', 'Every picture in the list is laid out in one grid picture, in list order (use ↑↓).')}</p>
         <div class="sec">
           <span class="label">{L('Kolom', 'Columns')}</span>
-          <Chips bind:value={st.collage.layout.cols} columns={5} small options={[0, 2, 3, 4, 5].map((v) => ({ value: v, label: v ? String(v) : L('Otomatis', 'Auto') }))} />
+          <Chips bind:value={st.collage.layout.cols} columns={6} small options={[0, 2, 3, 4, 5].map((v) => ({ value: v, label: v ? String(v) : L('Otomatis', 'Auto'), span: v ? 1 : 2 }))} />
           <span class="label">{L('Bentuk kotak', 'Cell shape')}</span>
           <Chips bind:value={st.collage.layout.cell} columns={5} small options={['1:1', '4:5', '3:4', '16:9', '9:16'].map((v) => ({ value: v, label: v }))} />
           <Segmented

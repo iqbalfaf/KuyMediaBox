@@ -37,10 +37,16 @@
     reorder?: boolean
   } = $props()
 
-  const cols = $derived(`minmax(0, 1fr) ${resultWidth}px 128px ${64 + (actions ? 34 : 0) + (reorder ? 68 : 0)}px`)
+  let width = $state(0)
+  const actW = $derived(64 + (actions ? 34 : 0) + (reorder ? 68 : 0))
+  // Too narrow for four columns (small window): status and result share one column so the
+  // file name keeps room. 28 = row padding, 12 = gap between columns, 220 = name + picture.
+  const compact = $derived(width > 0 && width < 28 + 36 + 220 + resultWidth + 128 + actW)
+  const midW = $derived(Math.max(120, Math.min(resultWidth, width - 28 - 24 - actW - 200)))
+  const cols = $derived(compact ? `minmax(0, 1fr) ${midW}px ${actW}px` : `minmax(0, 1fr) ${resultWidth}px 128px ${actW}px`)
 </script>
 
-<section class="card list" aria-label={L(`Daftar ${noun}`, `${noun} list`)}>
+<section class="card list" class:compact bind:clientWidth={width} aria-label={L(`Daftar ${noun}`, `${noun} list`)}>
   <div class="toolbar">
     <div class="count">
       <span class="n">{conv.items.length} {noun}</span>
@@ -62,7 +68,7 @@
   </div>
 
   <div class="head" style="grid-template-columns: {cols}">
-    <span>FILE</span><span>{L('HASIL', 'OUTPUT')}</span><span>STATUS</span><span></span>
+    <span>FILE</span>{#if compact}<span>STATUS</span>{:else}<span>{L('HASIL', 'OUTPUT')}</span><span>STATUS</span>{/if}<span></span>
   </div>
 
   <div class="rows">
@@ -83,8 +89,9 @@
           </div>
         </div>
         <div class="result">
+          {#if compact}<div class="cst"><StatusCell state={st} {task} /></div>{/if}
           {#if it.error}
-            <span class="bad">{it.error}</span>
+            <span class="bad clamp" title={it.error}>{it.error}</span>
           {:else if st === 'failed' && task}
             <span class="bad ellipsis" title={task.message}>{task.message || L('Gagal', 'Failed')}</span>
             <button class="link" onclick={() => showDetail(it.name, task.message, task.detail)}>{L('Lihat detail', 'View details')}</button>
@@ -95,7 +102,7 @@
             {@render result(it)}
           {/if}
         </div>
-        <div><StatusCell state={st} {task} /></div>
+        {#if !compact}<div><StatusCell state={st} {task} /></div>{/if}
         <div class="actions">
           {#if reorder}
             <button class="mini" aria-label={L('Naikkan', 'Move up')} title={L('Naikkan', 'Move up')} disabled={i === 0} onclick={() => conv.move(i, i - 1)}><Icon name="arrowUp" size={15} /></button>
@@ -143,11 +150,15 @@
     font-size: 15px;
     font-weight: 700;
     white-space: nowrap;
+    flex-shrink: 0;
   }
   .size {
     font-size: 13px;
     color: var(--text-3);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
   .loading {
     display: inline-flex;
@@ -271,6 +282,31 @@
     font-size: 13px;
     font-weight: 600;
     color: var(--err);
+  }
+  .clamp {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
+  }
+  .compact .clamp {
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+  }
+  .cst {
+    display: flex;
+    margin-bottom: 2px;
+  }
+  .cst > :global(.run) {
+    flex: 1;
+    min-width: 0;
+  }
+  /* One line of result under the status: the second line wouldn't fit the row. */
+  .compact .result :global(.r2) {
+    display: none;
   }
   .link {
     align-self: flex-start;

@@ -4,17 +4,20 @@
     value = $bindable(),
     onchange,
     label = '',
+    columns = 0,
   }: {
     options: { value: T; label: string; icon?: string; disabled?: boolean }[]
     value: T
     onchange?: (v: T) => void
     label?: string
+    /** Options per row (0 = all in one row); more options wrap to a second row. */
+    columns?: number
   } = $props()
 
   import Icon from './Icon.svelte'
 </script>
 
-<div class="seg" role="radiogroup" aria-label={label} style="grid-template-columns: repeat({options.length}, minmax(0, 1fr))">
+<div class="seg" role="radiogroup" aria-label={label} style="grid-template-columns: repeat({columns || options.length}, minmax(0, 1fr))">
   {#each options as o (o.value)}
     <button
       role="radio"

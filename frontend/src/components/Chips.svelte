@@ -7,7 +7,8 @@
     tall = false,
     onchange,
   }: {
-    options: { value: T; label: string; sub?: string; disabled?: boolean; title?: string }[]
+    /** span: how many columns the option takes (for a label longer than the others). */
+    options: { value: T; label: string; sub?: string; disabled?: boolean; title?: string; span?: number }[]
     value: T
     columns?: number
     small?: boolean
@@ -26,6 +27,7 @@
       disabled={o.disabled}
       title={o.title ?? ''}
       aria-pressed={o.value === value}
+      style={o.span ? `grid-column: span ${o.span}` : undefined}
       onclick={() => {
         value = o.value
         onchange?.(o.value)

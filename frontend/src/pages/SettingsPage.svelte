@@ -167,7 +167,7 @@
 
 <div class="body">
   <div class="col-main">
-    <section class="card" aria-label={L('Folder hasil', 'Output folders')}>
+    <section class="card folders" aria-label={L('Folder hasil', 'Output folders')}>
       <div class="head">
         <div class="ht">
           <h2>{L('Folder hasil', 'Output folders')}</h2>
@@ -526,13 +526,37 @@
   .head p b {
     color: var(--text-2);
   }
+  .folders {
+    container-type: inline-size;
+  }
   .frow {
     display: grid;
     grid-template-columns: 40px 170px minmax(0, 1fr) auto;
+    grid-template-areas: 'ic info pick act';
     align-items: center;
     gap: 14px;
     padding: 12px 20px;
     border-bottom: 1px solid var(--border-soft);
+  }
+  .frow > .fic {
+    grid-area: ic;
+  }
+  .frow > .finfo {
+    grid-area: info;
+  }
+  .frow > :global(.wrap) {
+    grid-area: pick;
+  }
+  .frow > .factions {
+    grid-area: act;
+  }
+  /* Narrow window: the folder picker gets its own row under the module name. */
+  @container (max-width: 620px) {
+    .frow {
+      grid-template-columns: 40px minmax(0, 1fr) auto;
+      grid-template-areas: 'ic info act' 'pick pick pick';
+      row-gap: 10px;
+    }
   }
   .fic {
     width: 40px;

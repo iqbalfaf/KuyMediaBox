@@ -90,7 +90,7 @@
       bind:value={o.compress.level}
       options={[
         { value: 'extreme', label: L('Ekstrem', 'Extreme'), sub: L('paling kecil', 'smallest') },
-        { value: 'recommended', label: L('Disarankan', 'Recommended'), sub: L('seimbang', 'balanced') },
+        { value: 'recommended', label: L('Disarankan', 'Balanced'), sub: L('seimbang', 'recommended') },
         { value: 'low', label: L('Ringan', 'Light'), sub: L('kualitas tinggi', 'high quality') },
       ]}
     />
@@ -321,7 +321,7 @@
       bind:value={o.export.mode}
       options={[
         { value: 'pages', label: L('Halaman jadi gambar', 'Pages to images') },
-        { value: 'extract', label: L('Ambil gambar di dalam', 'Pull out pictures') },
+        { value: 'extract', label: L('Ekstrak gambar', 'Pull out pictures') },
       ]}
     />
     <p class="hint">{o.export.mode === 'pages' ? L('Setiap halaman disimpan sebagai satu gambar.', 'Every page is saved as one picture.') : L('Foto dan gambar yang ada di dalam PDF disimpan dalam format aslinya.', 'Photos and pictures inside the PDF are saved in their original format.')}</p>
