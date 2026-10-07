@@ -99,6 +99,7 @@ Program yang sudah jadi tersedia di halaman **[Releases](https://github.com/iqba
 | **GIF** | Palet warna optimal; fps & ukuran bisa diatur |
 | **Gabung video** | Beberapa video jadi satu (urutan diatur ↑↓), ukuran & fps disamakan otomatis |
 | **Ambil frame** | Simpan gambar JPG/PNG tiap N detik ke satu folder |
+| **Ekstrak subtitle** | Track subtitle di dalam video (MKV, MP4, WEBM) disimpan jadi file terpisah: format asli (ASS tetap ASS) atau diubah ke SRT/VTT/ASS, semua track atau bahasa tertentu saja (`id, en`), plus font terlampir untuk ASS |
 | **Ambil audio saja** | Ekstrak audio dari video ke MP3, M4A, FLAC, WAV, OGG, atau OPUS |
 | **Info media** | Resolusi, codec, fps, durasi, dan ukuran dibaca otomatis (ffprobe) |
 | **Progress** | Persen per file, kecepatan encode (mis. `2.1x`), dan estimasi sisa waktu |

@@ -43,6 +43,38 @@ func TestParseProbe(t *testing.T) {
 	}
 }
 
+const mkvProbe = `{
+ "streams": [
+  {"index":0,"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"avg_frame_rate":"24000/1001"},
+  {"index":1,"codec_type":"audio","codec_name":"aac","sample_rate":"48000","channels":2},
+  {"index":2,"codec_type":"subtitle","codec_name":"ass","disposition":{"default":1,"forced":0},"tags":{"language":"ind","title":"Indonesia"}},
+  {"index":3,"codec_type":"subtitle","codec_name":"subrip","disposition":{"default":0,"forced":1},"tags":{"language":"und"}},
+  {"index":4,"codec_type":"attachment","codec_name":"ttf","tags":{"filename":"arial.ttf","mimetype":"application/x-truetype-font"}},
+  {"index":5,"codec_type":"attachment","tags":{"filename":"cover.jpg","mimetype":"image/jpeg"}},
+  {"index":6,"codec_type":"attachment","codec_name":"otf","tags":{"filename":"Font.OTF","mimetype":"application/octet-stream"}}
+ ],
+ "format": {"format_name":"matroska,webm","duration":"1400"}
+}`
+
+func TestParseProbeSubsAndFonts(t *testing.T) {
+	info, err := parseProbe([]byte(mkvProbe))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.SubCodec != "ass" || len(info.Subs) != 2 {
+		t.Fatalf("subs %q %+v", info.SubCodec, info.Subs)
+	}
+	if s := info.Subs[0]; s.Index != 2 || s.Lang != "ind" || s.Title != "Indonesia" || !s.Default || s.Forced {
+		t.Errorf("first sub %+v", s)
+	}
+	if s := info.Subs[1]; s.Index != 3 || s.Codec != "subrip" || s.Lang != "" || !s.Forced {
+		t.Errorf("second sub %+v", s)
+	}
+	if len(info.Fonts) != 2 || info.Fonts[0].Index != 4 || info.Fonts[1].Name != "Font.OTF" {
+		t.Errorf("fonts %+v", info.Fonts)
+	}
+}
+
 func TestParseProbeNoStreams(t *testing.T) {
 	if _, err := parseProbe([]byte(`{"streams":[],"format":{}}`)); err == nil {
 		t.Fatal("expected error")

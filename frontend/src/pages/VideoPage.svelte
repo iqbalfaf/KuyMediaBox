@@ -91,7 +91,8 @@
     if (it.fps) p.push(fps(it.fps))
     p.push(bytes(it.size))
     if (it.height > it.width) p.push(L('vertikal', 'vertical'))
-    if (it.subFile || it.subCodec) p.push(L('ada subtitle', 'has subtitles'))
+    if (it.subCount) p.push(`${it.subCount} subtitle`)
+    else if (it.subFile || it.subCodec) p.push(L('ada subtitle', 'has subtitles'))
     return p.join(' · ')
   }
 
@@ -107,6 +108,7 @@
       return [lossyAudio[st.a.format] ? (st.a.vbr && st.a.format !== 'm4a' ? `${f} · VBR` : `${f} · ${st.a.bitrate} kbps`) : `${f} · lossless`, L('Audio saja', 'Audio only')]
     }
     if (st.mode === 'frames') return [`${st.frameFormat.toUpperCase()} · ${L('tiap', 'every')} ${st.frameEvery} ${L('dtk', 's')}`, L('Folder berisi gambar', 'A folder of pictures')]
+    if (st.mode === 'subs') return [subFormatLabel(), it.subCount ? `${it.subCount} ${L('track subtitle', it.subCount === 1 ? 'subtitle track' : 'subtitle tracks')}` : L('Tidak ada subtitle yang bisa diambil', 'No subtitles to extract')]
     if (st.mode === 'sheet') return [`${st.sheet.format.toUpperCase()} · ${st.sheet.cols}×${st.sheet.rows}`, `${st.sheet.cols * st.sheet.rows} ${L('gambar dalam satu lembar', 'pictures on one sheet')}`]
     if (isGif) {
       const [w, h] = outputSize(it.width, it.height, st.v)
@@ -119,6 +121,11 @@
     const gpu = st.v.hw ? ` · GPU` : ''
     const fx = edits()
     return [`${st.v.format.toUpperCase()} · ${codec(st.v.codec)}${res ? ` · ${res}` : ''}${gpu}`, (w && h && (w !== it.width || h !== it.height) ? `${L('Menjadi', 'Becomes')} ${w}×${h} · ${q}` : q) + (fx ? ` · ${fx}` : '')]
+  }
+
+  function subFormatLabel(): string {
+    const f = st.subs.format === 'original' ? L('Format asli', 'Original format') : st.subs.format.toUpperCase()
+    return st.subs.langs.trim() ? `${f} · ${st.subs.langs.trim()}` : f
   }
 
   /** Short summary of the editing options, for the result column. */
@@ -167,7 +174,7 @@
   const reverseLong = $derived(st.v.reverse && conv.items.some((it) => !it.error && it.duration > 60) && !st.v.trimEnd)
   const pending = $derived(conv.pending())
   const invalidCustom = $derived(encodes && st.v.resolution === 'custom' && !(st.v.custom >= 16))
-  const trimBad = $derived(st.mode !== 'merge' && trimError(st.v.trimStart, st.v.trimEnd) !== '')
+  const trimBad = $derived(st.mode !== 'merge' && st.mode !== 'subs' && trimError(st.v.trimStart, st.v.trimEnd) !== '')
   const noFFmpeg = $derived(!hasTool('ffmpeg'))
   const mergeFew = $derived(st.mode === 'merge' && conv.items.filter((it) => !it.error).length < 2)
 
@@ -179,6 +186,7 @@
       frameEvery: st.frameEvery,
       frameFormat: st.frameFormat,
       sheet: $state.snapshot(st.sheet),
+      subs: $state.snapshot(st.subs),
     }
     if (st.mode === 'merge') {
       // Joining uses every file in list order.
@@ -194,6 +202,7 @@
     if (st.mode === 'merge') return `${L('Gabungkan', 'Join')} ${conv.items.filter((it) => !it.error).length} video`
     if (st.mode === 'frames') return `${L('Ambil frame', 'Export frames')}${pending.length ? ` (${pending.length})` : ''}`
     if (st.mode === 'sheet') return `${L('Buat lembar kontak', 'Make contact sheets')}${pending.length ? ` (${pending.length})` : ''}`
+    if (st.mode === 'subs') return `${L('Ekstrak subtitle', 'Extract subtitles')}${pending.length ? ` (${pending.length})` : ''}`
     return conv.hasUnprocessed() || pending.length === 0 ? `${L('Mulai konversi', 'Start converting')}${pending.length ? ` (${pending.length})` : ''}` : `${L('Konversi ulang', 'Convert again')} (${pending.length})`
   })
 </script>
@@ -239,7 +248,7 @@
         {@const r = resultLine(it)}
         <span class="r1">{r[0]}</span>
         {#if s === 'done' && task}
-          {#if st.mode === 'merge' || st.mode === 'frames'}
+          {#if st.mode === 'merge' || st.mode === 'frames' || st.mode === 'subs'}
             <span class="r2">{bytes(task.outSize)}{task.message ? ` · ${task.message}` : ''}</span>
           {:else}
             {@const diff = it.size ? Math.round(((task.outSize - it.size) / it.size) * 100) : 0}
@@ -261,12 +270,14 @@
       <Segmented
         label={L('Jenis hasil', 'Output type')}
         bind:value={st.mode}
+        columns={3}
         options={[
           { value: 'video', label: 'Video' },
           { value: 'audio', label: 'Audio' },
           { value: 'merge', label: L('Gabung', 'Join') },
           { value: 'frames', label: 'Frame' },
           { value: 'sheet', label: L('Lembar', 'Sheet') },
+          { value: 'subs', label: 'Subtitle' },
         ]}
       />
       {#if st.mode === 'merge'}
@@ -275,6 +286,8 @@
         <p class="hint">{L('Setiap video menghasilkan folder berisi gambar.', 'Each video produces a folder of pictures.')}</p>
       {:else if st.mode === 'sheet'}
         <p class="hint">{L('Lembar kontak: satu gambar berisi banyak cuplikan yang tersebar rata dari awal sampai akhir video, plus info file.', 'Contact sheet: one picture with many snapshots spread evenly through the video, plus file info.')}</p>
+      {:else if st.mode === 'subs'}
+        <p class="hint">{L('Ekstrak subtitle: track subtitle di dalam video (MKV, MP4, WEBM) disimpan jadi file .srt/.ass/… bernama sama, jadi otomatis terbaca pemutar.', 'Extract subtitles: the subtitle tracks inside a video (MKV, MP4, WEBM) are saved as .srt/.ass/… files with the same name, so players load them automatically.')}</p>
       {/if}
 
       {#if st.mode === 'video' || st.mode === 'merge'}
@@ -464,11 +477,11 @@
             <span class="label">{L('Frame per detik', 'Frames per second')}</span>
             <Chips
               bind:value={st.v.fps}
-              columns={5}
+              columns={7}
               small
               options={[
-                { value: 'original', label: isGif ? '12' : L('Asli', 'Original') }, { value: '60', label: '60' }, { value: '30', label: '30' },
-                { value: '24', label: '24' }, { value: 'custom', label: L('Lain', 'Other') },
+                { value: 'original', label: isGif ? '12' : L('Asli', 'Original'), span: 2 }, { value: '60', label: '60' }, { value: '30', label: '30' },
+                { value: '24', label: '24' }, { value: 'custom', label: L('Lain', 'Other'), span: 2 },
               ]}
             />
             {#if st.v.fps === 'custom'}
@@ -504,10 +517,10 @@
               <span class="label">{L('Bingkai & crop', 'Frame & crop')}</span>
               <Chips
                 bind:value={st.v.frame}
-                columns={5}
+                columns={6}
                 small
                 options={[
-                  { value: '', label: L('Asli', 'Original') }, { value: '9:16', label: '9:16' }, { value: '1:1', label: '1:1' },
+                  { value: '', label: L('Asli', 'Original'), span: 2 }, { value: '9:16', label: '9:16' }, { value: '1:1', label: '1:1' },
                   { value: '4:5', label: '4:5' }, { value: '16:9', label: '16:9' },
                 ]}
               />
@@ -645,6 +658,32 @@
             </div>
           {/if}
         {/if}
+      {:else if st.mode === 'subs'}
+        <div class="sec">
+          <span class="label">Format</span>
+          <Chips
+            bind:value={st.subs.format}
+            columns={4}
+            small
+            options={[
+              { value: 'original', label: L('Asli', 'Original') }, { value: 'srt', label: 'SRT' }, { value: 'vtt', label: 'VTT' }, { value: 'ass', label: 'ASS' },
+            ]}
+          />
+          <p class="hint">
+            {st.subs.format === 'original'
+              ? L('Disalin apa adanya: ASS tetap ASS (gaya, warna & posisi utuh), SRT tetap SRT.', 'Copied as is: ASS stays ASS (styles, colours & positions intact), SRT stays SRT.')
+              : st.subs.format === 'ass'
+                ? L('SRT/VTT diubah ke ASS dengan gaya bawaan.', 'SRT/VTT become ASS with a default style.')
+                : L('Paling mudah dibuka di mana saja. Dari ASS: warna, posisi & efek hilang.', 'Opens almost anywhere. From ASS: colours, positions & effects are lost.')}
+            {L(' Subtitle gambar (PGS/DVD) tetap disalin asli (.sup/.mks).', ' Picture subtitles (PGS/DVD) are always copied as they are (.sup/.mks).')}
+          </p>
+        </div>
+        <div class="sec">
+          <label class="label" for="sub-langs">{L('Hanya bahasa (opsional)', 'Only languages (optional)')}</label>
+          <input id="sub-langs" class="text-input" placeholder={L('mis. id, en — kosong = semua track', 'e.g. id, en — empty = every track')} bind:value={st.subs.langs} />
+          <p class="hint">{L('Kode bahasa (id, en, ja…) atau kata di judul track (mis. signs). Track tanpa tag bahasa hanya ikut bila kolom ini kosong.', 'Language codes (id, en, ja…) or a word in the track title (e.g. signs). Tracks without a language tag are only included when this is empty.')}</p>
+        </div>
+        <Switch bind:checked={st.subs.fonts} label={L('Ikut simpan font', 'Also save the fonts')} hint={L('Font yang terlampir di MKV untuk subtitle ASS, disimpan ke folder _fonts', 'Fonts attached to the MKV for ASS subtitles, saved to a _fonts folder')} />
       {:else if st.mode === 'sheet'}
         <div class="sec">
           <span class="label">{L('Kolom', 'Columns')}</span>
@@ -685,7 +724,7 @@
         </div>
       {/if}
 
-      {#if st.mode !== 'merge' && st.mode !== 'sheet'}
+      {#if st.mode !== 'merge' && st.mode !== 'sheet' && st.mode !== 'subs'}
         <div class="sec">
           <TrimFields
             bind:start={st.v.trimStart}

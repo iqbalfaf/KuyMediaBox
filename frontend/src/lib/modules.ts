@@ -5,9 +5,9 @@ import { L } from './i18n.svelte'
 import { api } from './api'
 import { load, saveHooks } from './stores/persist'
 import { mergeInto, userPresets, type Preset } from './stores/presets.svelte'
-import type { AudioOptions, CollageJob, ImageOptions, SheetOptions, SlideOptions, SubtitleJob, VideoOptions } from './types'
+import type { AudioOptions, CollageJob, ImageOptions, SheetOptions, SlideOptions, SubExtractOptions, SubtitleJob, VideoOptions } from './types'
 
-export type VideoMode = 'video' | 'audio' | 'merge' | 'frames' | 'sheet'
+export type VideoMode = 'video' | 'audio' | 'merge' | 'frames' | 'sheet' | 'subs'
 type Mode = VideoMode
 
 export const imageDefaults: { mode: 'convert' | 'anim' | 'collage'; o: ImageOptions; anim: SlideOptions; collage: CollageJob } = {
@@ -32,7 +32,7 @@ export const imageBuiltins = (): Preset[] => [
   { id: 'b-500', name: L('Dokumen / formulir (≤ 500 KB)', 'Documents / forms (≤ 500 KB)'), value: { format: 'jpg', quality: 90, resizeMode: 'original', targetKB: 500 } },
 ]
 
-export const videoDefaults: { mode: Mode; v: VideoOptions; a: AudioOptions; frameEvery: number; frameFormat: 'jpg' | 'png'; sheet: SheetOptions } = {
+export const videoDefaults: { mode: Mode; v: VideoOptions; a: AudioOptions; frameEvery: number; frameFormat: 'jpg' | 'png'; sheet: SheetOptions; subs: SubExtractOptions } = {
   mode: 'video',
   v: {
     format: 'mp4', codec: 'h264', quality: 'seimbang', manual: false, crf: 23, preset: 'medium', resolution: '720', custom: 540,
@@ -49,6 +49,7 @@ export const videoDefaults: { mode: Mode; v: VideoOptions; a: AudioOptions; fram
   frameEvery: 5,
   frameFormat: 'jpg',
   sheet: { cols: 4, rows: 5, width: 320, format: 'jpg', times: true },
+  subs: { format: 'original', langs: '', fonts: false },
 }
 
 export const videoBuiltins = (): Preset[] => [
@@ -120,7 +121,7 @@ export function moduleJob(kind: ModuleKind, st: any): any {
       return st.o
     case 'video': {
       const mode = st.mode === 'merge' ? 'video' : st.mode
-      return { mode, video: st.v, audio: st.a, frameEvery: st.frameEvery, frameFormat: st.frameFormat, sheet: st.sheet }
+      return { mode, video: st.v, audio: st.a, frameEvery: st.frameEvery, frameFormat: st.frameFormat, sheet: st.sheet, subs: st.subs }
     }
     case 'audio':
       return { mode: 'convert', options: st.a }
@@ -139,6 +140,7 @@ export function describeJob(kind: string, job: any): string {
       if (job?.mode === 'audio') return `Video → ${up(job?.audio?.format, 'mp3')}`
       if (job?.mode === 'frames') return L('Video → gambar per frame', 'Video → frame pictures')
       if (job?.mode === 'sheet') return L('Video → lembar kontak', 'Video → contact sheet')
+      if (job?.mode === 'subs') return `Video → subtitle (${job?.subs?.format && job.subs.format !== 'original' ? up(job.subs.format, '') : L('asli', 'original')})`
       return `Video → ${up(job?.video?.format, 'mp4')} ${up(job?.video?.codec, '')}${job?.video?.resolution && job.video.resolution !== 'original' ? ' ' + job.video.resolution + 'p' : ''}`.trim()
     case 'audio':
       return `Audio → ${up(job?.options?.format, 'mp3')}${job?.options?.normalize ? ' · ' + L('volume rata', 'even volume') : ''}${job?.options?.denoise && job.options.denoise !== 'off' ? ' · ' + L('kurangi noise', 'denoise') : ''}`

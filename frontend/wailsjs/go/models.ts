@@ -700,6 +700,7 @@ export namespace main {
 	    locked: boolean;
 	    subCodec: string;
 	    subFile: string;
+	    subCount: number;
 	    tags: Record<string, string>;
 	    cue: string;
 	    cueTracks: number;
@@ -734,6 +735,7 @@ export namespace main {
 	        this.locked = source["locked"];
 	        this.subCodec = source["subCodec"];
 	        this.subFile = source["subFile"];
+	        this.subCount = source["subCount"];
 	        this.tags = source["tags"];
 	        this.cue = source["cue"];
 	        this.cueTracks = source["cueTracks"];
@@ -1142,6 +1144,7 @@ export namespace main {
 	    frameEvery: number;
 	    frameFormat: string;
 	    sheet: SheetOptions;
+	    subs: mediaconv.SubExtractOptions;
 	
 	    static createFrom(source: any = {}) {
 	        return new VideoJob(source);
@@ -1155,6 +1158,7 @@ export namespace main {
 	        this.frameEvery = source["frameEvery"];
 	        this.frameFormat = source["frameFormat"];
 	        this.sheet = this.convertValues(source["sheet"], SheetOptions);
+	        this.subs = this.convertValues(source["subs"], mediaconv.SubExtractOptions);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1288,6 +1292,22 @@ export namespace mediaconv {
 	        this.background = source["background"];
 	        this.fade = source["fade"];
 	        this.music = source["music"];
+	    }
+	}
+	export class SubExtractOptions {
+	    format: string;
+	    langs: string;
+	    fonts: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SubExtractOptions(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.format = source["format"];
+	        this.langs = source["langs"];
+	        this.fonts = source["fonts"];
 	    }
 	}
 	export class Tags {

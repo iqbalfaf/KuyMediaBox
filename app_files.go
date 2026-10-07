@@ -83,6 +83,7 @@ type FileItem struct {
 	Locked        bool              `json:"locked"`    // PDF needs a password to open
 	SubCodec      string            `json:"subCodec"`  // first subtitle track inside the file
 	SubFile       string            `json:"subFile"`   // subtitle file next to the video
+	SubCount      int               `json:"subCount"`  // subtitle tracks inside the file
 	Tags          map[string]string `json:"tags"`      // audio: title, artist, album, …
 	Cue           string            `json:"cue"`       // audio: cue sheet next to the file
 	CueTracks     int               `json:"cueTracks"` // number of songs in the cue sheet
@@ -218,7 +219,7 @@ func (a *App) describe(kind, path, ffprobe string) FileItem {
 	it.Format, it.VideoCodec, it.FPS = info.Format, info.VideoCodec, info.FPS
 	it.AudioCodec, it.SampleRate, it.BitsPerSample, it.Channels = info.AudioCodec, info.SampleRate, info.BitsPerSample, info.Channels
 	it.HasVideo, it.HasAudio, it.HasCover = info.HasVideo, info.HasAudio, info.CoverIndex >= 0
-	it.SubCodec, it.Tags = info.SubCodec, map[string]string{}
+	it.SubCodec, it.SubCount, it.Tags = info.SubCodec, mediaconv.CanExtract(info.Subs), map[string]string{}
 	for _, k := range []string{"title", "artist", "album", "album_artist", "date", "genre", "track"} {
 		if v := info.Tags[k]; v != "" {
 			it.Tags[k] = v
@@ -408,12 +409,13 @@ func (a *App) StartImage(items []JobItem, o imageconv.Options) ([]JobRef, error)
 
 // VideoJob is what the Video page sends.
 type VideoJob struct {
-	Mode        string                 `json:"mode"` // video | audio | merge | frames
-	Video       mediaconv.VideoOptions `json:"video"`
-	Audio       mediaconv.AudioOptions `json:"audio"`
-	FrameEvery  float64                `json:"frameEvery"`  // frames: seconds between pictures
-	FrameFormat string                 `json:"frameFormat"` // frames: jpg | png
-	Sheet       SheetOptions           `json:"sheet"`       // sheet: contact sheet layout
+	Mode        string                      `json:"mode"` // video | audio | merge | frames | sheet | subs
+	Video       mediaconv.VideoOptions      `json:"video"`
+	Audio       mediaconv.AudioOptions      `json:"audio"`
+	FrameEvery  float64                     `json:"frameEvery"`  // frames: seconds between pictures
+	FrameFormat string                      `json:"frameFormat"` // frames: jpg | png
+	Sheet       SheetOptions                `json:"sheet"`       // sheet: contact sheet layout
+	Subs        mediaconv.SubExtractOptions `json:"subs"`        // subs: subtitle tracks saved as files
 }
 
 // SheetOptions lay out a contact sheet (a grid of pictures from the video).
@@ -439,6 +441,9 @@ func (a *App) StartVideo(items []JobItem, job VideoJob) ([]JobRef, error) {
 	ff, probe := a.tools.Path(tools.FFmpeg), a.tools.Path(tools.FFprobe)
 	if ff == "" || probe == "" {
 		return nil, errNoFFmpeg()
+	}
+	if job.Mode == "subs" {
+		return a.startSubExtract(items, job.Subs, out, ff, probe)
 	}
 	job.Video.Normalize()
 	job.Audio.Normalize()

@@ -32,7 +32,7 @@
     return {
       id: `u${Date.now()}-${seq++}`, path, name: path, ext: 'url', size: 0, width: 0, height: 0, duration: 0, format: '', videoCodec: '', fps: 0,
       audioCodec: '', sampleRate: 0, bitsPerSample: 0, channels: 0, hasVideo: false, hasAudio: false, hasCover: false, pages: 0, encrypted: false, locked: false,
-      subCodec: '', subFile: '', tags: null, cue: '', cueTracks: 0, error: '',
+      subCodec: '', subFile: '', subCount: 0, tags: null, cue: '', cueTracks: 0, error: '',
     }
   }
   function addUrls() {
@@ -61,7 +61,7 @@
     const o = pdfOpts
     switch (tool.id) {
       case 'compress':
-        return `PDF · ${{ extreme: L('Ekstrem', 'Extreme'), recommended: L('Disarankan', 'Recommended'), low: L('Ringan', 'Light') }[o.compress.level]}`
+        return `PDF · ${{ extreme: L('Ekstrem', 'Extreme'), recommended: L('Disarankan', 'Balanced'), low: L('Ringan', 'Light') }[o.compress.level]}`
       case 'pdf2img':
         return o.export.mode === 'extract' ? L('Gambar asli', 'Original pictures') : `${o.export.format.toUpperCase()} · ${o.export.dpi} DPI`
       case 'pdf2word':

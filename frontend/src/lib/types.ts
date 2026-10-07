@@ -44,6 +44,8 @@ export interface FileItem {
   locked: boolean
   subCodec: string
   subFile: string
+  /** Subtitle tracks inside the file. */
+  subCount: number
   tags: Record<string, string> | null
   cue: string
   cueTracks: number
@@ -193,6 +195,15 @@ export interface VideoOptions {
   denoise: Denoise
   music: VideoMusic
   watermark: ImageWatermark
+}
+
+/** Video page, subtitle mode: subtitle tracks inside a video saved as files. */
+export interface SubExtractOptions {
+  format: 'original' | 'srt' | 'vtt' | 'ass'
+  /** Only these languages ("id, en"); empty = every track. */
+  langs: string
+  /** Also save the attached fonts (for ASS). */
+  fonts: boolean
 }
 
 export interface SheetOptions {

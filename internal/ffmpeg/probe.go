@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -17,24 +18,43 @@ import (
 
 // Info describes a media file.
 type Info struct {
-	Format        string  `json:"format"`
-	Duration      float64 `json:"duration"` // seconds
-	Bitrate       int64   `json:"bitrate"`
-	HasVideo      bool    `json:"hasVideo"` // a real video stream, not cover art
-	HasAudio      bool    `json:"hasAudio"`
-	Width         int     `json:"width"` // as displayed (rotation applied)
-	Height        int     `json:"height"`
-	VideoCodec    string  `json:"videoCodec"`
-	FPS           float64 `json:"fps"`
-	AudioCodec    string  `json:"audioCodec"`
-	SampleRate    int     `json:"sampleRate"`
-	Channels      int     `json:"channels"`
-	BitsPerSample int     `json:"bitsPerSample"`
-	CoverIndex    int     `json:"coverIndex"` // stream index of attached picture, -1 if none
-	CoverCodec    string  `json:"coverCodec"`
-	SubCodec      string  `json:"subCodec"` // first subtitle stream ("" when none)
+	Format        string       `json:"format"`
+	Duration      float64      `json:"duration"` // seconds
+	Bitrate       int64        `json:"bitrate"`
+	HasVideo      bool         `json:"hasVideo"` // a real video stream, not cover art
+	HasAudio      bool         `json:"hasAudio"`
+	Width         int          `json:"width"` // as displayed (rotation applied)
+	Height        int          `json:"height"`
+	VideoCodec    string       `json:"videoCodec"`
+	FPS           float64      `json:"fps"`
+	AudioCodec    string       `json:"audioCodec"`
+	SampleRate    int          `json:"sampleRate"`
+	Channels      int          `json:"channels"`
+	BitsPerSample int          `json:"bitsPerSample"`
+	CoverIndex    int          `json:"coverIndex"` // stream index of attached picture, -1 if none
+	CoverCodec    string       `json:"coverCodec"`
+	SubCodec      string       `json:"subCodec"` // first subtitle stream ("" when none)
+	Subs          []SubTrack   `json:"subs"`     // every subtitle stream
+	Fonts         []Attachment `json:"fonts"`    // attached fonts (Matroska), used by ASS subtitles
 	// Tags are the container's metadata (lower-case keys: title, artist, album, date, genre, track, …).
 	Tags map[string]string `json:"tags"`
+}
+
+// SubTrack is a subtitle stream inside a media file.
+type SubTrack struct {
+	Index   int    `json:"index"` // stream index (for -map 0:N)
+	Codec   string `json:"codec"`
+	Lang    string `json:"lang"` // language tag in lower case ("" when unknown)
+	Title   string `json:"title"`
+	Default bool   `json:"default"`
+	Forced  bool   `json:"forced"`
+}
+
+// Attachment is a file attached to a Matroska container.
+type Attachment struct {
+	Index int    `json:"index"`
+	Name  string `json:"name"`
+	Mime  string `json:"mime"`
 }
 
 type probeStream struct {
@@ -98,6 +118,16 @@ func parseProbe(data []byte) (Info, error) {
 			if info.SubCodec == "" {
 				info.SubCodec = s.CodecName
 			}
+			lang := strings.ToLower(strings.TrimSpace(s.Tags["language"]))
+			if lang == "und" {
+				lang = ""
+			}
+			info.Subs = append(info.Subs, SubTrack{Index: s.Index, Codec: s.CodecName, Lang: lang, Title: strings.TrimSpace(s.Tags["title"]),
+				Default: s.Disposition["default"] == 1, Forced: s.Disposition["forced"] == 1})
+		case "attachment":
+			if name, mime := s.Tags["filename"], strings.ToLower(s.Tags["mimetype"]); isFont(name, mime) {
+				info.Fonts = append(info.Fonts, Attachment{Index: s.Index, Name: name, Mime: mime})
+			}
 		case "video":
 			if s.Disposition["attached_pic"] == 1 {
 				if info.CoverIndex < 0 {
@@ -155,6 +185,19 @@ func parseProbe(data []byte) (Info, error) {
 		return info, errors.New(i18n.L("tidak ada video atau audio di file ini", "this file has no video or audio"))
 	}
 	return info, nil
+}
+
+// isFont tells whether an attachment is a font (by its mime type or file name).
+func isFont(name, mime string) bool {
+	if strings.HasPrefix(mime, "font/") || strings.HasPrefix(mime, "application/x-font") ||
+		mime == "application/x-truetype-font" || mime == "application/vnd.ms-opentype" || mime == "application/font-sfnt" {
+		return true
+	}
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".ttf", ".otf", ".ttc", ".woff", ".woff2":
+		return true
+	}
+	return false
 }
 
 func rotation(s probeStream) int {
