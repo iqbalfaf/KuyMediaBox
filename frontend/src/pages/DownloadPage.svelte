@@ -8,7 +8,7 @@
   import AudioDownloadOptions from '../components/AudioDownloadOptions.svelte'
   import ToolBanner from '../components/ToolBanner.svelte'
   import Icon from '../components/Icon.svelte'
-  import { pickTrim } from '../components/TrimDialog.svelte'
+  import { pickTrim, setRemote, trim } from '../components/TrimDialog.svelte'
   import OutputPicker from '../components/OutputPicker.svelte'
   import Select from '../components/Select.svelte'
   import PresetBar from '../components/PresetBar.svelte'
@@ -66,6 +66,8 @@
         ],
   )
 
+  let previewSeq = 0
+
   async function setCut(r: LinkRow) {
     // One video with a known length: pick the part on a timeline.
     const one = r.col?.entries.length === 1 ? r.col.entries[0] : null
@@ -74,6 +76,20 @@
       pickTrim({ title: one.title || r.col!.title, duration: one.duration, thumb: one.thumbnail || r.col!.thumbnail, start: a, end: b }, (s, e) => {
         r.cut = s || e ? `${s || '0:00'}-${e}` : ''
       })
+      // Meanwhile find a stream so the video can be watched and scrubbed, not just its thumbnail.
+      const my = ++previewSeq
+      trim.loading = true
+      // Still this dialog (not closed, nor reopened for a file on the Video page)?
+      const current = () => my === previewSeq && trim.open && !trim.path
+      try {
+        const p = await api.previewLink(one.url || r.col!.url || r.link.url)
+        if (current()) setRemote(p)
+      } catch (e) {
+        if (current()) {
+          trim.loading = false
+          trim.note = L(`Pratinjau video tidak tersedia (${errText(e)}); yang tampil gambar sampulnya.`, `The video preview isn't available (${errText(e)}); its thumbnail is shown.`)
+        }
+      }
       return
     }
     const v = await askText(

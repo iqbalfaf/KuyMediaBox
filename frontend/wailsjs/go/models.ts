@@ -812,6 +812,24 @@ export namespace main {
 	        this.taskId = source["taskId"];
 	    }
 	}
+	export class LinkPreview {
+	    id: string;
+	    playable: boolean;
+	    video: boolean;
+	    audio: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new LinkPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.playable = source["playable"];
+	        this.video = source["video"];
+	        this.audio = source["audio"];
+	    }
+	}
 	export class ModelStatus {
 	    kind: string;
 	    id: string;

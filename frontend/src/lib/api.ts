@@ -86,6 +86,7 @@ export const api = {
 
   detectLinks: (text: string): Promise<Link[]> => call.DetectLinks(text),
   analyzeLink: (url: string): Promise<Collection> => call.AnalyzeLink(url),
+  previewLink: (url: string): Promise<{ id: string; playable: boolean; video: boolean; audio: boolean }> => call.PreviewLink(url),
   forgetCollection: (key: string): Promise<void> => call.ForgetCollection(key),
   pendingDownloads: (): Promise<PendingSummary> => call.PendingDownloads(),
   listSubscriptions: (): Promise<SubscriptionInfo[]> => call.ListSubscriptions(),

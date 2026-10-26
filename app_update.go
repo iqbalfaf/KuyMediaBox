@@ -15,7 +15,7 @@ import (
 )
 
 // Version is the app version. Release builds set it with -ldflags "-X main.Version=x.y.z".
-var Version = "0.6.0"
+var Version = "0.6.1"
 
 type updateState struct {
 	mu         sync.Mutex

@@ -9,11 +9,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"kuymediabox/internal/appdir"
 	"kuymediabox/internal/downloader"
 	"kuymediabox/internal/i18n"
 	"kuymediabox/internal/naming"
+	"kuymediabox/internal/preview"
 	"kuymediabox/internal/queue"
 	"kuymediabox/internal/tools"
 )
@@ -48,6 +50,27 @@ func (a *App) DetectLinks(text string) []downloader.Link {
 		out = []downloader.Link{}
 	}
 	return out
+}
+
+// LinkPreview tells the trim dialog how to show an online video.
+type LinkPreview struct {
+	ID       string `json:"id"`       // stream id for /kmb/remote and /kmb/rframe
+	Playable bool   `json:"playable"` // the player can play it; otherwise frames are shown
+	Video    bool   `json:"video"`
+	Audio    bool   `json:"audio"`
+}
+
+// PreviewLink finds a small stream of an online video so it can be watched and scrubbed
+// while choosing the part to download.
+func (a *App) PreviewLink(url string) (LinkPreview, error) {
+	a.waitTools()
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	s, err := downloader.PreviewStream(ctx, a.env(), url)
+	if err != nil {
+		return LinkPreview{}, err
+	}
+	return LinkPreview{ID: preview.AddRemote(s.URL, s.Headers), Playable: s.Playable(), Video: s.Video, Audio: s.Audio}, nil
 }
 
 // AnalyzeLink reads what a link contains (video, playlist, channel, Spotify list).

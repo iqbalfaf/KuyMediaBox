@@ -1,6 +1,7 @@
 // Package preview serves media previews to the UI: the file itself for the <video>/<audio>
 // player (/kmb/media), one video frame as JPEG (/kmb/frame) and a waveform picture
-// (/kmb/wave). The trim and crop dialogs use them.
+// (/kmb/wave). The trim and crop dialogs use them. Online videos are previewed through
+// /kmb/remote and /kmb/rframe (remote.go).
 package preview
 
 import (
@@ -35,6 +36,10 @@ func Middleware(ffmpeg func() string, next http.Handler) http.Handler {
 			serveWave(w, r, ffmpeg())
 		case "/kmb/imgx":
 			serveImage(w, r, ffmpeg())
+		case "/kmb/remote":
+			serveRemote(w, r)
+		case "/kmb/rframe":
+			serveRemoteFrame(w, r, ffmpeg())
 		default:
 			next.ServeHTTP(w, r)
 		}

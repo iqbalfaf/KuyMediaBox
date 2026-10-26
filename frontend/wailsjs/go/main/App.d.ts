@@ -134,6 +134,8 @@ export function PickFolder(arg1:string):Promise<Array<main.FileItem>>;
 
 export function PickToolPath(arg1:string):Promise<void>;
 
+export function PreviewLink(arg1:string):Promise<main.LinkPreview>;
+
 export function QuitApp():Promise<void>;
 
 export function RecheckTools():Promise<Array<tools.Status>>;

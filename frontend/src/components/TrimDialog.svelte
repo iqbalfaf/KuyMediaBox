@@ -14,9 +14,16 @@
     start: number
     end: number
     cb: Done | null
-  }>({ open: false, title: '', path: '', duration: 0, hasVideo: false, thumb: '', start: 0, end: 0, cb: null })
+    /** Online video: stream id (see PreviewLink), whether the player can play it, and
+     *  whether it is still being looked up. */
+    remote: string
+    remotePlay: boolean
+    loading: boolean
+    note: string
+  }>({ open: false, title: '', path: '', duration: 0, hasVideo: false, thumb: '', start: 0, end: 0, cb: null, remote: '', remotePlay: false, loading: false, note: '' })
 
-  /** Opens the dialog. path "" = a remote video (timeline only, with thumb as picture). */
+  /** Opens the dialog. path "" = a remote video: thumb as picture until setRemote gives a
+   *  stream to play or to take frames from. */
   export function pickTrim(o: { title: string; path?: string; duration: number; hasVideo?: boolean; thumb?: string; start: string; end: string }, cb: Done) {
     const s = parseTime(o.start) ?? 0
     const e = parseTime(o.end) ?? 0
@@ -29,8 +36,17 @@
       start: Math.min(s, o.duration),
       end: e > 0 && e <= o.duration ? e : o.duration,
       cb,
+      remote: '',
+      remotePlay: false,
+      loading: false,
+      note: '',
       open: true,
     })
+  }
+
+  /** Gives an open dialog the online stream of its video (from PreviewLink). */
+  export function setRemote(p: { id: string; playable: boolean; video: boolean }) {
+    Object.assign(trim, { remote: p.id, remotePlay: p.playable, hasVideo: p.video, loading: false, note: '' })
   }
 
   /** Seconds → "1:23.4" (tenths only when needed), the format the trim fields accept. */
@@ -46,6 +62,7 @@
 
 <script lang="ts">
   import { L } from '../lib/i18n.svelte'
+  import { untrack } from 'svelte'
   import Icon from './Icon.svelte'
 
   let dialog: HTMLDialogElement
@@ -78,15 +95,34 @@
   const dur = $derived(Math.max(trim.duration, 0.1))
   const pct = (t: number) => `${(Math.max(0, Math.min(t, dur)) / dur) * 100}%`
   const q = (s: string) => encodeURIComponent(s)
-  const mediaUrl = $derived(trim.path ? `/kmb/media?path=${q(trim.path)}` : '')
-  const frameUrl = $derived(trim.path ? `/kmb/frame?path=${q(trim.path)}&t=${framePos.toFixed(2)}&w=960` : trim.thumb)
+  const mediaUrl = $derived(trim.path ? `/kmb/media?path=${q(trim.path)}` : trim.remote && trim.remotePlay ? `/kmb/remote?id=${trim.remote}` : '')
+  const frameUrl = $derived(
+    trim.path
+      ? `/kmb/frame?path=${q(trim.path)}&t=${framePos.toFixed(2)}&w=960`
+      : trim.remote
+        ? `/kmb/rframe?id=${trim.remote}&t=${framePos.toFixed(2)}&w=960`
+        : trim.thumb,
+  )
+  const hasSource = $derived(!!trim.path || !!trim.remote)
+
+  // The online stream arrives after the dialog opened (before rendering, so no frame is
+  // asked for a stream the player is about to play).
+  $effect.pre(() => {
+    if (trim.remote) {
+      // Depends on the stream only: a player error later sets playable itself.
+      playable = trim.remotePlay
+      if (!trim.remotePlay) playing = false
+      framePos = untrack(() => pos)
+    }
+  })
   const waveUrl = $derived(trim.path && !trim.hasVideo ? `/kmb/wave?path=${q(trim.path)}&w=1400&h=120&c=ff7a45` : '')
 
   function seek(t: number) {
     pos = Math.max(0, Math.min(t, dur))
     if (media && playable) media.currentTime = pos
     clearTimeout(frameTimer)
-    frameTimer = window.setTimeout(() => (framePos = pos), 120)
+    // Frames of an online video take a moment each: ask less often while scrubbing.
+    frameTimer = window.setTimeout(() => (framePos = pos), trim.remote ? 350 : 120)
   }
 
   function timeAt(clientX: number): number {
@@ -160,6 +196,13 @@
     }
   }
 
+  // The player can't play this format: show frames from where it was.
+  function fail() {
+    playable = false
+    playing = false
+    framePos = pos
+  }
+
   function done() {
     const whole = trim.start <= 0.05 && trim.end >= dur - 0.05
     trim.cb?.(whole || trim.start <= 0.05 ? '' : fmtTime(trim.start), whole || trim.end >= dur - 0.05 ? '' : fmtTime(trim.end))
@@ -189,8 +232,11 @@
     </div>
 
     {#if trim.open}
-      <div class="stage" class:audio={trim.path && !trim.hasVideo}>
-        {#if trim.path && trim.hasVideo && playable}
+      <div class="stage" class:audio={hasSource && !trim.hasVideo}>
+        {#if trim.loading}
+          <span class="badge"><Icon name="loader" size={13} class="spin" />{L('Menyiapkan pratinjau…', 'Preparing the preview…')}</span>
+        {/if}
+        {#if mediaUrl && trim.hasVideo && playable}
           <!-- svelte-ignore a11y_media_has_caption -->
           <video
             bind:this={media}
@@ -200,11 +246,11 @@
             ontimeupdate={tick}
             onplay={() => (playing = true)}
             onpause={() => (playing = false)}
-            onerror={() => (playable = false)}
+            onerror={fail}
           ></video>
-        {:else if trim.path && !trim.hasVideo}
+        {:else if hasSource && !trim.hasVideo}
           <div class="audio-face"><Icon name="music" size={42} /><span>{fmtTime(pos)}</span></div>
-          {#if playable}
+          {#if playable && mediaUrl}
             <audio
               bind:this={media}
               src={mediaUrl}
@@ -213,7 +259,7 @@
               ontimeupdate={tick}
               onplay={() => (playing = true)}
               onpause={() => (playing = false)}
-              onerror={() => (playable = false)}
+              onerror={fail}
             ></audio>
           {/if}
         {:else if frameUrl}
@@ -224,7 +270,7 @@
       </div>
 
       <div class="controls">
-        <button class="btn icon play" disabled={!playable || !trim.path} aria-label={playing ? L('Jeda', 'Pause') : L('Putar', 'Play')} onclick={toggle}>
+        <button class="btn icon play" disabled={!playable || !mediaUrl} aria-label={playing ? L('Jeda', 'Pause') : L('Putar', 'Play')} onclick={toggle}>
           <Icon name={playing ? 'pause' : 'play'} size={16} />
         </button>
         <span class="now">{fmtTime(pos)} / {fmtTime(dur)}</span>
@@ -259,7 +305,8 @@
       </div>
       <p class="hint">
         {L('Tarik penanda di timeline, atau putar lalu klik "Mulai/Selesai di sini". Tombol: Spasi = putar, ←/→ = geser 1 dtk (Shift = 0,1 dtk), [ dan ] = set mulai/selesai.', 'Drag the markers on the timeline, or play and click "Start/End here". Keys: Space = play, ←/→ = move 1 s (Shift = 0.1 s), [ and ] = set start/end.')}
-        {#if trim.path && !playable && trim.hasVideo}{L(' Format ini tidak bisa diputar di pratinjau, jadi yang tampil gambar dari posisi yang dipilih.', ' This format can\'t be played in the preview, so a picture of the chosen position is shown.')}{/if}
+        {#if trim.note}{' '}{trim.note}{/if}
+        {#if hasSource && !playable && trim.hasVideo}{L(' Format ini tidak bisa diputar di pratinjau, jadi yang tampil gambar dari posisi yang dipilih.', ' This format can\'t be played in the preview, so a picture of the chosen position is shown.')}{/if}
       </p>
     {/if}
   </div>
@@ -296,6 +343,7 @@
     color: var(--text);
   }
   .stage {
+    position: relative;
     height: min(52vh, 480px);
     border-radius: 12px;
     overflow: hidden;
@@ -303,6 +351,20 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+  .badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
   }
   .stage.audio {
     height: 150px;

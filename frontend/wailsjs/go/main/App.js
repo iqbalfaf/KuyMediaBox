@@ -246,6 +246,10 @@ export function PickToolPath(arg1) {
   return window['go']['main']['App']['PickToolPath'](arg1);
 }
 
+export function PreviewLink(arg1) {
+  return window['go']['main']['App']['PreviewLink'](arg1);
+}
+
 export function QuitApp() {
   return window['go']['main']['App']['QuitApp']();
 }
