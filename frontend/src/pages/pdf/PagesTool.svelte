@@ -87,7 +87,8 @@
     } else if (o.split.mode === 'all') {
       for (let p = 1; p <= n; p++) g.set(p, p - 1)
     } else {
-      o.split.ranges.split(/[,;\n]+/).forEach((part, i) => {
+      // One file per range, like ParseRanges in Go (spaces separate too, "1 - 3" doesn't).
+      o.split.ranges.replace(/[–—]/g, '-').replace(/\s*-\s*/g, '-').split(/[,;\s]+/).filter(Boolean).forEach((part, i) => {
         const r = parseRange(part, n)
         r?.forEach((p) => !g.has(p) && g.set(p, i))
       })

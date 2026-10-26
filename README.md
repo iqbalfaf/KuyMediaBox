@@ -4,7 +4,7 @@
 
 # KuyMediaBox
 
-**Satu aplikasi desktop untuk konversi gambar, video, audio, subtitle otomatis, 40 alat PDF, alur kerja otomatis, dan download dari YouTube, TikTok, Instagram, Facebook, X, Pinterest, Reddit, SoundCloud, Twitch, Bilibili & Spotify.**
+**Satu aplikasi desktop untuk konversi gambar, video, audio, subtitle otomatis, 40 alat PDF, ganti nama massal, alur kerja otomatis, dan download dari YouTube, TikTok, Instagram, Facebook, X, Pinterest, Reddit, SoundCloud, Twitch, Bilibili & Spotify.**
 Ringan, offline, tanpa iklan, dan tanpa batas ukuran file. Tersedia dalam **Bahasa Indonesia** dan **English**.
 
 [![Release](https://img.shields.io/github/v/release/iqbalfaf/KuyMediaBox?label=download&color=ff7a45)](https://github.com/iqbalfaf/KuyMediaBox/releases/latest)
@@ -206,6 +206,21 @@ Semua file PDF diproses **di komputer Anda**, tidak ada yang diunggah ke interne
 <td><img src="docs/screenshots/pdf-bandingkan.png" alt="Bandingkan dua PDF" /></td>
 </tr>
 </table>
+
+### 🏷 Ganti nama massal
+
+Ganti nama banyak file **jenis apa saja** sekaligus. Nama baru tampil dulu di daftar (bisa diubah per file) sebelum apa pun diganti, dan hasilnya bisa **diurungkan**.
+
+| Cara | Contoh |
+|---|---|
+| **Dari isi PDF/Word** | Rapor hasil generate `rapor_001.pdf` → `AHMAD FAUZI.pdf`: teks setelah label seperti **“Nama Peserta Didik :”** dipakai sebagai nama. Format bisa digabung: `{nama} - {nisn}`, `{kelas} {nama}`, atau label apa saja `{Semester}`. Membaca PDF, DOCX, ODT (DOC/RTF lewat Office/LibreOffice); isi tabel Word ikut terbaca |
+| **Pola & nomor** | `Liburan {n}` → `Liburan 01`, `Liburan 02`, … (mulai, langkah, jumlah digit), `{file}` nama lama, `{tanggal}` tanggal file |
+| **Cari & ganti** | `IMG_` → `Foto `; bisa bedakan huruf besar/kecil atau memakai regex (`$1`, `$2`) |
+| **Tambah / potong** | Tambah teks di depan/belakang, buang N huruf di awal/akhir nama |
+
+- Pilihan huruf: tetap, **Kapital Awal**, KAPITAL, huruf kecil (untuk rapor hanya nama siswanya, kelas seperti “XII IPA 1” tetap); garis bawah jadi spasi; ekstensi huruf kecil.
+- **Ganti nama asli** di foldernya sendiri, atau **salin** dengan nama baru ke folder lain. Nama kembar diberi nomor `Budi (1).pdf`, file yang sudah ada tidak pernah ditimpa, dan dua file boleh bertukar nama.
+- Dari **Alat PDF**, kartu **Ganti nama dari isi** langsung membuka mode rapor.
 
 ### ⚙ Fitur umum
 
@@ -495,6 +510,7 @@ KuyMediaBox/
 ├── app_files.go            # binding: tambah file & mulai konversi
 ├── app_download.go         # binding: baca link & mulai download
 ├── app_pdf.go              # binding: alat PDF
+├── app_rename.go           # binding: ganti nama massal
 ├── app_flow.go             # alur kerja (langkah berantai)
 ├── app_cli.go              # perintah kmb (tanpa jendela)
 ├── app_tray.go             # system tray & mulai bersama Windows
@@ -508,6 +524,7 @@ KuyMediaBox/
 │   ├── mediaconv/          # argumen FFmpeg untuk video & audio
 │   ├── imageconv/          # konversi gambar pure Go (+ ICO & PDF)
 │   ├── pdf/                # alat PDF: PDFium (WebAssembly) + pdfcpu, OCR Windows, Office, Edge/Chrome headless
+│   ├── rename/             # ganti nama massal: pola, cari & ganti, label di isi dokumen, eksekusi & urungkan
 │   ├── downloader/         # deteksi link, yt-dlp (YouTube & sosmed), spotDL (Spotify), gallery-dl (foto, X, Pinterest)
 │   ├── tools/              # Tools Manager: cari, unduh, update
 │   ├── updater/            # update aplikasi dari GitHub Releases
@@ -519,7 +536,7 @@ KuyMediaBox/
 │   ├── proc/ platform/     # proses tersembunyi & utilitas Windows
 │   └── integration/        # test nyata dengan tools asli
 ├── frontend/src/
-│   ├── pages/              # Gambar, Video, Audio, Alat PDF (pages/pdf/), Download, Pengaturan
+│   ├── pages/              # Gambar, Video, Audio, Alat PDF (pages/pdf/), Ganti nama, Download, Pengaturan
 │   ├── components/         # Sidebar, FileList, OutputPicker, RunFooter, …
 │   └── lib/                # API, store, format, i18n (L('id', 'en'))
 ├── build/                  # ikon & konfigurasi build Windows

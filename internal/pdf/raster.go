@@ -106,7 +106,12 @@ func ToImages(ctx context.Context, in Input, o ImageExportOptions, dir, name str
 }
 
 func extractImages(ctx context.Context, in Input, o ImageExportOptions, dir, name string, prog Progress) ([]string, error) {
-	f, err := os.Open(in.Path)
+	plain, done, err := decrypted(in, dir)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	f, err := os.Open(plain)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +158,7 @@ func extractImages(ctx context.Context, in Input, o ImageExportOptions, dir, nam
 		prog(min(0.95, float64(n)*0.05))
 		return nil
 	}
-	if err := api.ExtractImages(f, sel, digest, conf(in.Password)); err != nil {
+	if err := api.ExtractImages(f, sel, digest, conf("")); err != nil {
 		return files, friendly(err)
 	}
 	if len(files) == 0 {

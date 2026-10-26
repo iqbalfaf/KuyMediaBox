@@ -72,6 +72,30 @@ func writeCtx(ctx *model.Context, path string) error {
 	return nil
 }
 
+// decrypted returns in.Path, or an unprotected copy of it in dir when it is encrypted
+// (remove it with the returned func). pdfcpu's own commands (n-up, image extraction)
+// refuse a file whose permissions forbid the change, even with the right password.
+func decrypted(in Input, dir string) (string, func(), error) {
+	c, err := readCtx(in.Path, in.Password)
+	if err != nil {
+		return "", nil, err
+	}
+	if c.Encrypt == nil {
+		return in.Path, func() {}, nil
+	}
+	f, err := os.CreateTemp(dir, ".kmb-plain-*.pdf")
+	if err != nil {
+		return "", nil, err
+	}
+	name := f.Name()
+	f.Close()
+	if err := writeCtx(c, name); err != nil {
+		os.Remove(name)
+		return "", nil, err
+	}
+	return name, func() { os.Remove(name) }, nil
+}
+
 // friendly turns common pdfcpu errors into readable messages.
 func friendly(err error) error {
 	if err == nil {
@@ -119,15 +143,13 @@ func ParsePages(s string, max int) ([]int, error) {
 	return out, nil
 }
 
-// ParseRanges turns "1-3, 4-6, 9" into ordered spans (kept in the given order).
+// ParseRanges turns "1-3, 4-6, 9" into ordered spans (kept in the given order). Like
+// ParsePages, spaces separate ranges too ("1-3 4-6"), but "1 - 3" is one range.
 func ParseRanges(s string, max int) ([][2]int, error) {
 	var out [][2]int
 	s = strings.NewReplacer("–", "-", "—", "-", ";", ",").Replace(s)
-	for _, part := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == '\n' }) {
-		part = strings.ReplaceAll(strings.TrimSpace(part), " ", "")
-		if part == "" {
-			continue
-		}
+	s = reDashSpace.ReplaceAllString(s, "-")
+	for _, part := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ' ' || r == '\n' || r == '\t' }) {
 		a, b, err := parseSpan(part, max)
 		if err != nil {
 			return nil, err

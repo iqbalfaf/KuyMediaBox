@@ -1,5 +1,5 @@
 export type Kind = 'image' | 'video' | 'audio' | 'download' | 'pdf' | 'subtitle'
-export type Page = 'image' | 'video' | 'audio' | 'subtitle' | 'flows' | 'download' | 'pdf' | 'history' | 'settings'
+export type Page = 'image' | 'video' | 'audio' | 'subtitle' | 'flows' | 'download' | 'pdf' | 'rename' | 'history' | 'settings'
 
 export type TaskStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled' | 'skipped'
 
@@ -485,6 +485,58 @@ export interface PdfJob {
   id: string
   path: string
   password: string
+}
+
+/** Bulk rename page: how new names are built (see internal/rename). */
+export type RenameMode = 'content' | 'pattern' | 'replace' | 'edit'
+export interface RenameOptions {
+  mode: RenameMode
+  labels: string
+  template: string
+  pattern: string
+  start: number
+  step: number
+  digits: number
+  find: string
+  with: string
+  regex: boolean
+  matchCase: boolean
+  prefix: string
+  suffix: string
+  cutStart: number
+  cutEnd: number
+  case: 'keep' | 'title' | 'upper' | 'lower'
+  tidy: boolean
+  extLower: boolean
+}
+
+export interface RenameItem {
+  id: string
+  path: string
+  password: string
+}
+
+export interface RenamePlan {
+  id: string
+  name: string
+  ext: string
+  error: string
+}
+
+export interface RenameJob {
+  id: string
+  path: string
+  name: string
+  ext: string
+}
+
+export interface RenameResult {
+  id: string
+  from: string
+  to: string
+  copy: boolean
+  skipped: boolean
+  error: string
 }
 
 export interface PdfOptions {

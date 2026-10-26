@@ -33,6 +33,7 @@
     { page: 'subtitle', label: L('Subtitle otomatis', 'Auto subtitles'), icon: 'subtitles', group: L('KONVERSI', 'CONVERT') },
     { page: 'flows', label: L('Alur kerja', 'Workflows'), icon: 'layers', group: L('KONVERSI', 'CONVERT') },
     { page: 'pdf', label: L('Alat PDF', 'PDF Tools'), icon: 'fileText', group: L('DOKUMEN', 'DOCUMENTS') },
+    { page: 'rename', label: L('Ganti nama massal', 'Bulk rename'), icon: 'tag', group: L('DOKUMEN', 'DOCUMENTS') },
     { page: 'download', label: 'Download', icon: 'download', group: 'ONLINE' },
   ])
 </script>

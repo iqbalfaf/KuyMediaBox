@@ -196,7 +196,13 @@ func NUp(in Input, o NUpOptions, out string) error {
 	if err != nil {
 		return friendly(err)
 	}
-	src, err := os.ReadFile(in.Path)
+	plain, done, err := decrypted(in, filepath.Dir(out))
+	if err != nil {
+		return err
+	}
+	defer done()
+	c = conf("")
+	src, err := os.ReadFile(plain)
 	if err != nil {
 		return err
 	}
@@ -209,7 +215,7 @@ func NUp(in Input, o NUpOptions, out string) error {
 	if err != nil {
 		return friendly(err)
 	}
-	// Re-save without the source's encryption.
+	// Re-save through pdfcpu's writer (as every other result).
 	tmp := out + ".nup"
 	if err := os.WriteFile(tmp, buf.Bytes(), 0o644); err != nil {
 		return err
@@ -400,12 +406,17 @@ func firstPage(p []int) int {
 }
 
 func exportForm(in Input) (*form.FormGroup, error) {
-	f, err := os.Open(in.Path)
+	plain, done, err := decrypted(in, "")
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	f, err := os.Open(plain)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	fg, err := api.ExportForm(f, filepath.Base(in.Path), conf(in.Password))
+	fg, err := api.ExportForm(f, filepath.Base(in.Path), conf(""))
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "no form") || strings.Contains(strings.ToLower(err.Error()), "acroform") {
 			return nil, NoFormError{}
@@ -525,13 +536,23 @@ func FillForm(ctx context.Context, in Input, fields []FormField, flatten bool, o
 	if err != nil {
 		return err
 	}
-	src, err := os.ReadFile(in.Path)
+	plain, done, err := decrypted(in, filepath.Dir(out))
+	if err != nil {
+		return err
+	}
+	defer done()
+	src, err := os.ReadFile(plain)
 	if err != nil {
 		return err
 	}
 	var buf bytes.Buffer
-	if err := api.FillForm(bytes.NewReader(src), bytes.NewReader(data), &buf, conf(in.Password)); err != nil {
-		return friendly(err)
+	if err := api.FillForm(bytes.NewReader(src), bytes.NewReader(data), &buf, conf("")); err != nil {
+		if !strings.Contains(err.Error(), "no form fields affected") {
+			return friendly(err)
+		}
+		// Nothing changed: save the form as it is.
+		buf.Reset()
+		buf.Write(src)
 	}
 	filled := out + ".form"
 	if err := os.WriteFile(filled, buf.Bytes(), 0o644); err != nil {

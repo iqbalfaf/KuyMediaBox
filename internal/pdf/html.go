@@ -287,8 +287,9 @@ func HTMLToPDF(ctx context.Context, rawURL string, o HTMLOptions, out, tmpDir st
 	if err := c.waitEvent(loadCtx, "Page.loadEventFired"); err != nil && ctx.Err() != nil {
 		return ctx.Err()
 	}
-	// Scroll through the page so lazy images load, then give late content a moment.
-	_ = c.call(ctx, s, "Runtime.evaluate", map[string]any{"expression": `(async()=>{for(let y=0;y<document.documentElement.scrollHeight;y+=innerHeight){scrollTo(0,y);await new Promise(r=>setTimeout(r,120))}scrollTo(0,0)})()`, "awaitPromise": true}, nil)
+	// Scroll through the page so lazy images load, then give late content a moment. Capped:
+	// an endless feed keeps growing while it is scrolled.
+	_ = c.call(ctx, s, "Runtime.evaluate", map[string]any{"expression": `(async()=>{const t=Date.now();for(let y=0;y<document.documentElement.scrollHeight&&y<30000&&Date.now()-t<15000;y+=innerHeight){scrollTo(0,y);await new Promise(r=>setTimeout(r,120))}scrollTo(0,0)})()`, "awaitPromise": true}, nil)
 	time.Sleep(800 * time.Millisecond)
 
 	size, ok := paper[o.PageSize]

@@ -4,7 +4,7 @@ import * as App from '../../wailsjs/go/main/App'
 import * as RT from '../../wailsjs/runtime/runtime'
 import type {
   AfterQueue, AudioOptions, AudioTags, Capabilities, CertInfo, Collection, CompareResult, DocInfo, DownloadOptions, EditItem, Entry, FileItem,
-  HistoryEntry, ImageOptions, JobRef, Link, OcrLanguage, OpenRequest, PageRef, PdfEnv, PdfJob, PdfOptions, PdfRect, Settings, TaskInfo,
+  HistoryEntry, ImageOptions, JobRef, Link, OcrLanguage, OpenRequest, PageRef, PdfEnv, PdfJob, PdfOptions, PdfRect, RenameItem, RenameJob, RenameOptions, RenamePlan, RenameResult, Settings, TaskInfo,
   CollageJob, ModelStatus, PdfBookmark, PdfDetails, PdfFormField, PdfMeta, PendingSummary, SubscriptionInfo, SheetOptions, SlideOptions, SubtitleJob, ToolStatus, UpdateInfo, VideoOptions,
 } from './types'
 
@@ -111,6 +111,10 @@ export const api = {
   pdfCompare: (a: string, b: string): Promise<CompareResult> => call.PdfCompare(a, b),
   pdfOcrLanguages: (): Promise<OcrLanguage[]> => call.PdfOcrLanguages(),
   pdfEnvironment: (): Promise<PdfEnv> => call.PdfEnvironment(),
+
+  renamePreview: (items: RenameItem[], o: RenameOptions): Promise<RenamePlan[]> => call.RenamePreview(items, o),
+  renameApply: (jobs: RenameJob[], copyDir: string): Promise<RenameResult[]> => call.RenameApply(jobs, copyDir),
+  renameUndo: (done: RenameResult[]): Promise<RenameResult[]> => call.RenameUndo(done),
   pdfScan: (): Promise<FileItem | null> => call.PdfScan(),
   pdfSaveCapture: (dataUrl: string): Promise<FileItem | null> => call.PdfSaveCapture(dataUrl),
   startPdf: (tool: string, items: PdfJob[], o: PdfOptions, secret = ''): Promise<JobRef[]> => call.StartPdf(tool, items, o, secret),

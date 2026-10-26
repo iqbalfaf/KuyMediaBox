@@ -262,6 +262,18 @@ export function RemoveSubscription(arg1) {
   return window['go']['main']['App']['RemoveSubscription'](arg1);
 }
 
+export function RenameApply(arg1, arg2) {
+  return window['go']['main']['App']['RenameApply'](arg1, arg2);
+}
+
+export function RenamePreview(arg1, arg2) {
+  return window['go']['main']['App']['RenamePreview'](arg1, arg2);
+}
+
+export function RenameUndo(arg1) {
+  return window['go']['main']['App']['RenameUndo'](arg1);
+}
+
 export function ResetToolPath(arg1) {
   return window['go']['main']['App']['ResetToolPath'](arg1);
 }

@@ -57,6 +57,7 @@ func Redact(ctx context.Context, in Input, o RedactOptions, out string, prog Pro
 		}
 	}
 	sort.Ints(pages)
+	widgets := map[int]bool{}
 	for i, p := range pages {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -73,12 +74,102 @@ func Redact(ctx context.Context, in Input, o RedactOptions, out string, prog Pro
 			r := image.Rect(int(b.X*W), int(b.Y*H), int((b.X+b.W)*W+0.999), int((b.Y+b.H)*H+0.999))
 			draw.Draw(rgba, r.Intersect(rgba.Bounds()), &image.Uniform{C: fill}, image.Point{}, draw.Src)
 		}
+		for nr := range annotRefs(pc, p) {
+			widgets[nr] = true
+		}
 		if err := replaceWithImage(pc, p, rgba); err != nil {
 			return err
 		}
 		prog(float64(i+1) / float64(len(pages)) * 0.9)
 	}
+	dropHidden(pc, widgets)
 	return writeCtx(pc, out)
+}
+
+// annotRefs returns the object numbers of a page's annotations (form widgets among them).
+func annotRefs(ctx *model.Context, pageNr int) map[int]bool {
+	out := map[int]bool{}
+	d, _, _, err := ctx.PageDict(pageNr, false)
+	if err != nil || d == nil {
+		return out
+	}
+	o, ok := d.Find("Annots")
+	if !ok {
+		return out
+	}
+	arr, err := ctx.DereferenceArray(o)
+	if err != nil {
+		return out
+	}
+	for _, a := range arr {
+		if ir, ok := a.(types.IndirectRef); ok {
+			out[ir.ObjectNumber.Value()] = true
+		}
+	}
+	return out
+}
+
+// dropHidden removes what could still reveal redacted content outside the pages: the
+// form fields whose widgets were on redacted pages (their values stay in the form
+// otherwise) and the structure tree of tagged PDFs (alternate texts of the old content).
+func dropHidden(ctx *model.Context, widgets map[int]bool) {
+	root, err := ctx.Catalog()
+	if err != nil || root == nil {
+		return
+	}
+	root.Delete("StructTreeRoot")
+	root.Delete("MarkInfo")
+	if len(widgets) == 0 {
+		return
+	}
+	o, ok := root.Find("AcroForm")
+	if !ok {
+		return
+	}
+	af, err := ctx.DereferenceDict(o)
+	if err != nil || af == nil {
+		return
+	}
+	fo, ok := af.Find("Fields")
+	if !ok {
+		return
+	}
+	fields, err := ctx.DereferenceArray(fo)
+	if err != nil {
+		return
+	}
+	kept := pruneFields(ctx, fields, widgets, 0)
+	if len(kept) == 0 {
+		root.Delete("AcroForm")
+		return
+	}
+	af.Update("Fields", kept)
+}
+
+// pruneFields returns the fields that keep a widget outside the redacted pages.
+func pruneFields(ctx *model.Context, arr types.Array, widgets map[int]bool, depth int) types.Array {
+	out := types.Array{}
+	for _, f := range arr {
+		if ir, ok := f.(types.IndirectRef); ok && widgets[ir.ObjectNumber.Value()] {
+			continue // the field is its own widget
+		}
+		d, err := ctx.DereferenceDict(f)
+		if err != nil || d == nil || depth > 32 {
+			out = append(out, f)
+			continue
+		}
+		if ko, ok := d.Find("Kids"); ok {
+			if kids, err := ctx.DereferenceArray(ko); err == nil && len(kids) > 0 {
+				left := pruneFields(ctx, kids, widgets, depth+1)
+				if len(left) == 0 {
+					continue
+				}
+				d.Update("Kids", left)
+			}
+		}
+		out = append(out, f)
+	}
+	return out
 }
 
 // replaceWithImage turns page pageNr into a single full-page image (rotation baked in).

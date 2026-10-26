@@ -5,7 +5,7 @@ import (
 	"errors"
 	"image"
 	_ "image/jpeg" // image config for watermark images
-	_ "image/png"
+	"image/png"
 	"math"
 	"os"
 	"strconv"
@@ -88,11 +88,23 @@ func Watermark(in Input, o WatermarkOptions, out string) error {
 		if img, err = os.ReadFile(o.Image); err != nil {
 			return errors.New(i18n.L("gambar watermark tidak bisa dibuka", "the watermark image can't be opened"))
 		}
-		cfg, _, err := image.DecodeConfig(bytes.NewReader(img))
-		if err != nil {
+		cfg, format, err := image.DecodeConfig(bytes.NewReader(img))
+		if err != nil || cfg.Width == 0 || cfg.Height == 0 {
 			return errors.New(i18n.L("gambar watermark harus PNG atau JPG", "the watermark image must be PNG or JPG"))
 		}
 		iw, ih = cfg.Width, cfg.Height
+		if format != "png" && format != "jpeg" {
+			// WEBP, HEIC, …: the PDF writer takes PNG and JPEG only.
+			m, _, err := image.Decode(bytes.NewReader(img))
+			if err != nil {
+				return errors.New(i18n.L("gambar watermark harus PNG atau JPG", "the watermark image must be PNG or JPG"))
+			}
+			var buf bytes.Buffer
+			if err := png.Encode(&buf, m); err != nil {
+				return err
+			}
+			img = buf.Bytes()
+		}
 	} else if strings.TrimSpace(o.Text) == "" {
 		return errors.New(i18n.L("isi teks watermark", "enter the watermark text"))
 	}

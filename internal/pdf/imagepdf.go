@@ -10,6 +10,7 @@ import (
 	"image/jpeg"
 	"io"
 	"os"
+	"strings"
 
 	"kuymediabox/internal/i18n"
 	"kuymediabox/internal/imageconv"
@@ -24,12 +25,18 @@ type ImagePage struct {
 
 // WriteImagePDF writes pages that each show one image (JPEG compressed).
 func WriteImagePDF(path string, pages []ImagePage, quality int) error {
+	return writeImagePDFFile(path, len(pages), func(i int) (ImagePage, error) { return pages[i], nil }, quality)
+}
+
+// writeImagePDFFile writes n pages; page(i) is called once per page, in order, so each
+// image can be decoded just before it is written and dropped after.
+func writeImagePDFFile(path string, n int, page func(i int) (ImagePage, error), quality int) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	w := bufio.NewWriterSize(f, 1<<20)
-	err = writeImagePDF(w, pages, quality)
+	err = writeImagePDF(w, n, page, quality)
 	if err == nil {
 		err = w.Flush()
 	}
@@ -53,13 +60,13 @@ func (c *countWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
-func writeImagePDF(out io.Writer, pages []ImagePage, quality int) error {
+func writeImagePDF(out io.Writer, count int, page func(i int) (ImagePage, error), quality int) error {
 	if quality < 1 || quality > 100 {
 		quality = 90
 	}
 	w := &countWriter{w: out}
 	// Objects: 1 catalog, 2 pages, then per page: page, content, image.
-	n := 2 + len(pages)*3
+	n := 2 + count*3
 	offsets := make([]int64, n+1)
 	obj := func(id int, body string) {
 		offsets[id] = w.n
@@ -67,13 +74,17 @@ func writeImagePDF(out io.Writer, pages []ImagePage, quality int) error {
 	}
 	fmt.Fprint(w, "%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
 	obj(1, "<< /Type /Catalog /Pages 2 0 R >>")
-	kids := ""
-	for i := range pages {
-		kids += fmt.Sprintf("%d 0 R ", 3+i*3)
+	var kids strings.Builder
+	for i := range count {
+		fmt.Fprintf(&kids, "%d 0 R ", 3+i*3)
 	}
-	obj(2, fmt.Sprintf("<< /Type /Pages /Kids [%s] /Count %d >>", kids, len(pages)))
+	obj(2, fmt.Sprintf("<< /Type /Pages /Kids [%s] /Count %d >>", kids.String(), count))
 	var jpg bytes.Buffer
-	for i, p := range pages {
+	for i := range count {
+		p, err := page(i)
+		if err != nil {
+			return err
+		}
 		pid, cid, iid := 3+i*3, 4+i*3, 5+i*3
 		res := "<< >>"
 		content := ""
@@ -164,25 +175,24 @@ func ImagesToPDF(ctx context.Context, files []string, out string, o ImagesOption
 	if len(files) == 0 {
 		return errors.New(i18n.L("tidak ada gambar", "no images"))
 	}
-	pages := make([]ImagePage, 0, len(files))
-	for i, f := range files {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		img, err := imageconv.Decode(ctx, f, ffmpeg)
-		if err != nil {
-			return fmt.Errorf("%s: %w", baseName(f), err)
-		}
-		b := img.Bounds()
-		pw, ph, box := LayoutImage(o, b.Dx(), b.Dy())
-		pages = append(pages, ImagePage{Img: img, PageW: pw, PageH: ph, Box: box})
-		prog(float64(i+1) / float64(len(files)) * 0.7)
-	}
 	q := o.Quality
 	if q == 0 {
 		q = 90
 	}
-	err := WriteImagePDF(out, pages, q)
+	// One picture in memory at a time: a hundred phone photos would not fit at once.
+	err := writeImagePDFFile(out, len(files), func(i int) (ImagePage, error) {
+		if err := ctx.Err(); err != nil {
+			return ImagePage{}, err
+		}
+		img, err := imageconv.Decode(ctx, files[i], ffmpeg)
+		if err != nil {
+			return ImagePage{}, fmt.Errorf("%s: %w", baseName(files[i]), err)
+		}
+		b := img.Bounds()
+		pw, ph, box := LayoutImage(o, b.Dx(), b.Dy())
+		prog(float64(i+1) / float64(len(files)) * 0.95)
+		return ImagePage{Img: img, PageW: pw, PageH: ph, Box: box}, nil
+	}, q)
 	prog(1)
 	return err
 }

@@ -170,7 +170,6 @@ func OCR(ctx context.Context, in Input, o OCROptions, out, tmpDir string, prog P
 		return 0, err
 	}
 	defer worker.close()
-	const dpi = 300
 	items := map[int][]Item{}
 	done := 0
 	img := filepath.Join(tmpDir, "ocr-"+randomHex(6)+".png")
@@ -184,6 +183,11 @@ func OCR(ctx context.Context, in Input, o OCROptions, out, tmpDir string, prog P
 				prog(float64(i+1) / float64(len(pages)) * 0.9)
 				continue
 			}
+		}
+		// 300 DPI, lower for big pages: Windows OCR refuses images over 10000 pixels.
+		dpi := 300
+		if w, h, err := doc.Size(p - 1); err == nil && max(w, h) > 0 {
+			dpi = max(72, min(dpi, int(9600*72/max(w, h))))
 		}
 		pic, err := doc.RenderDPI(p-1, dpi)
 		if err != nil {
@@ -205,7 +209,7 @@ func OCR(ctx context.Context, in Input, o OCROptions, out, tmpDir string, prog P
 			}
 			return 0, fmt.Errorf(i18n.L("halaman %d: %w", "page %d: %w"), p, err)
 		}
-		s := 72.0 / dpi
+		s := 72.0 / float64(dpi)
 		for _, line := range res.Lines {
 			for _, w := range line.W {
 				if len(w) < 5 {

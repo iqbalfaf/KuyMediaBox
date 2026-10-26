@@ -114,13 +114,15 @@ export function initials(s: string): string {
 /** Parses "1-20", "1–20", "3,5,7-9" into a set of 1-based positions. */
 export function parseRange(text: string, max: number): Set<number> | null {
   const out = new Set<number>()
-  const parts = text.replace(/[–—]/g, '-').split(/[,;\s]+/).filter(Boolean)
+  // Same rules as ParsePages in Go: "8-" runs to the last page, "-3" from the first, and
+  // "5 - 7" is one range.
+  const parts = text.replace(/[–—]/g, '-').replace(/\s*-\s*/g, '-').split(/[,;\s]+/).filter(Boolean)
   if (parts.length === 0) return null
   for (const p of parts) {
-    const m = p.match(/^(\d+)(?:-(\d+))?$/)
-    if (!m) return null
-    let a = Number(m[1])
-    let b = m[2] ? Number(m[2]) : a
+    const m = p.match(/^(\d*)-(\d*)$/) ?? p.match(/^(\d+)$/)
+    if (!m || m[0] === '-') return null
+    let a = m[1] ? Number(m[1]) : 1
+    let b = m.length > 2 ? (m[2] ? Number(m[2]) : max) : a
     if (a > b) [a, b] = [b, a]
     for (let i = Math.max(1, a); i <= Math.min(max, b); i++) out.add(i)
   }

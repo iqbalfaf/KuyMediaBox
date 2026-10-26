@@ -8,6 +8,7 @@ import {history} from '../models';
 import {config} from '../models';
 import {tools} from '../models';
 import {queue} from '../models';
+import {rename} from '../models';
 import {imageconv} from '../models';
 import {mediaconv} from '../models';
 
@@ -140,6 +141,12 @@ export function RecheckTools():Promise<Array<tools.Status>>;
 export function RemoveHistory(arg1:Array<string>):Promise<void>;
 
 export function RemoveSubscription(arg1:string):Promise<void>;
+
+export function RenameApply(arg1:Array<rename.Job>,arg2:string):Promise<Array<rename.Result>>;
+
+export function RenamePreview(arg1:Array<main.RenameItem>,arg2:main.RenameRequest):Promise<Array<main.RenamePlan>>;
+
+export function RenameUndo(arg1:Array<rename.Result>):Promise<Array<rename.Result>>;
 
 export function ResetToolPath(arg1:string):Promise<void>;
 

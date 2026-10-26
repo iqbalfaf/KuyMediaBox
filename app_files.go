@@ -46,6 +46,8 @@ func acceptExt(kind, ext string) bool {
 		return imageconv.InputExts[ext]
 	case kindWord, kindExcel, kindPPT:
 		return pdf.OfficeExts[ext] == officeFamily[kind]
+	case kindAny:
+		return true
 	case kindHTML:
 		return ext == ".html" || ext == ".htm" || ext == ".mhtml" || ext == ".svg"
 	case queue.KindImage:
@@ -131,6 +133,9 @@ func collect(kind string, paths []string) []string {
 			if strings.HasPrefix(name, ".") || strings.Contains(name, ".kmb-part.") {
 				return nil
 			}
+			if kind == kindAny && (strings.EqualFold(name, "desktop.ini") || strings.EqualFold(name, "thumbs.db")) {
+				return nil
+			}
 			if acceptExt(kind, filepath.Ext(name)) {
 				add(path)
 			}
@@ -180,6 +185,15 @@ func (a *App) describe(kind, path, ffprobe string) FileItem {
 	it := FileItem{ID: nextItemID(), Path: path, Name: filepath.Base(path), Ext: strings.TrimPrefix(strings.ToLower(filepath.Ext(path)), ".")}
 	if st, err := os.Stat(path); err == nil {
 		it.Size = st.Size()
+	}
+	if kind == kindAny {
+		// Any file can be renamed; PDFs say whether they are locked (for reading their text).
+		if it.Ext == "pdf" {
+			if info, err := pdf.Inspect(context.Background(), path); err == nil {
+				it.Pages, it.Encrypted, it.Locked = info.Pages, info.Encrypted, info.Locked
+			}
+		}
+		return it
 	}
 	switch kind {
 	case kindPDF:
@@ -260,6 +274,9 @@ var dialogFilters = map[string]wruntime.FileFilter{
 // PickFiles opens a multi-file dialog for a converter page.
 func (a *App) PickFiles(kind string) ([]FileItem, error) {
 	filter, ok := dialogFilters[kind]
+	if kind == kindAny {
+		filter, ok = wruntime.FileFilter{}, true
+	}
 	if !ok {
 		return nil, errors.New(i18n.L("jenis tidak dikenal", "unknown kind"))
 	}
@@ -269,9 +286,13 @@ func (a *App) PickFiles(kind string) ([]FileItem, error) {
 	case queue.KindAudio, queue.KindSubtitle:
 		filter.DisplayName = i18n.L("Video & audio", "Video & audio")
 	}
+	filters := []wruntime.FileFilter{{DisplayName: i18n.L("Semua file", "All files"), Pattern: "*.*"}}
+	if filter.Pattern != "" {
+		filters = append([]wruntime.FileFilter{filter}, filters...)
+	}
 	paths, err := wruntime.OpenMultipleFilesDialog(a.ctx, wruntime.OpenDialogOptions{
 		Title:   i18n.L("Pilih file", "Choose files"),
-		Filters: []wruntime.FileFilter{filter, {DisplayName: i18n.L("Semua file", "All files"), Pattern: "*.*"}},
+		Filters: filters,
 	})
 	if err != nil || len(paths) == 0 {
 		return []FileItem{}, err

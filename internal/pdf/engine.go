@@ -340,9 +340,10 @@ func (d *Doc) PageText(i int) (string, error) {
 	return r.Text, nil
 }
 
-// SaveCopy writes the document as PDFium sees it (used to rebuild damaged files).
+// SaveCopy writes the document as PDFium sees it (used to rebuild damaged files), without
+// the source's password, like every other result.
 func (d *Doc) SaveCopy(w io.Writer) error {
-	_, err := d.inst.FPDF_SaveAsCopy(&requests.FPDF_SaveAsCopy{Document: d.ref, FileWriter: w})
+	_, err := d.inst.FPDF_SaveAsCopy(&requests.FPDF_SaveAsCopy{Document: d.ref, FileWriter: w, Flags: requests.SaveFlagRemoveSecurity})
 	return engineErr(err)
 }
 

@@ -1,7 +1,7 @@
 import { L } from './i18n.svelte'
 
 /** How a tool's workspace looks. */
-export type ToolPattern = 'batch' | 'combine' | 'pages' | 'editor' | 'compare' | 'web' | 'meta' | 'form'
+export type ToolPattern = 'batch' | 'combine' | 'pages' | 'editor' | 'compare' | 'web' | 'meta' | 'form' | 'link'
 
 /** File filter sent to the backend (see app_pdf.go). */
 export type ToolInput = 'pdf' | 'pdfimage' | 'word' | 'excel' | 'ppt' | 'html'
@@ -52,6 +52,8 @@ export const pdfTools: PdfTool[] = [
   t('organize', 'organize', 'grid', 'pages', 'pdf', PDF, () => L('Susun halaman', 'Organize PDF'), () => L('Geser, putar, hapus, gandakan halaman, atau tambah halaman kosong.', 'Drag, rotate, delete or duplicate pages and add blank ones.')),
   t('scan', 'organize', 'scan', 'combine', 'pdfimage', IMG, () => L('Scan ke PDF', 'Scan to PDF'), () => L('Ambil dari scanner atau kamera, lalu jadikan PDF.', 'Capture from a scanner or camera and save as PDF.')),
 
+  // Opens the bulk rename page in its "from the document" mode.
+  t('rename', 'organize', 'tag', 'link', 'pdf', ['PDF', 'DOCX', 'DOC', 'ODT', 'RTF'], () => L('Ganti nama dari isi', 'Rename from content'), () => L('Beri nama file PDF/Word sesuai isinya, mis. nama siswa di rapor.', 'Name PDF/Word files after their content, e.g. the student name on report cards.')),
   t('nup', 'organize', 'grid', 'batch', 'pdf', PDF, () => L('N-up (beberapa per lembar)', 'N-up (several per sheet)'), () => L('Cetak 2, 4, atau lebih halaman di satu lembar kertas.', 'Print 2, 4 or more pages on one sheet of paper.')),
   t('booklet', 'organize', 'layers', 'batch', 'pdf', PDF, () => L('Buklet', 'Booklet'), () => L('Susun halaman untuk dicetak bolak-balik lalu dilipat jadi buku kecil.', 'Arrange pages to print double-sided and fold into a booklet.')),
   t('compress', 'optimize', 'shrink', 'batch', 'pdf', PDF, () => L('Kompres PDF', 'Compress PDF'), () => L('Perkecil ukuran file dengan tiga tingkat kompresi.', 'Make files smaller with three compression levels.')),

@@ -12,6 +12,8 @@
   import FormTool from './pdf/FormTool.svelte'
   import { categories, pdfTools, toolById } from '../lib/pdfTools'
   import { initPdf, pdfNav } from '../lib/stores/pdf.svelte'
+  import { nav } from '../lib/stores/app.svelte'
+  import { renameOpts } from '../lib/stores/rename.svelte'
 
   onMount(() => {
     initPdf()
@@ -26,6 +28,11 @@
   })
 
   function open(id: string) {
+    if (toolById(id)?.pattern === 'link') {
+      renameOpts.mode = 'content'
+      nav.page = 'rename'
+      return
+    }
     pdfNav.tool = id
   }
 </script>

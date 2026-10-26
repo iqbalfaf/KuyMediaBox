@@ -311,7 +311,8 @@ func Organize(ctx context.Context, sources []Input, pages []PageRef, out, tmpDir
 		if p.Src >= 0 {
 			continue
 		}
-		tmp := filepath.Join(tmpDir, fmt.Sprintf("blank-%d.pdf", i))
+		// Random name: two organise jobs may run at once.
+		tmp := filepath.Join(tmpDir, fmt.Sprintf("blank-%s-%d.pdf", randomHex(6), i))
 		if err := blankPDF(tmp, p.W, p.H); err != nil {
 			return err
 		}

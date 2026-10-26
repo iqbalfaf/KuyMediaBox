@@ -1053,6 +1053,86 @@ export namespace main {
 	        this.job = source["job"];
 	    }
 	}
+	export class RenameItem {
+	    id: string;
+	    path: string;
+	    password: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RenameItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.path = source["path"];
+	        this.password = source["password"];
+	    }
+	}
+	export class RenamePlan {
+	    id: string;
+	    name: string;
+	    ext: string;
+	    error: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RenamePlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.ext = source["ext"];
+	        this.error = source["error"];
+	    }
+	}
+	export class RenameRequest {
+	    mode: string;
+	    labels: string;
+	    template: string;
+	    pattern: string;
+	    start: number;
+	    step: number;
+	    digits: number;
+	    find: string;
+	    with: string;
+	    regex: boolean;
+	    matchCase: boolean;
+	    prefix: string;
+	    suffix: string;
+	    cutStart: number;
+	    cutEnd: number;
+	    case: string;
+	    tidy: boolean;
+	    extLower: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new RenameRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mode = source["mode"];
+	        this.labels = source["labels"];
+	        this.template = source["template"];
+	        this.pattern = source["pattern"];
+	        this.start = source["start"];
+	        this.step = source["step"];
+	        this.digits = source["digits"];
+	        this.find = source["find"];
+	        this.with = source["with"];
+	        this.regex = source["regex"];
+	        this.matchCase = source["matchCase"];
+	        this.prefix = source["prefix"];
+	        this.suffix = source["suffix"];
+	        this.cutStart = source["cutStart"];
+	        this.cutEnd = source["cutEnd"];
+	        this.case = source["case"];
+	        this.tidy = source["tidy"];
+	        this.extLower = source["extLower"];
+	    }
+	}
 	export class SheetOptions {
 	    cols: number;
 	    rows: number;
@@ -2187,6 +2267,51 @@ export namespace queue {
 	        this.started = source["started"];
 	        this.finished = source["finished"];
 	        this.seq = source["seq"];
+	    }
+	}
+
+}
+
+export namespace rename {
+	
+	export class Job {
+	    id: string;
+	    path: string;
+	    name: string;
+	    ext: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Job(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.path = source["path"];
+	        this.name = source["name"];
+	        this.ext = source["ext"];
+	    }
+	}
+	export class Result {
+	    id: string;
+	    from: string;
+	    to: string;
+	    copy: boolean;
+	    skipped: boolean;
+	    error: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Result(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.from = source["from"];
+	        this.to = source["to"];
+	        this.copy = source["copy"];
+	        this.skipped = source["skipped"];
+	        this.error = source["error"];
 	    }
 	}
 

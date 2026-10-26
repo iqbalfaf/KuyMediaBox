@@ -94,6 +94,9 @@ func recompressImage(xt *model.XRefTable, nr int, lv compressLevel, gray bool) {
 	if _, ok := sd.Find("Mask"); ok {
 		return // colour-key masks break with lossy compression
 	}
+	if _, ok := sd.Find("Decode"); ok {
+		return // the samples are mapped (e.g. inverted) by Decode; decoding ignores it
+	}
 	if bpc := sd.IntEntry("BitsPerComponent"); bpc == nil || *bpc != 8 {
 		return
 	}
@@ -134,7 +137,6 @@ func recompressImage(xt *model.XRefTable, nr int, lv compressLevel, gray bool) {
 	sd.FilterPipeline = []types.PDFFilter{{Name: "DCTDecode"}}
 	sd.Update("Filter", types.Name("DCTDecode"))
 	sd.Delete("DecodeParms")
-	sd.Delete("Decode")
 	sd.Update("Width", types.Integer(b.Dx()))
 	sd.Update("Height", types.Integer(b.Dy()))
 	sd.Update("BitsPerComponent", types.Integer(8))

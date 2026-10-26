@@ -28,6 +28,7 @@ const (
 	kindExcel    = "excel"
 	kindPPT      = "ppt"
 	kindHTML     = "html"
+	kindAny      = "any" // bulk rename: every file
 )
 
 var officeFamily = map[string]string{kindWord: pdf.FamilyWord, kindExcel: pdf.FamilyExcel, kindPPT: pdf.FamilyPPT}

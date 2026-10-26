@@ -11,6 +11,7 @@
   import DownloadPage from './pages/DownloadPage.svelte'
   import SettingsPage from './pages/SettingsPage.svelte'
   import PdfPage from './pages/PdfPage.svelte'
+  import RenamePage from './pages/RenamePage.svelte'
   import SubtitlePage from './pages/SubtitlePage.svelte'
   import WorkflowPage from './pages/WorkflowPage.svelte'
   import { flowDrop, initFlows } from './lib/stores/flows.svelte'
@@ -27,6 +28,7 @@
   import { openRequest } from './lib/stores/open.svelte'
   import type { OpenRequest } from './lib/types'
   import { convFor, pdfDrop, pdfNav } from './lib/stores/pdf.svelte'
+  import { renameConv } from './lib/stores/rename.svelte'
   import { toolById } from './lib/pdfTools'
   import { api, runtime } from './lib/api'
   import { initApp, nav, settings, toast } from './lib/stores/app.svelte'
@@ -104,6 +106,9 @@
           break
         case 'flows':
           flowDrop.fn?.(paths)
+          break
+        case 'rename':
+          renameConv.addPaths(paths)
           break
         case 'pdf':
           if (pdfDrop.fn) pdfDrop.fn(paths)
@@ -195,6 +200,8 @@
       <DownloadPage />
     {:else if nav.page === 'pdf'}
       <PdfPage />
+    {:else if nav.page === 'rename'}
+      <RenamePage />
     {:else if nav.page === 'history'}
       <HistoryPage />
     {:else}
